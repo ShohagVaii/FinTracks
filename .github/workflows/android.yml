@@ -31,7 +31,14 @@ jobs:
           gradle-version: 8.10.2
 
       - name: Build debug APK
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
+        run: |
+          set +e
+          gradle :app:assembleDebug --no-daemon --stacktrace > build.log 2>&1
+          rc=$?
+          # Surface the actual compiler/Gradle errors as annotations (readable via the API).
+          grep -E "^e: |What went wrong|Could not|FAILURE" -A4 build.log | head -c 6000 | sed ':a;N;$!ba;s/\n/%0A/g' > errors.txt
+          echo "::error::$(cat errors.txt)"
+          exit $rc
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
