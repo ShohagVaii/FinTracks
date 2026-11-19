@@ -2,10 +2,9 @@ package com.fintracks.app.data
 
 import android.content.Context
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.serializer
 
 /**
  * Single entry point for all data. Every request carries the user's access token,
@@ -64,93 +63,26 @@ class Repository(context: Context) {
         }
     }
 
-    private suspend inline fun <reified T> select(path: String): List<T> =
-        json.decodeFromString(ListSerializer(serializer<T>()), authed("GET", path))
+    // ---------- Generic table access (RLS filters rows by user) ----------
 
-    // ---------- Reads ----------
+    suspend fun list(table: String, query: String = "select=*"): List<JsonObject> =
+        json.decodeFromString(ListSerializer(JsonObject.serializer()), authed("GET", "/rest/v1/$table?$query"))
 
-    suspend fun fetchProfile(): ProfileRow? =
-        select<ProfileRow>("/rest/v1/profiles?select=*&id=eq.${uid()}").firstOrNull()
-
-    suspend fun fetchTransactions(): List<TxRow> =
-        select("/rest/v1/transactions?select=*&order=tx_date.desc,created_at.desc")
-
-    suspend fun fetchShops(): List<ShopRow> =
-        select("/rest/v1/credit_shops?select=*&order=created_at.desc")
-
-    suspend fun fetchEntries(): List<EntryRow> =
-        select("/rest/v1/credit_entries?select=*&order=purchase_date.desc")
-
-    suspend fun fetchPayments(): List<PaymentRow> =
-        select("/rest/v1/credit_payments?select=*&order=paid_on.desc")
-
-    // ---------- Writes ----------
-
-    suspend fun insertTransaction(
-        type: String, amount: Double, category: String, note: String, date: String, mode: String
-    ) {
-        val body = buildJsonObject {
-            put("user_id", uid())
-            put("type", type)
-            put("amount", amount)
-            put("category", category)
-            put("note", note)
-            put("tx_date", date)
-            put("payment_mode", mode)
-        }
-        authed("POST", "/rest/v1/transactions", body, "return=minimal")
+    suspend fun insert(table: String, body: JsonObject) {
+        val withUser = JsonObject(body + ("user_id" to JsonPrimitive(uid())))
+        authed("POST", "/rest/v1/$table", withUser, "return=minimal")
     }
 
-    suspend fun insertShop(name: String, phone: String, note: String) {
-        val body = buildJsonObject {
-            put("user_id", uid())
-            put("name", name)
-            put("phone", phone)
-            put("note", note)
-        }
-        authed("POST", "/rest/v1/credit_shops", body, "return=minimal")
-    }
-
-    suspend fun insertEntry(
-        shopId: String, item: String, quantity: Double, unitPrice: Double,
-        purchaseDate: String, dueDate: String?, note: String
-    ) {
-        val body = buildJsonObject {
-            put("user_id", uid())
-            put("shop_id", shopId)
-            put("item_name", item)
-            put("quantity", quantity)
-            put("unit_price", unitPrice)
-            put("purchase_date", purchaseDate)
-            put("due_date", dueDate)
-            put("note", note)
-        }
-        authed("POST", "/rest/v1/credit_entries", body, "return=minimal")
-    }
-
-    suspend fun insertPayment(shopId: String, amount: Double, paidOn: String, note: String) {
-        val body = buildJsonObject {
-            put("user_id", uid())
-            put("shop_id", shopId)
-            put("amount", amount)
-            put("paid_on", paidOn)
-            put("note", note)
-        }
-        authed("POST", "/rest/v1/credit_payments", body, "return=minimal")
-    }
-
-    suspend fun updateProfile(name: String?, theme: String?, themeColor: String?, privacy: Boolean?) {
-        val body = buildJsonObject {
-            name?.let { put("name", it) }
-            theme?.let { put("theme", it) }
-            themeColor?.let { put("theme_color", it) }
-            privacy?.let { put("is_privacy_mode", it) }
-        }
-        authed("PATCH", "/rest/v1/profiles?id=eq.${uid()}", body, "return=minimal")
+    suspend fun update(table: String, id: String, body: JsonObject) {
+        authed("PATCH", "/rest/v1/$table?id=eq.$id", body, "return=minimal")
     }
 
     suspend fun delete(table: String, id: String) {
         authed("DELETE", "/rest/v1/$table?id=eq.$id")
+    }
+
+    suspend fun updateProfile(fields: JsonObject) {
+        authed("PATCH", "/rest/v1/profiles?id=eq.${uid()}", fields, "return=minimal")
     }
 
     companion object {

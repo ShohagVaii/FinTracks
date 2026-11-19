@@ -3,20 +3,28 @@ package com.fintracks.app.ui
 import java.time.LocalDate
 import java.util.Locale
 
-/** Formats an amount in taka. In privacy mode the amount is masked. */
+/** Money in taka. Privacy mode masks the amount, like the web app. */
 fun taka(value: Double, privacy: Boolean = false): String {
     if (privacy) return "৳ ••••"
     val whole = value % 1.0 == 0.0
     return "৳ " + String.format(Locale.US, if (whole) "%,.0f" else "%,.2f", value)
 }
 
-/** Shows 2 not 2.0 for whole numbers. */
-fun num(value: Double): String =
-    if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+/** 2 instead of 2.0 for whole numbers. */
+fun fmtNum(value: Double): String = if (value % 1.0 == 0.0) value.toLong().toString() else String.format(Locale.US, "%.2f", value)
 
-fun isValidIsoDate(text: String): Boolean =
-    runCatching { LocalDate.parse(text.trim()) }.isSuccess
-
+fun isValidIsoDate(text: String): Boolean = runCatching { LocalDate.parse(text.trim()) }.isSuccess
 fun todayIso(): String = LocalDate.now().toString()
 
-fun currentMonthPrefix(): String = LocalDate.now().toString().take(7)
+// Category keys are the same Bengali names the web app uses, with the same icons.
+data class Cat(val name: String, val icon: String)
+val EXPENSE_CATS = listOf(Cat("খাদ্য", "🍔"), Cat("যাতায়াত", "🚗"), Cat("শপিং", "🛍️"), Cat("বিল", "📜"), Cat("অন্যান্য", "📦"))
+val INCOME_CATS = listOf(Cat("বেতন", "💰"), Cat("অন্যান্য", "📦"))
+val ALL_CATS = (EXPENSE_CATS + INCOME_CATS).distinctBy { it.name }
+fun catIcon(name: String): String = ALL_CATS.firstOrNull { it.name == name }?.icon ?: "📦"
+
+val PAYMENT_MODES = listOf("Cash", "Card", "Bkash", "Nagad", "Rocket", "Bank")
+val MOODS = listOf("😊", "😐", "😔", "😡", "🤑")
+
+/** Parses user input like "১২০০" or "1,200.50". Returns null when it is not a number. */
+fun parseAmount(text: String): Double? = text.replace(",", "").trim().toDoubleOrNull()

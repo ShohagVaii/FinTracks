@@ -3,21 +3,46 @@ package com.fintracks.app.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.fintracks.app.data.EntryRow
-import com.fintracks.app.data.PaymentRow
 import com.fintracks.app.data.PendingSmsStore
-import com.fintracks.app.data.ProfileRow
 import com.fintracks.app.data.Repository
-import com.fintracks.app.data.ShopRow
 import com.fintracks.app.data.SmsSuggestion
 import com.fintracks.app.data.SupabaseException
-import com.fintracks.app.data.TxRow
+import com.fintracks.app.data.row
+import com.fintracks.app.data.str
+import com.fintracks.app.data.num
+import com.fintracks.app.data.bool
+import com.fintracks.app.data.strList
+import com.fintracks.app.data.id
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 import java.io.IOException
+
+/** Every table the app reads, with its PostgREST query. Rows stay as JSON for generic CRUD. */
+val TABLES: List<Pair<String, String>> = listOf(
+    "transactions" to "select=*&order=tx_date.desc,created_at.desc",
+    "accounts" to "select=*&order=created_at.asc",
+    "budgets" to "select=*",
+    "goals" to "select=*",
+    "debts" to "select=*&order=settled.asc",
+    "loans" to "select=*",
+    "subscriptions" to "select=*",
+    "investments" to "select=*",
+    "credit_shops" to "select=*&order=created_at.asc",
+    "credit_entries" to "select=*&order=purchase_date.desc",
+    "credit_payments" to "select=*&order=paid_on.desc",
+    "bill_splits" to "select=*&order=split_date.desc",
+    "shopping_items" to "select=*",
+    "mess_members" to "select=*",
+    "mess_bazaars" to "select=*&order=bazaar_date.desc",
+    "mess_meals" to "select=*&order=meal_date.desc"
+)
 
 data class UiState(
     val checking: Boolean = true,
@@ -25,13 +50,17 @@ data class UiState(
     val busy: Boolean = false,
     val message: String? = null,
     val notice: String? = null,
-    val profile: ProfileRow? = null,
-    val transactions: List<TxRow> = emptyList(),
-    val shops: List<ShopRow> = emptyList(),
-    val entries: List<EntryRow> = emptyList(),
-    val payments: List<PaymentRow> = emptyList(),
+    val profile: JsonObject? = null,
+    val tables: Map<String, List<JsonObject>> = emptyMap(),
     val pendingSms: List<SmsSuggestion> = emptyList()
-)
+) {
+    fun rows(table: String): List<JsonObject> = tables[table].orEmpty()
+    val dark: Boolean get() = profile?.str("theme") != "light"
+    val accent: AccentColor get() = AccentColor.fromKey(profile?.str("theme_color"))
+    val privacy: Boolean get() = profile?.bool("is_privacy_mode") == true
+    val currency: String get() = profile?.str("currency").takeUnless { it.isNullOrEmpty() } ?: "BDT"
+    val name: String get() = profile?.str("name").orEmpty()
+}
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = Repository(app)
@@ -46,25 +75,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun loadAll() {
-        val profile = repo.fetchProfile()
-        val tx = repo.fetchTransactions()
-        val shops = repo.fetchShops()
-        val entries = repo.fetchEntries()
-        val payments = repo.fetchPayments()
+        val profile = repo.list("profiles", "select=*&id=eq.${repo.uid()}").firstOrNull()
+        val tables = coroutineScope {
+            TABLES.map { (t, q) -> async { t to repo.list(t, q) } }.awaitAll().toMap()
+        }
         _state.update {
             it.copy(
                 signedIn = true,
-                profile = profile ?: ProfileRow(id = repo.uid()),
-                transactions = tx,
-                shops = shops,
-                entries = entries,
-                payments = payments,
+                profile = profile,
+                tables = tables,
                 pendingSms = PendingSmsStore.load(getApplication())
             )
         }
     }
 
-    /** Shows busy state, converts errors into a readable message, and signs out on expired sessions. */
+    /** Shows busy state, converts errors into readable messages, and signs out on expired sessions. */
     private suspend fun runGuarded(block: suspend () -> Unit) {
         _state.update { it.copy(busy = true, message = null) }
         try {
@@ -75,7 +100,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _state.value = UiState(checking = false)
             } else {
                 val text = e.message.orEmpty()
-                val friendly = if (text.contains("Invalid login", ignoreCase = true)) "ইমেইল বা পাসওয়ার্ড ভুল" else text
+                val friendly = when {
+                    text.contains("Invalid login", ignoreCase = true) -> "ইমেইল বা পাসওয়ার্ড ভুল"
+                    text.contains("already registered", ignoreCase = true) -> "এই ইমেইল দিয়ে আগে অ্যাকাউন্ট খোলা হয়েছে"
+                    text.contains("Email not confirmed", ignoreCase = true) -> "ইমেইলে পাঠানো লিংকে ক্লিক করে অ্যাকাউন্ট কনফার্ম করুন"
+                    else -> text
+                }
                 _state.update { it.copy(message = friendly) }
             }
         } catch (e: IOException) {
@@ -96,7 +126,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun signUp(name: String, email: String, password: String) = act {
         val hasSession = repo.signUp(email, password, name)
         if (hasSession) loadAll()
-        else _state.update { it.copy(notice = "অ্যাকাউন্ট তৈরি হয়েছে। ইমেইল কনফার্ম করে লগইন করুন।") }
+        else _state.update { it.copy(notice = "অ্যাকাউন্ট তৈরি হয়েছে। ইমেইলের কনফার্মেশন লিংকে ক্লিক করে লগইন করুন।") }
     }
 
     fun signIn(email: String, password: String) = act {
@@ -114,57 +144,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = UiState(checking = false)
     }
 
-    // ---------- Transactions ----------
+    // ---------- Generic CRUD (RLS enforces ownership) ----------
 
-    fun addTransaction(type: String, amount: Double, category: String, note: String, date: String, mode: String) = act {
-        repo.insertTransaction(type, amount, category, note, date, mode)
+    /** Insert when id is null, otherwise update the row. */
+    fun save(table: String, body: JsonObject, id: String?) = act {
+        if (id == null) repo.insert(table, body) else repo.update(table, id, body)
         loadAll()
     }
 
-    fun deleteTransaction(id: String) = act {
-        repo.delete("transactions", id)
+    fun remove(table: String, id: String) = act {
+        repo.delete(table, id)
         loadAll()
     }
 
-    // ---------- Credit (বাকি) ----------
-
-    fun addShop(name: String, phone: String, note: String) = act {
-        repo.insertShop(name, phone, note)
+    fun saveProfile(body: JsonObject) = act {
+        repo.updateProfile(body)
         loadAll()
     }
 
-    fun deleteShop(id: String) = act {
-        repo.delete("credit_shops", id)
-        loadAll()
-    }
-
-    fun addEntry(
-        shopId: String, item: String, quantity: Double, unitPrice: Double,
-        purchaseDate: String, dueDate: String?, note: String
-    ) = act {
-        repo.insertEntry(shopId, item, quantity, unitPrice, purchaseDate, dueDate, note)
-        loadAll()
-    }
-
-    fun deleteEntry(id: String) = act {
-        repo.delete("credit_entries", id)
-        loadAll()
-    }
-
-    fun addPayment(shopId: String, amount: Double, paidOn: String, note: String) = act {
-        repo.insertPayment(shopId, amount, paidOn, note)
-        loadAll()
-    }
-
-    fun deletePayment(id: String) = act {
-        repo.delete("credit_payments", id)
-        loadAll()
-    }
-
-    // ---------- Profile / settings ----------
-
-    fun updateProfile(name: String? = null, theme: String? = null, themeColor: String? = null, privacy: Boolean? = null) = act {
-        repo.updateProfile(name, theme, themeColor, privacy)
+    /** Several writes in order, then one reload (used for things like shop + entry). */
+    fun batch(writes: List<Triple<String, JsonObject, String?>>) = act {
+        writes.forEach { (table, body, id) ->
+            if (id == null) repo.insert(table, body) else repo.update(table, id, body)
+        }
         loadAll()
     }
 
@@ -172,8 +174,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun acceptSms(s: SmsSuggestion) {
         dismissSms(s)
-        val mode = if (s.provider == "Cash") "Cash" else s.provider
-        addTransaction(s.type, s.amount, "Others", s.note, todayIso(), mode)
+        save(
+            "transactions",
+            row(
+                "type" to s.type,
+                "amount" to s.amount,
+                "category" to "অন্যান্য",
+                "note" to s.note,
+                "tx_date" to todayIso(),
+                "payment_mode" to s.provider,
+                "currency" to "BDT"
+            ),
+            null
+        )
     }
 
     fun dismissSms(s: SmsSuggestion) {

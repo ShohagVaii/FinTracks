@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinTracks · ইমেইল কনফার্মেশন</title>
+  <meta name="description" content="FinTracks / SritiSetu – আপনার স্মার্ট আর্থিক সহায়ক" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; font-family: 'Hind Siliguri', system-ui, sans-serif;
+      background: #020617; color: #fff; display: flex; align-items: center; justify-content: center; padding: 24px;
+      background-image: radial-gradient(circle at 20% 10%, rgba(14,165,233,.18), transparent 40%),
+                        radial-gradient(circle at 80% 90%, rgba(37,99,235,.15), transparent 40%);
+    }
+    .card {
+      width: 100%; max-width: 440px; padding: 36px 28px; text-align: center;
+      background: rgba(15,23,42,.6); border: 1px solid rgba(255,255,255,.08); border-radius: 32px;
+      backdrop-filter: blur(16px); box-shadow: 0 25px 60px rgba(0,0,0,.45);
+    }
+    .brand {
+      font-size: 28px; font-weight: 900; margin: 0;
+      background: linear-gradient(90deg, #38bdf8, #2563eb); -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .tag { font-size: 10px; letter-spacing: .4em; text-transform: uppercase; color: #64748b; margin: 4px 0 28px; font-weight: 700; }
+    .icon {
+      width: 84px; height: 84px; border-radius: 28px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;
+      font-size: 42px; background: rgba(16,185,129,.15); border: 1px solid rgba(16,185,129,.35);
+    }
+    .icon.error { background: rgba(244,63,94,.15); border-color: rgba(244,63,94,.35); }
+    h1 { font-size: 22px; margin: 0 0 10px; font-weight: 800; }
+    p { color: #94a3b8; line-height: 1.7; margin: 0 0 18px; font-size: 15px; }
+    .steps { text-align: left; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); border-radius: 20px; padding: 16px 18px; margin: 18px 0; }
+    .steps li { margin: 8px 0; color: #cbd5e1; font-size: 14px; }
+    .btn {
+      display: block; width: 100%; padding: 15px; border-radius: 18px; text-decoration: none; font-weight: 800; font-size: 15px;
+      background: linear-gradient(135deg, #0ea5e9, #2563eb); color: #fff; box-shadow: 0 10px 30px rgba(14,165,233,.35); margin-top: 10px;
+    }
+    .btn.ghost { background: transparent; border: 1px solid rgba(255,255,255,.12); box-shadow: none; color: #94a3b8; }
+    .hidden { display: none; }
+    footer { margin-top: 26px; font-size: 11px; letter-spacing: .15em; text-transform: uppercase; color: #475569; font-weight: 700; }
+    footer a { color: #38bdf8; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h2 class="brand">FinTracks</h2>
+    <div class="tag">Premium Finance</div>
+
+    <!-- Success state (default) -->
+    <section id="ok">
+      <div class="icon">✅</div>
+      <h1>ইমেইল কনফার্ম হয়েছে</h1>
+      <p>আপনার অ্যাকাউন্ট সক্রিয় হয়েছে। এখন FinTracks অ্যাপে ফিরে গিয়ে আপনার ইমেইল ও পাসওয়ার্ড দিয়ে লগইন করুন।</p>
+      <ol class="steps">
+        <li>১. এই ট্যাব বন্ধ করে ফোনে FinTracks অ্যাপ খুলুন।</li>
+        <li>২. ইমেইল ও পাসওয়ার্ড দিয়ে লগইন করুন।</li>
+        <li>৩. আপনার বাজেট, বাকি ও লেনদেন সবই এখানে পাবেন।</li>
+      </ol>
+    </section>
+
+    <!-- Error state (shown when the link is expired or invalid) -->
+    <section id="err" class="hidden">
+      <div class="icon error">⚠️</div>
+      <h1>লিংকটি কাজ করছে না</h1>
+      <p>লিংকের মেয়াদ শেষ হয়ে গেছে বা আগে ব্যবহার করা হয়েছে। অ্যাপে আবার সাইন-আপ বা লগইন করে নতুন কনফার্মেশন মেইল নিন।</p>
+    </section>
+
+    <a class="btn" href="https://github.com/ShohagVaii/FinTracks" target="_blank" rel="noopener">প্রজেক্ট দেখুন</a>
+    <a class="btn ghost" href="https://t.me/Shohag_vaii" target="_blank" rel="noopener">সহায়তা (Telegram)</a>
+
+    <footer>© 2026 SritiSetu · Crafted by <a href="https://www.facebook.com/its.Shohag.X10" target="_blank" rel="noopener">Shohag Vaii</a></footer>
+  </main>
+
+  <script>
+    // Supabase puts results in the URL hash, e.g. #error=access_denied&error_description=...
+    // A successful confirmation may carry access_token; we never store or display tokens.
+    (function () {
+      var hash = window.location.hash || '';
+      var params = new URLSearchParams(hash.replace(/^#/, ''));
+      if (params.get('error') || params.get('error_code')) {
+        document.getElementById('ok').classList.add('hidden');
+        document.getElementById('err').classList.remove('hidden');
+      }
+      // Remove any tokens from the address bar so they are not kept in history.
+      if (hash) history.replaceState(null, '', window.location.pathname);
+    })();
+  </script>
+</body>
+</html>
