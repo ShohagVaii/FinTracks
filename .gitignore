@@ -1,0 +1,26 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+local.properties
+*.jks
+*.keystore
+
+# Web (Vite)
+node_modules/
+dist/
+
+# Android / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/.idea/
+android/.kotlin/
+*.apk
+*.aab
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.log
