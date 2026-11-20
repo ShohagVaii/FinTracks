@@ -23,6 +23,13 @@ Schema: `supabase/migrations/`. Edge Functions: `ai-chat` (Gemini key kept as a 
 - **Calculator:** safe in-app evaluator (`+ − × ÷ % ( )`), opened from the transaction form. It does not use `eval`.
 - **Insights:** 30/60/90-day cash-flow forecast, unusual-spending alerts (more than 40% above the 3-month average), net worth, and a 30-day spending heatmap. These are local calculations.
 - **Tags:** comma-separated tags on transactions, searchable.
+- **বাকি খাতা:** দোকান → কেনা (একাধিক আইটেম, ± সমন্বয়, শেষ তারিখ) → পরিশোধের কিস্তি। পরিশোধ বাকির বেশি হলে আটকায় (অ্যাপ + ডাটাবেস দুই জায়গাতেই)। ধার/লোন থেকে আলাদা।
+- **বাজেট এনভেলপ:** "পরের মাসে নিয়ে যাও" চালু করলে অব্যবহৃত টাকা পরের মাসের সীমায় যোগ হয় (সর্বোচ্চ ১২ মাস)। ৮০%-এ হলুদ, সীমা ছাড়ালে লাল।
+- **লক্ষ্য:** জমা ও তোলা; লক্ষ্যের বেশি জমা বা জমার বেশি তোলা আটকায়। ২৫/৫০/৭৫/১০০% মাইলস্টোনে উদযাপন ও শেয়ার কার্ড (PNG)।
+- **আনডু:** মুছে ফেললে ৫ সেকেন্ড "ফেরত আনুন" সুযোগ থাকে।
+- **ভয়েস এন্ট্রি:** "🎙 বলুন" বাংলায় বললে পরিমাণ, ধরন ও ক্যাটাগরি ফর্মে বসে (পাঁচশো, দুই হাজার, দেড় লাখ ইত্যাদি)।
+- **রসিদ এন্ট্রি:** "📷 রসিদ" বা "🖼 ছবি" দিয়ে ছবি থেকে মোট, তারিখ, দোকানের নাম ফর্মে বসে (ML Kit, অফলাইন)। সেভ করার আগে যাচাই করতে হয়।
+- **ব্যাকআপ রিস্টোর:** Settings → "ব্যাকআপ থেকে ফিরিয়ে আনুন"। আগে পুরো ফাইল যাচাই হয়, পরে প্রিভিউ দেখিয়ে জিজ্ঞেস করে। বিদ্যমান ডেটা মোছে না।
 - **Backup:** JSON file of every user table, shared from Settings. The PIN and session are never included.
 - **Home-screen widget:** balance widget.
 - **Settings:** profile, dark/light theme, accent colour, currency, privacy mode, security, export, sign out.

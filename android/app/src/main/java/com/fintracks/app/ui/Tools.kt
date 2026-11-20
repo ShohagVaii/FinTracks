@@ -48,6 +48,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,43 +76,53 @@ object Web {
 
 fun fmtMoney(v: Double): String = "৳ " + String.format(Locale.US, "%,.0f", v)
 
+/** One tile in the Tools grid. */
+private data class ToolTile(val overlay: Overlay, val label: String, val icon: ImageVector, val color: Color)
+
 @Composable
 fun ToolsScreen(onOpen: (Overlay) -> Unit) {
+    // Each tool has its own colour, like the web app's tool grid.
     val tools = listOf(
-        Triple(Overlay.CHAT, "AI সহকারী", Icons.Default.Info),
-        Triple(Overlay.REPORTS, "রিপোর্ট", Icons.Default.Star),
-        Triple(Overlay.LOAN, "লোন", Icons.Default.CreditCard),
-        Triple(Overlay.ZAKAT, "যাকাত", Icons.Default.AccountBalance),
-        Triple(Overlay.DEBTS, "ধার ও পাওনা", Icons.Default.Work),
-        Triple(Overlay.INVESTMENTS, "সম্পদ", Icons.Default.Landscape),
-        Triple(Overlay.TAX, "ট্যাক্স", Icons.Default.Receipt),
-        Triple(Overlay.CURRENCY, "কনভার্টার", Icons.Default.Refresh),
-        Triple(Overlay.SUBSCRIPTIONS, "সাবস্ক্রিপশন", Icons.Default.Repeat),
-        Triple(Overlay.CREDIT, "বাকি খাতা", Icons.Default.Receipt),
-        Triple(Overlay.BUDGETS, "বাজেট", Icons.Default.Check),
-        Triple(Overlay.GOALS, "লক্ষ্য", Icons.Default.Star),
-        Triple(Overlay.ACCOUNTS, "অ্যাকাউন্ট", Icons.Default.Add)
+        ToolTile(Overlay.CHAT, "AI সহকারী", Icons.Default.Info, Color(0xFF818CF8)),
+        ToolTile(Overlay.REPORTS, "রিপোর্ট", Icons.Default.Star, Color(0xFF38BDF8)),
+        ToolTile(Overlay.LOAN, "লোন", Icons.Default.CreditCard, Color(0xFFF59E0B)),
+        ToolTile(Overlay.ZAKAT, "যাকাত", Icons.Default.AccountBalance, Color(0xFF10B981)),
+        ToolTile(Overlay.DEBTS, "ধার ও পাওনা", Icons.Default.Work, Color(0xFFF43F5E)),
+        ToolTile(Overlay.INVESTMENTS, "সম্পদ", Icons.Default.Landscape, Color(0xFF34D399)),
+        ToolTile(Overlay.TAX, "ট্যাক্স", Icons.Default.Receipt, Color(0xFFFB7185)),
+        ToolTile(Overlay.CURRENCY, "কনভার্টার", Icons.Default.Refresh, Color(0xFF60A5FA)),
+        ToolTile(Overlay.SUBSCRIPTIONS, "সাবস্ক্রিপশন", Icons.Default.Repeat, Color(0xFFA78BFA)),
+        ToolTile(Overlay.CREDIT, "বাকি খাতা", Icons.Default.Receipt, Color(0xFFFBBF24)),
+        ToolTile(Overlay.BUDGETS, "বাজেট", Icons.Default.Check, Color(0xFF2DD4BF)),
+        ToolTile(Overlay.GOALS, "লক্ষ্য", Icons.Default.Star, Color(0xFFFB923C)),
+        ToolTile(Overlay.ACCOUNTS, "অ্যাকাউন্ট", Icons.Default.Add, Color(0xFF94A3B8))
     )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Financial Hub", fontSize = 24.sp, fontWeight = FontWeight.Black)
         Text("FinTrack Premium Tools", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         tools.chunked(3).forEach { rowItems ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                rowItems.forEach { (ov, label, icon) ->
+                rowItems.forEach { tile ->
                     Column(
                         Modifier
                             .weight(1f)
                             .aspectRatio(1f)
                             .clip(RoundedCornerShape(28.dp))
                             .background(MaterialTheme.colorScheme.surface)
-                            .clickable { onOpen(ov) }
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(28.dp))
+                            .clickable { onOpen(tile.overlay) }
                             .padding(8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Icon(icon, contentDescription = label, tint = Sky400, modifier = Modifier.height(28.dp))
+                        Box(
+                            Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).background(tile.color.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(tile.icon, contentDescription = tile.label, tint = tile.color, modifier = Modifier.size(24.dp))
+                        }
                         Spacer(Modifier.height(8.dp))
-                        Text(label, fontSize = 10.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(tile.label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
                 repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
