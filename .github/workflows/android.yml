@@ -8,12 +8,20 @@ on:
       - '.github/workflows/android.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: android
+    env:
+      # Monotonic per workflow, so every CI build gets a higher versionCode than the previous one.
+      VERSION_CODE: ${{ github.run_number }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
 
     steps:
       - name: Checkout
@@ -30,6 +38,23 @@ jobs:
         with:
           gradle-version: 8.10.2
 
+      - name: Prepare release keystore (from GitHub Secrets)
+        id: ks
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ] || [ -z "$STORE_PASSWORD" ]; then
+            echo "::warning::Release signing secrets are missing (KEYSTORE_BASE64, KEY_ALIAS, KEY_PASSWORD, STORE_PASSWORD). Only the debug APK is built; the GitHub Release step is skipped."
+            echo "has=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
+          echo "has=true" >> "$GITHUB_OUTPUT"
+
       - name: Build debug APK
         run: |
           set +e
@@ -40,10 +65,44 @@ jobs:
           echo "::error::$(cat errors.txt)"
           exit $rc
 
-      - name: Unit tests (parsers, backup, budgets)
+      - name: Unit tests (parsers, backup, budgets, voucher checksum)
         run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Build signed release APK
+        if: steps.ks.outputs.has == 'true'
+        run: gradle :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Verify signature matches the release keystore
+        if: steps.ks.outputs.has == 'true'
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          apk_sha1=$("$APKSIGNER" verify --print-certs "$APK" | awk -F': ' '/certificate SHA-1 digest/{print $2; exit}' | tr -d ': ' | tr 'A-F' 'a-f')
+          ks_sha1=$(openssl pkcs12 -in "$KEYSTORE_PATH" -passin env:STORE_PASSWORD -nokeys 2>/dev/null | openssl x509 -noout -fingerprint -sha1 | cut -d= -f2 | tr -d ': ' | tr 'A-F' 'a-f')
+          echo "Keystore SHA-1 : $ks_sha1"
+          echo "APK signer SHA-1: $apk_sha1"
+          if [ -z "$apk_sha1" ] || [ "$apk_sha1" != "$ks_sha1" ]; then
+            echo "::error::APK is not signed with the release keystore"
+            exit 1
+          fi
+          cp "$APK" "$RUNNER_TEMP/FinTrack.apk"
+
+      - name: Publish GitHub Release (v<versionName>-<versionCode>)
+        if: steps.ks.outputs.has == 'true'
+        run: |
+          VN=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)
+          TAG="v${VN}-${VERSION_CODE}"
+          APK="$RUNNER_TEMP/FinTrack.apk"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" --target "$GITHUB_SHA" --title "FinTrack $VN ($VERSION_CODE)" --notes "Signed release build from CI run ${GITHUB_RUN_NUMBER}. Asset: FinTrack.apk"
+          fi
+          echo "Release: $TAG"
+
+      - name: Upload debug APK (artifact)
         uses: actions/upload-artifact@v4
         with:
           name: FinTracks-debug-apk

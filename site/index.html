@@ -3,91 +3,152 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FinTrack · ইমেইল কনফার্মেশন</title>
-  <meta name="description" content="FinTrack – আপনার স্মার্ট আর্থিক সহায়ক" />
+  <title>FinTrack · স্মার্ট আর্থিক সহায়ক</title>
+  <meta name="description" content="FinTrack – আয়-ব্যয়, বাজেট, বাকি ও ভাউচার এক জায়গায়। বাংলায়, নিরাপদে।" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700;900&display=swap" rel="stylesheet" />
   <style>
-    :root { color-scheme: dark; }
+    :root { color-scheme: dark; --sky:#38bdf8; --blue:#2563eb; --bg:#020617; --card:rgba(15,23,42,.62); --line:rgba(255,255,255,.08); --muted:#94a3b8; }
     * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
-      margin: 0; min-height: 100vh; font-family: 'Hind Siliguri', system-ui, sans-serif;
-      background: #020617; color: #fff; display: flex; align-items: center; justify-content: center; padding: 24px;
-      background-image: radial-gradient(circle at 20% 10%, rgba(14,165,233,.18), transparent 40%),
-                        radial-gradient(circle at 80% 90%, rgba(37,99,235,.15), transparent 40%);
+      margin: 0; min-height: 100vh; font-family: 'Hind Siliguri', system-ui, sans-serif; color: #fff; background: var(--bg);
+      background-image: radial-gradient(circle at 15% 0%, rgba(14,165,233,.20), transparent 42%),
+                        radial-gradient(circle at 90% 80%, rgba(37,99,235,.18), transparent 40%);
+      background-attachment: fixed;
     }
-    .card {
-      width: 100%; max-width: 440px; padding: 36px 28px; text-align: center;
-      background: rgba(15,23,42,.6); border: 1px solid rgba(255,255,255,.08); border-radius: 32px;
-      backdrop-filter: blur(16px); box-shadow: 0 25px 60px rgba(0,0,0,.45);
-    }
-    .brand {
-      font-size: 28px; font-weight: 900; margin: 0;
-      background: linear-gradient(90deg, #38bdf8, #2563eb); -webkit-background-clip: text; background-clip: text; color: transparent;
-    }
-    .tag { font-size: 10px; letter-spacing: .4em; text-transform: uppercase; color: #64748b; margin: 4px 0 28px; font-weight: 700; }
-    .icon {
-      width: 84px; height: 84px; border-radius: 28px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;
-      font-size: 42px; background: rgba(16,185,129,.15); border: 1px solid rgba(16,185,129,.35);
-    }
-    .icon.error { background: rgba(244,63,94,.15); border-color: rgba(244,63,94,.35); }
-    h1 { font-size: 22px; margin: 0 0 10px; font-weight: 800; }
-    p { color: #94a3b8; line-height: 1.7; margin: 0 0 18px; font-size: 15px; }
-    .steps { text-align: left; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); border-radius: 20px; padding: 16px 18px; margin: 18px 0; }
-    .steps li { margin: 8px 0; color: #cbd5e1; font-size: 14px; }
-    .btn {
-      display: block; width: 100%; padding: 15px; border-radius: 18px; text-decoration: none; font-weight: 800; font-size: 15px;
-      background: linear-gradient(135deg, #0ea5e9, #2563eb); color: #fff; box-shadow: 0 10px 30px rgba(14,165,233,.35); margin-top: 10px;
-    }
-    .btn.ghost { background: transparent; border: 1px solid rgba(255,255,255,.12); box-shadow: none; color: #94a3b8; }
-    .hidden { display: none; }
-    footer { margin-top: 26px; font-size: 11px; letter-spacing: .15em; text-transform: uppercase; color: #475569; font-weight: 700; }
-    footer a { color: #38bdf8; text-decoration: none; }
+    main { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+    .logo { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 22px; text-decoration: none; color: #fff; }
+    .logo-mark { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; font-weight: 900; color: #fff;
+                 background: linear-gradient(135deg, #38bdf8, #2563eb); box-shadow: 0 8px 22px rgba(14,165,233,.35); }
+    nav a { color: var(--muted); text-decoration: none; font-size: 14px; margin-left: 18px; }
+    nav a:hover { color: var(--sky); }
+
+    .banner { display: none; border-radius: 22px; padding: 16px 18px; margin: 4px 0 18px; border: 1px solid; font-size: 15px; line-height: 1.6; }
+    .banner.show { display: block; }
+    .banner.ok { background: rgba(16,185,129,.12); border-color: rgba(16,185,129,.4); }
+    .banner.err { background: rgba(244,63,94,.12); border-color: rgba(244,63,94,.4); }
+    .banner strong { display: block; font-size: 17px; margin-bottom: 4px; }
+
+    .hero { text-align: center; padding: 36px 0 26px; }
+    .hero h1 { font-size: clamp(40px, 8vw, 68px); margin: 0; font-weight: 900; line-height: 1.1;
+               background: linear-gradient(90deg, #38bdf8, #2563eb); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .tagline { color: #cbd5e1; font-size: clamp(17px, 2.4vw, 21px); margin: 14px auto 0; max-width: 640px; line-height: 1.7; }
+    .dl { display: inline-flex; align-items: center; gap: 10px; margin-top: 30px; padding: 17px 34px; border-radius: 20px; text-decoration: none;
+          font-weight: 800; font-size: 18px; color: #fff; background: linear-gradient(135deg, #0ea5e9, #2563eb);
+          box-shadow: 0 14px 40px rgba(14,165,233,.40); }
+    .dl:hover { filter: brightness(1.08); }
+    .ver { margin-top: 14px; font-size: 14px; color: var(--muted); }
+    .ver b { color: #e2e8f0; font-weight: 700; }
+    .note { margin-top: 10px; font-size: 13px; color: #64748b; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin: 34px 0 10px; }
+    .feat { background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 20px; backdrop-filter: blur(16px); }
+    .feat .ic { width: 44px; height: 44px; border-radius: 15px; display: grid; place-items: center; font-size: 22px; background: rgba(56,189,248,.14); border: 1px solid rgba(56,189,248,.3); margin-bottom: 12px; }
+    .feat h3 { margin: 0 0 6px; font-size: 17px; }
+    .feat p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+
+    .verify { margin: 26px 0 8px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+              background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 20px 22px; }
+    .verify p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.6; }
+    .verify a { padding: 12px 22px; border-radius: 16px; text-decoration: none; font-weight: 700; color: #fff; border: 1px solid rgba(255,255,255,.14); }
+
+    footer { margin: 40px 0 30px; text-align: center; border-top: 1px solid var(--line); padding-top: 26px; }
+    .social { display: flex; justify-content: center; gap: 14px; margin-bottom: 16px; }
+    .social a { width: 44px; height: 44px; border-radius: 16px; display: grid; place-items: center; background: rgba(255,255,255,.05); border: 1px solid var(--line); color: #e2e8f0; }
+    .social a:hover { color: var(--sky); border-color: rgba(56,189,248,.4); }
+    .social svg { width: 20px; height: 20px; fill: currentColor; }
+    .credit { font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #cbd5e1; font-weight: 700; margin: 0; }
+    .copy { font-size: 11px; letter-spacing: .15em; text-transform: uppercase; color: #64748b; font-weight: 700; margin: 10px 0 0; }
   </style>
 </head>
 <body>
-  <main class="card">
-    <h2 class="brand">FinTrack</h2>
-    <div class="tag">Premium Finance</div>
+<main>
+  <header>
+    <a class="logo" href="./"><span class="logo-mark">F</span>FinTrack</a>
+    <nav><a href="verify.html">ভাউচার যাচাই</a><a href="https://github.com/ShohagVaii/FinTracks" target="_blank" rel="noopener">GitHub</a></nav>
+  </header>
 
-    <!-- Success state (default) -->
-    <section id="ok">
-      <div class="icon">✅</div>
-      <h1>ইমেইল কনফার্ম হয়েছে</h1>
-      <p>আপনার অ্যাকাউন্ট সক্রিয় হয়েছে। এখন FinTrack অ্যাপে ফিরে গিয়ে আপনার ইমেইল ও পাসওয়ার্ড দিয়ে লগইন করুন।</p>
-      <ol class="steps">
-        <li>১. এই ট্যাব বন্ধ করে ফোনে FinTrack অ্যাপ খুলুন।</li>
-        <li>২. ইমেইল ও পাসওয়ার্ড দিয়ে লগইন করুন।</li>
-        <li>৩. আপনার বাজেট, বাকি ও লেনদেন সবই এখানে পাবেন।</li>
-      </ol>
-    </section>
+  <!-- Shown when the user comes back from the Supabase email confirmation link -->
+  <section id="confirmed" class="banner ok" role="status">
+    <strong>✅ ইমেইল কনফার্ম হয়েছে</strong>
+    আপনার অ্যাকাউন্ট সক্রিয় হয়েছে। এখন FinTrack অ্যাপ খুলে ইমেইল ও পাসওয়ার্ড দিয়ে লগইন করুন।
+  </section>
+  <!-- Shown when the confirmation link is expired or already used -->
+  <section id="linkerr" class="banner err" role="alert">
+    <strong>⚠️ লিংকটি কাজ করছে না</strong>
+    লিংকের মেয়াদ শেষ হয়ে গেছে বা আগে ব্যবহার করা হয়েছে। অ্যাপে আবার সাইন-আপ বা লগইন করে নতুন কনফার্মেশন মেইল নিন।
+  </section>
 
-    <!-- Error state (shown when the link is expired or invalid) -->
-    <section id="err" class="hidden">
-      <div class="icon error">⚠️</div>
-      <h1>লিংকটি কাজ করছে না</h1>
-      <p>লিংকের মেয়াদ শেষ হয়ে গেছে বা আগে ব্যবহার করা হয়েছে। অ্যাপে আবার সাইন-আপ বা লগইন করে নতুন কনফার্মেশন মেইল নিন।</p>
-    </section>
+  <section class="hero">
+    <h1>FinTrack</h1>
+    <p class="tagline">আপনার আয়, ব্যয়, বাজেট ও বাকি — সব এক জায়গায়। সহজ বাংলা ইন্টারফেসে, নিরাপদ ক্লাউড সিঙ্কে।</p>
+    <a class="dl" href="https://github.com/ShohagVaii/FinTracks/releases/latest/download/FinTrack.apk" rel="noopener">
+      ⬇ Android APK ডাউনলোড
+    </a>
+    <div class="ver">বর্তমান সংস্করণ: <b id="ver">লোড হচ্ছে…</b></div>
+    <div class="note">ডাউনলোডের পর ফোনে "অজানা উৎস থেকে ইনস্টল" অনুমতি দিতে হতে পারে।</div>
+  </section>
 
-    <a class="btn" href="https://github.com/ShohagVaii/FinTracks" target="_blank" rel="noopener">প্রজেক্ট দেখুন</a>
-    <a class="btn ghost" href="https://t.me/Shohag_vaii" target="_blank" rel="noopener">সহায়তা (Telegram)</a>
+  <section class="grid" aria-label="ফিচার">
+    <div class="feat"><div class="ic">💸</div><h3>আয়-ব্যয় ট্র্যাকিং</h3><p>প্রতিটি লেনদেন দ্রুত যোগ করুন। মুড, পেমেন্ট মেথড ও হ্যাশট্যাগ দিয়ে গুছিয়ে রাখুন।</p></div>
+    <div class="feat"><div class="ic">📊</div><h3>বাজেট ও রিপোর্ট</h3><p>মাসিক বাজেট, হিটম্যাপ ও সাপ্তাহিক-মাসিক-বাৎসরিক রিপোর্ট দেখুন।</p></div>
+    <div class="feat"><div class="ic">🤝</div><h3>বাকি ও ঋণ</h3><p>কে কত পাবেন, কাকে কত দিতে হবে — পরিষ্কার হিসাব, পরিশোধের ট্র্যাক।</p></div>
+    <div class="feat"><div class="ic">📩</div><h3>SMS পার্সার</h3><p>ব্যাংক ও মোবাইল ব্যাংকিং এর SMS থেকে লেনদেন স্বয়ংক্রিয়ভাবে প্রস্তাব করে।</p></div>
+    <div class="feat"><div class="ic">🧾</div><h3>ভাউচার ও যাচাই</h3><p>প্রতিটি লেনদেনের ভাউচার তৈরি করুন। TRX ও চেকসাম দিয়ে যেকোনো সময় যাচাই করা যায়।</p></div>
+    <div class="feat"><div class="ic">✨</div><h3>AI সহকারী</h3><p>"Ask FinTrack AI" — আপনার খরচের প্রশ্ন করুন, সাথে সাথে উত্তর পান।</p></div>
+  </section>
 
-    <footer>© 2026 FinTrack · Crafted by <a href="https://www.facebook.com/its.Shohag.X10" target="_blank" rel="noopener">Shohag Vaii</a></footer>
-  </main>
+  <section class="verify">
+    <p>কোনো ভাউচারের সত্যতা যাচাই করতে চান? TRX আইডি ও চেকসাম দিন।</p>
+    <a href="verify.html">ভাউচার যাচাই করুন</a>
+  </section>
 
-  <script>
-    // Supabase puts results in the URL hash, e.g. #error=access_denied&error_description=...
-    // A successful confirmation may carry access_token; we never store or display tokens.
-    (function () {
-      var hash = window.location.hash || '';
-      var params = new URLSearchParams(hash.replace(/^#/, ''));
-      if (params.get('error') || params.get('error_code')) {
-        document.getElementById('ok').classList.add('hidden');
-        document.getElementById('err').classList.remove('hidden');
-      }
-      // Remove any tokens from the address bar so they are not kept in history.
-      if (hash) history.replaceState(null, '', window.location.pathname);
-    })();
-  </script>
+  <footer>
+    <div class="social">
+      <a href="https://www.facebook.com/its.Shohag.X10" target="_blank" rel="noopener" aria-label="Facebook">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.09 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.69.24 2.69.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.26h3.33l-.53 3.49h-2.8V24C19.61 23.09 24 18.1 24 12.07z"/></svg>
+      </a>
+      <a href="https://t.me/Shohag_vaii" target="_blank" rel="noopener" aria-label="Telegram">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.94 0C5.35 0 0 5.35 0 11.94S5.35 23.88 11.94 23.88 23.88 18.53 23.88 11.94 18.53 0 11.94 0zm5.56 8.16-1.86 8.78c-.14.62-.5.77-1.02.48l-2.82-2.08-1.36 1.31c-.15.15-.28.28-.57.28l.2-2.87 5.22-4.72c.23-.2-.05-.32-.35-.12L7.9 13.5l-2.78-.87c-.6-.19-.61-.6.13-.89l10.86-4.19c.5-.19.95.12.79.61z"/></svg>
+      </a>
+    </div>
+    <p class="credit">CRAFTED WITH ❤ BY SHOHAG VAII</p>
+    <p class="copy">© FINTRACK PREMIUM FINANCE</p>
+  </footer>
+</main>
+
+<script>
+  // 1) Version from the latest GitHub Release (never hard-coded).
+  (function () {
+    var el = document.getElementById('ver');
+    fetch('https://api.github.com/repos/ShohagVaii/FinTracks/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+      .then(function (r) { if (r.status === 404) return null; if (!r.ok) throw new Error('bad'); return r.json(); })
+      .then(function (rel) {
+        if (!rel) { el.textContent = 'এখনো রিলিজ নেই'; return; }
+        var d = rel.published_at ? new Date(rel.published_at).toLocaleDateString('bn-BD') : '';
+        el.textContent = rel.name || rel.tag_name;
+        if (d) el.textContent += ' · ' + d;
+      })
+      .catch(function () { el.textContent = 'লোড করা যায়নি'; });
+  })();
+
+  // 2) Email confirmation return. Supabase puts the result in the URL hash.
+  //    We show a message only; tokens are never stored or displayed, and the hash is removed from the address bar.
+  (function () {
+    var hash = window.location.hash || '';
+    if (!hash) return;
+    var p = new URLSearchParams(hash.replace(/^#/, ''));
+    var type = p.get('type');
+    var confirmTypes = ['signup', 'email', 'magiclink', 'invite', 'email_change'];
+    if (p.get('error') || p.get('error_code')) {
+      document.getElementById('linkerr').classList.add('show');
+    } else if (p.get('access_token') || confirmTypes.indexOf(type) !== -1) {
+      document.getElementById('confirmed').classList.add('show');
+    }
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  })();
+</script>
 </body>
 </html>

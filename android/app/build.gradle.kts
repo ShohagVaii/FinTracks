@@ -5,6 +5,11 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+// Release signing comes from environment variables set by CI (GitHub Secrets). No secret, no release key.
+// The keystore file is decoded by the workflow to KEYSTORE_PATH; passwords never appear in this file.
+val releaseKeystore: File? = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() }?.let { File(it) }
+val hasReleaseKey = releaseKeystore?.exists() == true
+
 android {
     namespace = "com.fintracks.app"
     compileSdk = 35
@@ -13,7 +18,8 @@ android {
         applicationId = "bd.shohagvai.fintrack"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
+        // CI sets VERSION_CODE to the Actions run number, so every CI build is newer than the last one.
+        versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
         versionName = "1.0.0"
 
         // Public values only. The publishable key is safe to ship; RLS protects the data.
@@ -33,9 +39,22 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                storeFile = releaseKeystore
+                storeType = "pkcs12"
+                storePassword = System.getenv("STORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (hasReleaseKey) signingConfig = signingConfigs.getByName("release")
         }
     }
 }
