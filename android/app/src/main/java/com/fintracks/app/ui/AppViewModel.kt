@@ -245,8 +245,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Saves profile fields and applies them locally at once (theme, privacy, accent), so the UI changes without a reload. */
     fun saveProfile(body: JsonObject) = act {
         repo.updateProfile(body)
+        val merged = JsonObject(state.value.profile.orEmpty() + body)
+        _state.update { it.copy(profile = merged) }
         refreshTables()
     }
 
