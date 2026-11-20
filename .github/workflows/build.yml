@@ -1,6 +1,8 @@
-name: Build Android APK
+# Legacy Capacitor wrapper. The native Kotlin app is built by android.yml.
+# Manual-only now, because it would overwrite the native android/ folder.
+name: Legacy Capacitor APK (manual)
 
-on: [push]
+on: workflow_dispatch
 
 
 jobs:
