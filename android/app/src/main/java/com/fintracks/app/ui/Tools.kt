@@ -85,7 +85,7 @@ fun ToolsScreen(onOpen: (Overlay) -> Unit) {
         Triple(Overlay.TAX, "ট্যাক্স", Icons.Default.Receipt),
         Triple(Overlay.CURRENCY, "কনভার্টার", Icons.Default.Refresh),
         Triple(Overlay.SUBSCRIPTIONS, "সাবস্ক্রিপশন", Icons.Default.Repeat),
-        Triple(Overlay.CREDIT, "বাকি", Icons.Default.Receipt),
+        Triple(Overlay.CREDIT, "বাকি খাতা", Icons.Default.Receipt),
         Triple(Overlay.BUDGETS, "বাজেট", Icons.Default.Check),
         Triple(Overlay.GOALS, "লক্ষ্য", Icons.Default.Star),
         Triple(Overlay.ACCOUNTS, "অ্যাকাউন্ট", Icons.Default.Add)

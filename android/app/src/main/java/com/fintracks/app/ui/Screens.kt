@@ -92,6 +92,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             }
             if (income > 0) Text("সঞ্চয়ের হার: ${"%.0f".format(savingsRate)}%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        CreditDueCard(state) { openOverlay(Overlay.CREDIT) }
         HeatmapCard(txs, p)
 
         if (state.pendingSms.isNotEmpty()) {

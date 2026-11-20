@@ -52,7 +52,7 @@ import kotlinx.serialization.json.JsonObject
 /** Full-screen tools opened from the Tools tab or the header. */
 enum class Overlay(val title: String) {
     ZAKAT("যাকাত ক্যালকুলেটর"), TAX("ট্যাক্স ক্যালকুলেটর"), CURRENCY("কারেন্সি কনভার্টার"),
-    CHAT("AI সহকারী"), LOAN("লোন / EMI"), CREDIT("বাকি (দোকানের হিসাব)"), DEBTS("ধার ও পাওনা"),
+    CHAT("AI সহকারী"), LOAN("লোন / EMI"), CREDIT("বাকি খাতা"), DEBTS("ধার ও পাওনা"),
     BUDGETS("বাজেট এনভেলপ"), GOALS("সঞ্চয় লক্ষ্য"), INVESTMENTS("ইনভেস্টমেন্ট"),
     SUBSCRIPTIONS("সাবস্ক্রিপশন"), ACCOUNTS("অ্যাকাউন্ট ও ট্রান্সফার"), REPORTS("পরিসংখ্যান ও রিপোর্ট"), SETTINGS("সেটিংস")
 }
@@ -183,7 +183,7 @@ private fun OverlayContent(overlay: Overlay, state: UiState, vm: AppViewModel, o
         Overlay.TAX -> TaxScreen(state)
         Overlay.CURRENCY -> CurrencyScreen()
         Overlay.LOAN -> LoanScreen(state, vm)
-        Overlay.CREDIT -> CreditScreen(state, vm)
+        Overlay.CREDIT -> BakiScreen(state, vm)
         Overlay.DEBTS -> DebtsScreen(state, vm)
         Overlay.BUDGETS -> BudgetsScreen(state, vm)
         Overlay.GOALS -> GoalsScreen(state, vm)
