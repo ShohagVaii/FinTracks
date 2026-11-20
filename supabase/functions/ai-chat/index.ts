@@ -1,6 +1,7 @@
-// FinTrack AI chat — Supabase Edge Function (verify_jwt = true).
+// FinTrack AI chat — Supabase Edge Function.
+// verify_jwt=true only rejects requests without any JWT, and the public anon key is itself a JWT,
+// so this function also checks that the bearer token belongs to a signed-in user (GoTrue /auth/v1/user).
 // The Gemini key lives only in the GEMINI_API_KEY secret.
-// Models are tried in order; a retired/unavailable model (404/400/429/503) falls through to the next.
 const MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 
 const SYSTEM =
@@ -13,6 +14,21 @@ function json(o: unknown, status = 200) {
     status,
     headers: { 'content-type': 'application/json; charset=utf-8' },
   });
+}
+
+/** Returns the user id when the bearer token is a real, signed-in session. Anon keys fail here. */
+async function signedInUserId(req: Request): Promise<string | null> {
+  const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) return null;
+  const base = Deno.env.get('SUPABASE_URL');
+  const anon = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+  if (!base) return null;
+  const res = await fetch(`${base}/auth/v1/user`, {
+    headers: { apikey: anon, authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+  const user: any = await res.json();
+  return typeof user?.id === 'string' ? user.id : null;
 }
 
 async function callGemini(key: string, model: string, prompt: string): Promise<Response> {
@@ -29,6 +45,10 @@ async function callGemini(key: string, model: string, prompt: string): Promise<R
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
+
+  const userId = await signedInUserId(req);
+  if (!userId) return json({ error: 'sign in required' }, 401);
+
   const key = Deno.env.get('GEMINI_API_KEY');
   if (!key) return json({ error: 'AI is not configured' }, 500);
 
@@ -44,7 +64,7 @@ Deno.serve(async (req: Request) => {
 
   const prompt = `আর্থিক সারসংক্ষেপ:\n${context}\n\nপ্রশ্ন: ${question}`;
 
-  let lastStatus = 0;
+  const attempts: { model: string; status: number; message: string }[] = [];
   for (const model of MODELS) {
     const res = await callGemini(key, model, prompt);
     if (res.ok) {
@@ -52,9 +72,10 @@ Deno.serve(async (req: Request) => {
       const text = (data?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? '').join('');
       return json({ answer: text || 'উত্তর পাওয়া যায়নি', model });
     }
-    lastStatus = res.status;
-    // Only fall through when the model itself is the problem; other errors stop here.
+    // Keep the provider's message (it never contains the key) so failures can be diagnosed.
+    const message = (await res.text()).slice(0, 300);
+    attempts.push({ model, status: res.status, message });
     if (![400, 404, 429, 503].includes(res.status)) break;
   }
-  return json({ error: 'AI service error', status: lastStatus }, 502);
+  return json({ error: 'AI service error', status: attempts.at(-1)?.status ?? 0, attempts }, 502);
 });
