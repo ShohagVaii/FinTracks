@@ -257,7 +257,7 @@ object Export {
 
     private fun qrBitmap(text: String, size: Int): Bitmap {
         val hints = mapOf(EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M, EncodeHintType.MARGIN to 1)
-        val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR, size, size, hints)
+        val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, size, size, hints)
         val pixels = IntArray(size * size)
         for (y in 0 until size) for (x in 0 until size) {
             pixels[y * size + x] = if (matrix.get(x, y)) Color.BLACK else Color.WHITE
