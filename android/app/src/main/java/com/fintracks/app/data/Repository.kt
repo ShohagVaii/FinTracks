@@ -2,6 +2,7 @@ package com.fintracks.app.data
 
 import android.content.Context
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -89,6 +90,18 @@ class Repository(context: Context) {
 
     suspend fun delete(table: String, id: String) {
         authed("DELETE", "/rest/v1/$table?id=eq.$id")
+    }
+
+    /**
+     * Restore: inserts rows, or updates rows with the same id. Every row is stamped with the
+     * current user's id, so a backup from another account can never write outside this account.
+     */
+    suspend fun upsert(table: String, rows: List<JsonObject>) {
+        val uid = uid()
+        rows.chunked(400).forEach { chunk ->
+            val body = JsonArray(chunk.map { JsonObject(it + ("user_id" to JsonPrimitive(uid))) })
+            authed("POST", "/rest/v1/$table?on_conflict=id", body, "resolution=merge-duplicates,return=minimal")
+        }
     }
 
     suspend fun updateProfile(fields: JsonObject) {

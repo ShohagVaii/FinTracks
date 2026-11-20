@@ -189,6 +189,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         loadAll()
     }
 
+    /** Restores a validated backup. Existing rows stay; rows with the same id are updated. */
+    fun restoreBackup(plan: BackupPlan) = act {
+        RESTORE_ORDER.forEach { table ->
+            val rows = plan.tables[table].orEmpty()
+            if (rows.isNotEmpty()) repo.upsert(table, rows)
+        }
+        loadAll()
+        _state.update { it.copy(notice = "ব্যাকআপ থেকে ${plan.total}টি সারি ফিরিয়ে আনা হয়েছে") }
+    }
+
     // ---------- SMS suggestions ----------
 
     fun acceptSms(s: SmsSuggestion) {

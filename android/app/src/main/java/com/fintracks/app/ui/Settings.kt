@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
@@ -45,6 +47,19 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
     var showDisable by remember { mutableStateOf(false) }
     var showOldPin by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
+    var restorePlan by remember { mutableStateOf<BackupPlan?>(null) }
+    val pickBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            try {
+                val text = withContext(Dispatchers.IO) {
+                    ctx.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                }
+                restorePlan = Backup.parse(text)
+            } catch (e: Exception) {
+                Toast.makeText(ctx, e.message ?: "ফাইল পড়া যায়নি", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     Page {
         AppCard {
@@ -137,6 +152,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                     }
                 }
             }) { Text("ব্যাকআপ ফাইল শেয়ার") }
+            OutlinedButton(onClick = { pickBackup.launch(arrayOf("application/json", "text/plain")) }) { Text("ব্যাকআপ থেকে ফিরিয়ে আনুন") }
         }
         AppCard {
             Text("বিপজ্জনক এলাকা", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
@@ -162,6 +178,23 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
             showOldPin = false
             showSetPin = true
         }
+    }
+    restorePlan?.let { plan ->
+        AlertDialog(
+            onDismissRequest = { restorePlan = null },
+            title = { Text("ব্যাকআপ ফিরিয়ে আনবেন?", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("ব্যাকআপের তারিখ: ${plan.exportedAt.take(10)}", fontSize = 13.sp)
+                    plan.tables.filter { it.value.isNotEmpty() }.forEach { (t, rows) ->
+                        Text("$t: ${rows.size}টি", fontSize = 12.sp)
+                    }
+                    Text("বিদ্যমান ডেটা মুছবে না। একই ID থাকলে সেই সারি আপডেট হবে।", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            confirmButton = { TextButton(onClick = { vm.restoreBackup(plan); restorePlan = null }) { Text("ফিরিয়ে আনুন") } },
+            dismissButton = { TextButton(onClick = { restorePlan = null }) { Text("বাতিল") } }
+        )
     }
     if (showDelete) {
         DeleteAccountDialog(
