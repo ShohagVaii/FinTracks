@@ -35,7 +35,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Offline assistant. It answers from the user's own data with no network and no API key.
- * A Gemini-backed version needs the key kept on a server (Supabase Edge Function), so it is not included here.
+ * Answers from local data. When online, ChatScreen first asks the Supabase edge function ai-chat (Gemini key stays on the server).
  */
 object Assistant {
     private fun has(q: String, vararg words: String) = words.any { q.contains(it) }
