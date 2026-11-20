@@ -32,7 +32,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import android.speech.RecognizerIntent
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
+import java.io.File
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -262,6 +271,73 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
     var tagsText by remember { mutableStateOf(existing?.strList("tags")?.joinToString(", ") ?: "") }
     var showCalc by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var reading by remember { mutableStateOf(false) }
+    var captureNote by remember { mutableStateOf<String?>(null) }
+    var cameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    // Fills the form from a receipt. Nothing is saved until the user presses সেভ.
+    fun applyReceipt(r: ReceiptData) {
+        r.amount?.let { amount = fmtNum(it) }
+        r.date?.let { date = it }
+        if (note.isBlank()) r.shop?.let { note = it }
+        if (type != "Income") r.category?.let { category = it }
+        captureNote = if (r.amount == null) "রসিদে মোট টাকা পাওয়া যায়নি, হাতে লিখুন" else "রসিদ থেকে পড়া হয়েছে। যাচাই করে সেভ করুন।"
+    }
+    fun readReceipt(uri: Uri) {
+        reading = true
+        scope.launch {
+            try {
+                val text = withContext(Dispatchers.IO) { recognizeReceiptText(ctx, uri) }
+                applyReceipt(CaptureParser.parseReceipt(text))
+            } catch (e: Exception) {
+                Toast.makeText(ctx, "রসিদ পড়া যায়নি: ${e.message ?: "অজানা সমস্যা"}", Toast.LENGTH_LONG).show()
+            } finally {
+                reading = false
+            }
+        }
+    }
+    val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
+        val said = res.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (!said.isNullOrBlank()) {
+            val v = CaptureParser.parseVoice(said)
+            if (v == null) {
+                Toast.makeText(ctx, "পরিমাণ বোঝা যায়নি। আবার বলুন বা লিখুন", Toast.LENGTH_LONG).show()
+            } else {
+                amount = fmtNum(v.amount)
+                type = v.type
+                category = v.category ?: if (v.type == "Income") "অন্যান্য" else category
+                note = v.transcript
+                captureNote = "ভয়েস থেকে ভরা হয়েছে। যাচাই করে সেভ করুন।"
+            }
+        }
+    }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val uri = cameraUri
+        if (ok && uri != null) readReceipt(uri)
+    }
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) readReceipt(uri)
+    }
+    fun launchVoice() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "যেমন: পাঁচশো টাকা বাজার করলাম")
+        }
+        try {
+            voiceLauncher.launch(intent)
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(ctx, "এই ফোনে ভয়েস সার্চ চালু নেই", Toast.LENGTH_LONG).show()
+        }
+    }
+    fun launchCamera() {
+        val file = File(File(ctx.cacheDir, "exports").apply { mkdirs() }, "receipt-${System.currentTimeMillis()}.jpg")
+        val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
+        cameraUri = uri
+        cameraLauncher.launch(uri)
+    }
     val cats = if (type == "Income") INCOME_CATS else EXPENSE_CATS
     val accounts = state.rows("accounts")
 
@@ -302,6 +378,17 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextIn("পরিমাণ (৳)", amount, { amount = it }, number = true, modifier = Modifier.weight(1f))
             OutlinedButton(onClick = { showCalc = true }) { Text("🧮") }
+        }
+        if (existing == null) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(onClick = { launchVoice() }, modifier = Modifier.weight(1f)) { Text("🎙 বলুন", fontSize = 12.sp) }
+                OutlinedButton(onClick = { launchCamera() }, modifier = Modifier.weight(1f)) { Text("📷 রসিদ", fontSize = 12.sp) }
+                OutlinedButton(onClick = {
+                    galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }, modifier = Modifier.weight(1f)) { Text("🖼 ছবি", fontSize = 12.sp) }
+            }
+            if (reading) Text("রসিদ পড়া হচ্ছে…", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            captureNote?.let { Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary) }
         }
         if (type != "Transfer") {
             Text("ক্যাটাগরি", fontSize = 12.sp)

@@ -54,6 +54,10 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     // QR codes for receipts (free, Apache-2.0)
     implementation("com.google.zxing:core:3.5.3")
+    // On-device receipt OCR (free, works offline)
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    // Unit tests for parsers and backup round-trip (JVM, no device needed)
+    testImplementation("junit:junit:4.13.2")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")

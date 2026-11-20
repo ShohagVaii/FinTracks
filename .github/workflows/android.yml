@@ -40,6 +40,9 @@ jobs:
           echo "::error::$(cat errors.txt)"
           exit $rc
 
+      - name: Unit tests (parsers, backup, budgets)
+        run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
