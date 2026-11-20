@@ -86,6 +86,7 @@ import kotlinx.coroutines.withContext
 import com.fintracks.app.data.bool
 import com.fintracks.app.data.strList
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import com.fintracks.app.data.id
 import com.fintracks.app.data.num
@@ -97,18 +98,19 @@ import kotlinx.serialization.json.JsonObject
 private val incomeGreen = Color(0xFF10B981)
 private val expenseRed = Color(0xFFF43F5E)
 
-/** Balance of one account from its opening balance and all of its transactions. */
+/**
+ * Balance of one account from its opening balance and its income/expense rows.
+ * Transfers do not move money between accounts (transfer is a type and tag only), so they are ignored here.
+ */
 fun accountBalance(acc: JsonObject, txs: List<JsonObject>): Double {
     val id = acc.id()
     var b = acc.num("opening_balance")
     for (t in txs) {
         val amt = t.num("amount")
         val from = t.accountId() == id
-        val to = t.toAccountId() == id
         when (t.str("type")) {
             "Income" -> if (from) b += amt
             "Expense" -> if (from) b -= amt
-            "Transfer" -> { if (from) b -= amt; if (to) b += amt }
         }
     }
     return b
@@ -506,14 +508,14 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         when {
             amt == null || amt <= 0 -> error = "সঠিক পরিমাণ লিখুন"
             !isValidIsoDate(date) -> error = "তারিখ লিখুন (YYYY-MM-DD)"
-            type == "Transfer" && (accountId.isEmpty() || toAccountId.isEmpty() || accountId == toAccountId) ->
-                error = "দুটি ভিন্ন অ্যাকাউন্ট বাছাই করুন"
             else -> onSave(
                 row(
                     "type" to type, "amount" to amt, "currency" to state.currency,
                     "category" to if (type == "Transfer") "ট্রান্সফার" else category,
                     "note" to note, "tx_date" to date, "payment_mode" to mode, "mood" to mood,
-                    "account_id" to nonEmpty(accountId), "to_account_id" to if (type == "Transfer") nonEmpty(toAccountId) else null,
+                    // Transfers never link accounts; JsonNull clears any old link on edit (row() would skip a null).
+                    "account_id" to (if (type == "Transfer") JsonNull else nonEmpty(accountId)),
+                    "to_account_id" to JsonNull,
                     "is_recurring" to recurring,
                     "tags" to JsonArray(tagsText.split(',', '#').map { it.trim() }.filter { it.isNotEmpty() }.distinct().map { JsonPrimitive(it) })
                 ),
@@ -595,9 +597,9 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (accounts.isNotEmpty()) {
+                if (accounts.isNotEmpty() && type != "Transfer") {
                     Column(Modifier.weight(1f)) {
-                        Text(if (type == "Transfer") "কোথা থেকে" else "অ্যাকাউন্ট", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("অ্যাকাউন্ট", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         PickerField(accountId, listOf("" to "কোনোটি নয়") + accounts.map { it.id() to it.str("name") }) { accountId = it }
                     }
                 }
@@ -606,11 +608,12 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                     PickerField(mode, PAYMENT_MODES.map { it to it }) { mode = it }
                 }
             }
-            if (type == "Transfer" && accounts.isNotEmpty()) {
-                Column {
-                    Text("কোথায়", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    PickerField(toAccountId, accounts.map { it.id() to it.str("name") }) { toAccountId = it }
-                }
+            if (type == "Transfer") {
+                Text(
+                    "ট্রান্সফার শুধু ধরন ও ট্যাগ: অ্যাকাউন্ট ব্যালেন্স বদলায় না, আয় বা ব্যয়ের হিসাবেও ধরা হয় না।",
+                    fontSize = 12.sp,
+                    color = Sky400
+                )
             }
             Text("মুড", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -666,7 +669,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
 }
 
 @Composable
-private fun StatPill(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
+internal fun StatPill(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
     Column(
         modifier
             .clip(RoundedCornerShape(40.dp))

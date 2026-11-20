@@ -328,6 +328,10 @@ fun ReportsScreen(state: UiState) {
             KeyValue("লেনদেন সংখ্যা", txs.size.toString(), Color(0xFF94A3B8))
         }
         AppCard {
+            Text("আয় বনাম ব্যয় (সারসংক্ষেপ)", fontWeight = FontWeight.Bold)
+            IncomeExpenseBars(income, expense, p)
+        }
+        AppCard {
             Text("খাতওয়ারি ব্যয়", fontWeight = FontWeight.Bold)
             if (cats.isEmpty()) Text("কোনো ব্যয় নেই", color = MaterialTheme.colorScheme.onSurfaceVariant)
             cats.forEach { (name, v) ->
@@ -339,12 +343,8 @@ fun ReportsScreen(state: UiState) {
                 ProgressBar(pct, Sky500)
             }
         }
-        AppCard {
-            Text("ব্যয়ের ট্রেন্ড", fontWeight = FontWeight.Bold)
-            val byDay = txs.filter { it.str("type") == "Expense" }.groupBy { dateOf(it, "tx_date") }
-                .toSortedMap().values.map { list -> list.sumOf { it.num("amount") } }
-            LineChart(byDay.ifEmpty { listOf(0.0) }, Color(0xFF0EA5E9))
-        }
+        // Trend uses fixed windows (7 days / 30 days / 12 months) chosen by its own tabs, not the period picker above.
+        ExpenseTrendCard(state.rows("transactions"), p)
         AppCard {
             Text("রিপোর্ট এক্সপোর্ট", fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {

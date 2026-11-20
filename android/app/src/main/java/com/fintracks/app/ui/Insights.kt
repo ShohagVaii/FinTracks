@@ -18,6 +18,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -200,5 +204,138 @@ fun HeatmapCard(txs: List<JsonObject>, privacy: Boolean, ym: YearMonth, onPrev: 
             }
         }
         Text("মোট ব্যয় (এই মাস): ${taka(perDay.sum(), privacy)}", fontSize = 12.sp)
+    }
+}
+
+// ======================= Expense trend (report) =======================
+
+private data class TrendBucket(val short: String, val full: String, val total: Double)
+
+/**
+ * Expense trend with its own tabs: সাপ্তাহিক = last 7 days, মাসিক = last 30 days (daily),
+ * বাৎসরিক = last 12 months (monthly). Ignores the report's period picker on purpose: these are fixed windows.
+ */
+@Composable
+fun ExpenseTrendCard(txs: List<JsonObject>, privacy: Boolean) {
+    var view by remember { mutableStateOf("month") }
+    val today = LocalDate.now()
+    val expenses = txs.filter { it.str("type") == "Expense" }
+    val byDay = HashMap<String, Double>()
+    val byMonth = HashMap<String, Double>()
+    expenses.forEach { t ->
+        val d = dateOf(t, "tx_date")
+        if (d.length >= 7) {
+            byDay[d] = (byDay[d] ?: 0.0) + t.num("amount")
+            byMonth[d.substring(0, 7)] = (byMonth[d.substring(0, 7)] ?: 0.0) + t.num("amount")
+        }
+    }
+    val buckets: List<TrendBucket> = when (view) {
+        "week", "month" -> {
+            val days = if (view == "week") 7 else 30
+            (days - 1 downTo 0).map { k ->
+                val d = today.minusDays(k.toLong())
+                TrendBucket(
+                    short = bnDigits(d.dayOfMonth.toString()),
+                    full = "${bnDigits(d.dayOfMonth.toString())} ${BN_MONTHS[d.monthValue - 1]}",
+                    total = byDay[d.toString()] ?: 0.0
+                )
+            }
+        }
+        else -> (11 downTo 0).map { k ->
+            val ym = YearMonth.from(today).minusMonths(k.toLong())
+            TrendBucket(
+                short = bnDigits(ym.monthValue.toString()),
+                full = "${BN_MONTHS[ym.monthValue - 1]} ${bnDigits(ym.year.toString())}",
+                total = byMonth[ym.toString()] ?: 0.0
+            )
+        }
+    }
+    val max = buckets.maxOfOrNull { it.total } ?: 0.0
+    val peakIndex = if (max > 0) buckets.indexOfFirst { it.total == max } else -1
+    val average = if (buckets.isNotEmpty()) buckets.sumOf { it.total } / buckets.size else 0.0
+
+    AppCard {
+        Text("ব্যয়ের ট্রেন্ড", fontWeight = FontWeight.Bold)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("week" to "সাপ্তাহিক", "month" to "মাসিক", "year" to "বাৎসরিক").forEach { (key, label) ->
+                val on = view == key
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(50))
+                        .background(if (on) Sky500.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.05f))
+                        .clickable { view = key }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(label, fontSize = 13.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, color = if (on) Sky400 else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        if (max <= 0) {
+            EmptyHint("এই সময়ে কোনো ব্যয় নেই")
+        } else {
+            Row(Modifier.fillMaxWidth().height(150.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                buckets.forEachIndexed { i, b ->
+                    val frac = if (b.total <= 0) 0f else maxOf((b.total / max).toFloat(), 0.03f)
+                    Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom, horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight(frac)
+                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                .background(if (i == peakIndex) Rose500 else Sky500.copy(alpha = 0.55f))
+                        )
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                buckets.forEachIndexed { i, b ->
+                    val showLabel = when (view) {
+                        "month" -> i % 5 == 0 || i == buckets.lastIndex
+                        else -> true
+                    }
+                    Text(
+                        if (showLabel) b.short else "",
+                        modifier = Modifier.weight(1f),
+                        fontSize = 9.sp,
+                        maxLines = 1,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            if (peakIndex >= 0) {
+                Text(
+                    "সবচেয়ে বেশি খরচ: ${buckets[peakIndex].full} · ${taka(max, privacy)}",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Rose500
+                )
+            }
+            Text("গড় (প্রতি ${if (view == "year") "মাসে" else "দিনে"}): ${taka(average, privacy)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** Income and expense of the selected report period as two bars on a shared scale. */
+@Composable
+fun IncomeExpenseBars(income: Double, expense: Double, privacy: Boolean) {
+    val max = maxOf(income, expense)
+    val rows = listOf(Triple("আয়", income, Emerald500), Triple("ব্যয়", expense, Rose500))
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        rows.forEach { (label, value, color) ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(label, fontSize = 13.sp)
+                    Text(taka(value, privacy), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = color)
+                }
+                Box(Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = 0.06f))) {
+                    val frac = if (max > 0) (value / max).toFloat() else 0f
+                    Box(Modifier.fillMaxWidth(frac).height(12.dp).clip(RoundedCornerShape(6.dp)).background(color))
+                }
+            }
+        }
+        Text("নিট: ${taka(income - expense, privacy)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

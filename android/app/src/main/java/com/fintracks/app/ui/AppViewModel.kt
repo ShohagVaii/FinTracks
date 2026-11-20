@@ -292,7 +292,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         linked.forEach { (t, i) -> repo.delete(t, i) }
         refreshTables()
         // Shops delete their purchases and payments too, so they are not undoable. Linked rows are not undoable either.
-        if (row != null && table != "credit_shops" && linked.isEmpty()) {
+        // Shops and members delete their children too (purchases, bazaar and meal rows), so they are not undoable.
+        if (row != null && table != "credit_shops" && table != "mess_members" && linked.isEmpty()) {
             _state.update { it.copy(undo = UndoEntry(table, row, System.nanoTime())) }
         }
     }
