@@ -93,6 +93,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun loadAll() {
         val profile = repo.list("profiles", "select=*&id=eq.${repo.uid()}").firstOrNull()
         val tables = Sync.run(getApplication<Application>(), repo, profile?.bool("is_privacy_mode") == true)
+        Voucher.syncLocal(getApplication<Application>(), tables["transactions"].orEmpty(), profile)
         _state.update {
             it.copy(
                 signedIn = true,
@@ -106,6 +107,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** After a write: refetch the 16 tables only. Full sync (recurring, reminders, widget) runs on login and daily. */
     private suspend fun refreshTables() {
         val tables = Sync.fetchTables(repo)
+        Voucher.syncLocal(getApplication<Application>(), tables["transactions"].orEmpty(), state.value.profile)
         _state.update { it.copy(tables = tables) }
     }
 

@@ -1,0 +1,136 @@
+package com.fintracks.app.ui
+
+import android.graphics.Bitmap
+import android.widget.Toast
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.fintracks.app.data.str
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonObject
+
+/** Receipt view for one transaction (opened by a normal tap): the voucher, then share as image or PDF. */
+@Composable
+fun ReceiptDialog(t: JsonObject, state: UiState, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var preview by remember { mutableStateOf<Bitmap?>(null) }
+    var busy by remember { mutableStateOf(false) }
+
+    LaunchedEffect(t, state.name) {
+        preview = withContext(Dispatchers.IO) { Voucher.renderSingle(ctx, state, t) }
+    }
+
+    // Shares are rendered again so the issue time is the moment of sharing.
+    fun share(asPdf: Boolean) {
+        busy = true
+        scope.launch {
+            try {
+                if (asPdf) {
+                    val file = withContext(Dispatchers.IO) { Voucher.singlePdf(ctx, state, t) }
+                    Export.share(ctx, file, "application/pdf", "FinTrack লেনদেন ভাউচার")
+                } else {
+                    val file = withContext(Dispatchers.IO) {
+                        Voucher.pngFile(ctx, Voucher.renderSingle(ctx, state, t))
+                    }
+                    Export.share(ctx, file, "image/png", "FinTrack লেনদেন ভাউচার")
+                }
+            } catch (e: Exception) {
+                Toast.makeText(ctx, "শেয়ার ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("লেনদেনের ভাউচার", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = "বন্ধ করুন") }
+                }
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    val bmp = preview
+                    if (bmp != null) {
+                        Image(
+                            bitmap = bmp.asImageBitmap(),
+                            contentDescription = "ভাউচার",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        CircularProgressIndicator()
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { share(false) },
+                        enabled = preview != null && !busy,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("ছবি শেয়ার") }
+                    OutlinedButton(
+                        onClick = { share(true) },
+                        enabled = preview != null && !busy,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("PDF শেয়ার") }
+                }
+            }
+        }
+    }
+}
+
+/** Long-press menu on a transaction row: the only place where edit and delete are offered. */
+@Composable
+fun TxActionDialog(t: JsonObject, onEdit: () -> Unit, onDelete: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("লেনদেন", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                Text(t.str("category").ifEmpty { "লেনদেন" }, fontSize = 14.sp)
+                TextButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) { Text("এডিট করুন") }
+                TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) {
+                    Text("মুছে ফেলুন", color = Color(0xFFF43F5E))
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+    )
+}

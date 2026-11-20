@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.fintracks.app.data.id
 import kotlinx.serialization.json.JsonObject
 
 /** Full-screen tools opened from the Tools tab or the header. */
@@ -107,6 +108,8 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
     val overlay = overlayName?.let { runCatching { Overlay.valueOf(it) }.getOrNull() }
     val snackbar = remember { SnackbarHostState() }
     var showCalc by remember { mutableStateOf(false) }
+    var receipt by remember { mutableStateOf<JsonObject?>(null) }
+    var txAction by remember { mutableStateOf<JsonObject?>(null) }
 
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it) } }
     LaunchedEffect(state.notice) { state.notice?.let { snackbar.showSnackbar(it) } }
@@ -155,8 +158,8 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
                 if (overlay != null) {
                     OverlayContent(overlay, state, vm, openTx) { overlayName = null }
                 } else when (tab) {
-                    "dashboard" -> DashboardScreen(state, vm, openTx) { overlayName = it.name }
-                    "transactions" -> TransactionsScreen(state, vm, openTx)
+                    "dashboard" -> DashboardScreen(state, vm, openTx, { receipt = it }, { txAction = it }) { overlayName = it.name }
+                    "transactions" -> TransactionsScreen(state, vm, openTx, { receipt = it }, { txAction = it })
                     "shared" -> SharedScreen(state, vm)
                     else -> ToolsScreen { overlayName = it.name }
                 }
@@ -171,6 +174,16 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
     }
 
     if (showCalc) CalculatorDialog(onUse = { showCalc = false }, onDismiss = { showCalc = false })
+
+    receipt?.let { r -> ReceiptDialog(r, state) { receipt = null } }
+    txAction?.let { a ->
+        TxActionDialog(
+            a,
+            onEdit = { txAction = null; openTx(a) },
+            onDelete = { txAction = null; vm.remove("transactions", a.id()) },
+            onDismiss = { txAction = null }
+        )
+    }
 
     txEditor?.let { editor ->
         TransactionDialog(

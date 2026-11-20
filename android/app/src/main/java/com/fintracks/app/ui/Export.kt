@@ -44,7 +44,7 @@ object Export {
         s.forEach { c -> append(if (c in '0'..'9') '০' + (c - '0') else c) }
     }
 
-    private fun accountName(state: UiState, t: JsonObject): String =
+    fun accountName(state: UiState, t: JsonObject): String =
         state.rows("accounts").firstOrNull { it.id() == t.strOrNull("account_id") }?.str("name").orEmpty()
 
     private fun rows(state: UiState, txs: List<JsonObject>): List<List<Any>> =
@@ -73,11 +73,7 @@ object Export {
     }
 
     /** One transaction as a voucher PDF (Bengali, with QR code). */
-    fun receiptFile(ctx: Context, state: UiState, t: JsonObject): File {
-        val file = newFile(ctx, Format.PDF, "fintrack-receipt")
-        writeReceiptPdf(ctx, file, state, t)
-        return file
-    }
+    fun receiptFile(ctx: Context, state: UiState, t: JsonObject): File = Voucher.singlePdf(ctx, state, t)
 
     fun share(ctx: Context, file: File, mime: String, title: String) {
         val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
@@ -155,7 +151,7 @@ object Export {
 
     private val fontCache = HashMap<Boolean, Typeface>()
 
-    private fun font(ctx: Context, bold: Boolean): Typeface = fontCache.getOrPut(bold) {
+    fun font(ctx: Context, bold: Boolean): Typeface = fontCache.getOrPut(bold) {
         runCatching {
             Typeface.createFromAsset(ctx.applicationContext.assets, if (bold) "fonts/NotoSansBengali-Bold.ttf" else "fonts/NotoSansBengali-Regular.ttf")
         }.getOrDefault(Typeface.DEFAULT)
@@ -255,7 +251,7 @@ object Export {
 
     // ---------------- Receipt / voucher PDF (single transaction, with QR) ----------------
 
-    private fun qrBitmap(text: String, size: Int): Bitmap {
+    fun qrBitmap(text: String, size: Int): Bitmap {
         val hints = mapOf(EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M, EncodeHintType.MARGIN to 1)
         val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, size, size, hints)
         val pixels = IntArray(size * size)
@@ -263,90 +259,5 @@ object Export {
             pixels[y * size + x] = if (matrix.get(x, y)) Color.BLACK else Color.WHITE
         }
         return Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
-    }
-
-    private fun writeReceiptPdf(ctx: Context, file: File, state: UiState, t: JsonObject) {
-        val pw = 420; val ph = 880
-        val doc = PdfDocument()
-        val page = doc.startPage(PdfDocument.PageInfo.Builder(pw, ph, 1).create())
-        val c = page.canvas
-        val type = t.str("type")
-        val accent = when (type) { "Income" -> "#059669"; "Expense" -> "#DC2626"; else -> "#0284C7" }
-        val trx = t.id().replace("-", "").take(8).uppercase()
-        val amount = t.num("amount")
-        val sign = when (type) { "Income" -> "+ "; "Expense" -> "- "; else -> "" }
-
-        // Paper + top gradient strip
-        c.drawColor(Color.parseColor("#F8FAFC"))
-        val card = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
-        c.drawRoundRect(RectF(20f, 20f, pw - 20f, ph - 20f), 24f, 24f, card)
-        val strip = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = android.graphics.LinearGradient(20f, 0f, pw - 20f, 0f, Color.parseColor("#0284C7"), Color.parseColor("#22D3EE"), android.graphics.Shader.TileMode.CLAMP)
-        }
-        c.drawRoundRect(RectF(20f, 20f, pw - 20f, 40f), 24f, 24f, strip)
-
-        // Diagonal watermark
-        val wm = paint(ctx, 34f, Color.parseColor("#F1F5F9"), bold = true, align = Paint.Align.CENTER)
-        c.save(); c.rotate(-30f, pw / 2f, ph / 2f)
-        c.drawText("FINTRACK PREMIUM", pw / 2f, ph / 2f, wm)
-        c.restore()
-
-        val center = paint(ctx, 26f, Color.parseColor("#0F172A"), bold = true, align = Paint.Align.CENTER)
-        c.drawText("FINTRACK PREMIUM", pw / 2f, 100f, center)
-        c.drawText("অফিসিয়াল লেনদেন ভাউচার", pw / 2f, 124f, paint(ctx, 12f, Color.parseColor("#0284C7"), bold = true, align = Paint.Align.CENTER))
-        c.drawText("TRX ID: #$trx", pw / 2f, 146f, paint(ctx, 11f, Color.parseColor("#64748B"), align = Paint.Align.CENTER))
-
-        // Issue time pill
-        val pill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F1F5F9") }
-        c.drawRoundRect(RectF(60f, 166f, pw - 60f, 196f), 14f, 14f, pill)
-        c.drawText("ইস্যু সময়: ${bn(todayIso())}", pw / 2f, 186f, paint(ctx, 11f, Color.parseColor("#334155"), bold = true, align = Paint.Align.CENTER))
-
-        // Amount box
-        val tint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor(when (type) { "Income" -> "#ECFDF5"; "Expense" -> "#FEF2F2"; else -> "#F0F9FF" })
-        }
-        c.drawRoundRect(RectF(50f, 214f, pw - 50f, 340f), 20f, 20f, tint)
-        val label = when (type) { "Income" -> "মোট আয় (INCOME)"; "Expense" -> "মোট ব্যয় (EXPENSE)"; else -> "ট্রান্সফার (TRANSFER)" }
-        c.drawText(label, pw / 2f, 246f, paint(ctx, 12f, Color.parseColor(accent), bold = true, align = Paint.Align.CENTER))
-        c.drawText("$sign৳ ${bn(String.format("%,.2f", amount))}", pw / 2f, 300f, paint(ctx, 36f, Color.parseColor(accent), bold = true, align = Paint.Align.CENTER))
-        c.drawText("✔ যাচাইকৃত ও FinTrack-এ সংরক্ষিত", pw / 2f, 326f, paint(ctx, 10f, Color.parseColor(accent), bold = true, align = Paint.Align.CENTER))
-
-        // Detail rows
-        val lab = paint(ctx, 12f, Color.parseColor("#64748B"))
-        val val1 = paint(ctx, 12f, Color.parseColor("#0F172A"), bold = true, align = Paint.Align.RIGHT)
-        val rows = listOf(
-            "লেনদেনের তারিখ" to bn(dateOf(t, "tx_date")),
-            "ক্যাটাগরি" to "${catIcon(t.str("category"))} ${t.str("category")}",
-            "পেমেন্ট মেথড" to t.str("payment_mode").ifEmpty { "-" },
-            "অ্যাকাউন্ট" to accountName(state, t).ifEmpty { "-" },
-            "মুড" to t.str("mood").ifEmpty { "-" },
-            "নোট" to t.str("note").ifEmpty { "-" }.take(40),
-            "প্রোফাইল" to (state.profile?.str("name")?.ifEmpty { "-" } ?: "-")
-        )
-        var y = 372f
-        rows.forEach { (k, v) ->
-            c.drawText(k, 60f, y, lab)
-            c.drawText(v, pw - 60f, y, val1)
-            y += 28f
-        }
-
-        // Dashed divider
-        val dash = Paint().apply {
-            color = Color.parseColor("#CBD5E1"); style = Paint.Style.STROKE; strokeWidth = 1.5f
-            pathEffect = android.graphics.DashPathEffect(floatArrayOf(6f, 6f), 0f)
-        }
-        c.drawLine(50f, y + 6f, pw - 50f, y + 6f, dash)
-
-        // QR code
-        val qrSize = 150
-        val qr = qrBitmap("FT|$trx|$type|${fmtNum(amount)}|${dateOf(t, "tx_date")}", qrSize * 2)
-        c.drawBitmap(qr, null, RectF(pw / 2f - qrSize / 2f, y + 22f, pw / 2f + qrSize / 2f, y + 22f + qrSize), null)
-        val fy = y + 22f + qrSize + 26f
-        c.drawText("FT-$trx-SECURE", pw / 2f, fy, paint(ctx, 10f, Color.parseColor("#64748B"), align = Paint.Align.CENTER))
-        c.drawText("FinTrack সুরক্ষিত লেজার · শুধুমাত্র আপনার জন্য", pw / 2f, fy + 18f, paint(ctx, 9f, Color.parseColor("#94A3B8"), align = Paint.Align.CENTER))
-
-        doc.finishPage(page)
-        file.outputStream().use { doc.writeTo(it) }
-        doc.close()
     }
 }

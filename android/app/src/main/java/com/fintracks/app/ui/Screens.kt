@@ -117,7 +117,7 @@ fun accountBalance(acc: JsonObject, txs: List<JsonObject>): Double {
 private data class DashStats(val income: Double, val expense: Double, val total: Double, val savingsRate: Double)
 
 @Composable
-fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit, openOverlay: (Overlay) -> Unit) {
+fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit, openReceipt: (JsonObject) -> Unit, onTxLongPress: (JsonObject) -> Unit, openOverlay: (Overlay) -> Unit) {
     val txs = state.rows("transactions")
     val accounts = state.rows("accounts")
     val p = state.privacy
@@ -277,7 +277,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
 
         SectionTitle("সাম্প্রতিক লেনদেন")
         if (txs.isEmpty()) EmptyHint("এখনো কোনো লেনদেন নেই। নিচের + বাটন দিয়ে যোগ করুন।")
-        txs.take(5).forEach { t -> TxItem(t, state, onClick = { openTx(t) }, onDelete = null) }
+        txs.take(5).forEach { t -> TxItem(t, state, onClick = { openReceipt(t) }, onDelete = null, onLongClick = { onTxLongPress(t) }) }
         Spacer(Modifier.height(90.dp))
     }
 }
@@ -286,11 +286,11 @@ private fun lastIndexWithData(list: List<Double>): Int = list.indexOfLast { it >
 
 /** One transaction line: icon, note, mode, date, amount. */
 @Composable
-fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onDelete: (() -> Unit)?, onShare: (() -> Unit)? = null) {
+fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onDelete: (() -> Unit)?, onShare: (() -> Unit)? = null, onLongClick: (() -> Unit)? = null) {
     val type = t.str("type")
     val amountColor = when (type) { "Income" -> incomeGreen; "Expense" -> expenseRed; else -> Sky400 }
     val sign = when (type) { "Income" -> "+"; "Expense" -> "-"; else -> "⇄" }
-    AppCard(onClick = onClick) {
+    AppCard(onClick = onClick, onLongClick = onLongClick) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).background(VideoCardLift.copy(alpha = 0.8f)),
@@ -309,7 +309,7 @@ fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onDelete: (() -> 
 }
 
 @Composable
-fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit) {
+fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit, openReceipt: (JsonObject) -> Unit, onTxLongPress: (JsonObject) -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
@@ -347,13 +347,25 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                     }
                 }) { Text("$label", maxLines = 1, softWrap = false, fontSize = 13.sp) }
             }
+            OutlinedButton(modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 4.dp), enabled = !busy && filtered.isNotEmpty(), onClick = {
+                busy = true
+                scope.launch {
+                    try {
+                        val file = withContext(Dispatchers.IO) { Voucher.summaryPdf(ctx, state, filtered, range.label) }
+                        Export.share(ctx, file, "application/pdf", "FinTrack সারসংক্ষেপ ভাউচার")
+                    } catch (e: Exception) {
+                        Toast.makeText(ctx, "ভাউচার ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
+                    } finally { busy = false }
+                }
+            }) { Text("ভাউচার", maxLines = 1, softWrap = false, fontSize = 13.sp) }
         }
         if (filtered.isEmpty()) EmptyHint("এই সময়সীমায় কোনো লেনদেন পাওয়া যায়নি")
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
             items(filtered, key = { it.id() }) { t ->
                 TxItem(
                     t, state,
-                    onClick = { openTx(t) },
+                    onClick = { openReceipt(t) },
+                    onLongClick = { onTxLongPress(t) },
                     onDelete = { vm.remove("transactions", t.id()) },
                     onShare = {
                         scope.launch {

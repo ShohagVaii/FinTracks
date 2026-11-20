@@ -59,14 +59,15 @@ import androidx.compose.foundation.verticalScroll
 
 /** Glass-style card, like the web app's `.glass` class. */
 @Composable
-fun AppCard(onClick: (() -> Unit)? = null, borderColor: Color = Color.White.copy(alpha = 0.08f), content: @Composable ColumnScope.() -> Unit) {
+@OptIn(ExperimentalFoundationApi::class)
+fun AppCard(onClick: (() -> Unit)? = null, borderColor: Color = Color.White.copy(alpha = 0.08f), onLongClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     val colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     val border = BorderStroke(1.dp, borderColor)
     val inner: @Composable ColumnScope.() -> Unit = {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp), content = content)
     }
-    if (onClick != null) {
-        Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), colors = colors, border = border, shape = RoundedCornerShape(24.dp)) { inner() }
+    if (onClick != null || onLongClick != null) {
+        Card(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick ?: {}, onLongClick = onLongClick), colors = colors, border = border, shape = RoundedCornerShape(24.dp)) { inner() }
     } else {
         Card(modifier = Modifier.fillMaxWidth(), colors = colors, border = border, shape = RoundedCornerShape(24.dp)) { inner() }
     }
