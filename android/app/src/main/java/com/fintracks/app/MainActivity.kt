@@ -5,6 +5,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.fragment.app.FragmentActivity
 import com.fintracks.app.ui.AppLock
+import com.fintracks.app.ui.DailySyncWorker
 import com.fintracks.app.ui.FinTracksApp
 
 /** FragmentActivity is required by BiometricPrompt. */
@@ -13,6 +14,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         if (savedInstanceState == null && AppLock.isEnabled(this)) AppLock.lock()
+        DailySyncWorker.schedule(this)
         setContent { FinTracksApp() }
     }
 

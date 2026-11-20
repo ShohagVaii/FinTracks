@@ -178,7 +178,7 @@ private fun OverlayHeader(title: String, onBack: () -> Unit) {
 @Composable
 private fun OverlayContent(overlay: Overlay, state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit) {
     when (overlay) {
-        Overlay.CHAT -> ChatScreen(state)
+        Overlay.CHAT -> ChatScreen(state, vm)
         Overlay.ZAKAT -> ZakatScreen(state)
         Overlay.TAX -> TaxScreen(state)
         Overlay.CURRENCY -> CurrencyScreen()

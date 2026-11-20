@@ -4,6 +4,10 @@ import android.content.Context
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -83,6 +87,17 @@ class Repository(context: Context) {
 
     suspend fun updateProfile(fields: JsonObject) {
         authed("PATCH", "/rest/v1/profiles?id=eq.${uid()}", fields, "return=minimal")
+    }
+
+    /** Calls the server-side AI function. The Gemini key never leaves Supabase. */
+    suspend fun askAi(question: String, context: String): String {
+        val body = buildJsonObject {
+            put("question", question)
+            put("context", context)
+        }
+        val text = authed("POST", "/functions/v1/ai-chat", body)
+        return json.parseToJsonElement(text).jsonObject["answer"]?.jsonPrimitive?.content
+            ?: throw SupabaseException(500, "AI উত্তর পাওয়া যায়নি")
     }
 
     companion object {

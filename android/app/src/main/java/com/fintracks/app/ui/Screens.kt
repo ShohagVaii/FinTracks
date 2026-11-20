@@ -32,6 +32,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.fintracks.app.data.bool
 import com.fintracks.app.data.id
 import com.fintracks.app.data.num
@@ -152,7 +158,7 @@ private fun lastIndexWithData(list: List<Double>): Int = list.indexOfLast { it >
 
 /** One transaction line: icon, note, mode, date, amount. */
 @Composable
-fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onDelete: (() -> Unit)?) {
+fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onDelete: (() -> Unit)?, onShare: (() -> Unit)? = null) {
     val type = t.str("type")
     val amountColor = when (type) { "Income" -> incomeGreen; "Expense" -> expenseRed; else -> Sky400 }
     val sign = when (type) { "Income" -> "+"; "Expense" -> "-"; else -> "⇄" }
@@ -165,6 +171,7 @@ fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onDelete: (() -> 
                 Text("${dateOf(t, "tx_date")} · ${t.str("payment_mode")} ${t.str("mood")}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text("$sign ${taka(t.num("amount"), state.privacy)}", color = amountColor, fontWeight = FontWeight.Bold)
+            if (onShare != null) OutlinedButton(onClick = onShare, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)) { Text("শেয়ার", fontSize = 11.sp) }
             if (onDelete != null) DeleteButton(onDelete)
         }
     }
@@ -172,20 +179,62 @@ fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onDelete: (() -> 
 
 @Composable
 fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("all") }
+    var period by remember { mutableStateOf(Period.MONTH) }
+    var customFrom by remember { mutableStateOf(todayIso().substring(0, 8) + "01") }
+    var customTo by remember { mutableStateOf(todayIso()) }
+    var busy by remember { mutableStateOf(false) }
+    val range = rangeFor(period, customFrom, customTo)
     val all = state.rows("transactions")
-    val filtered = all.filter { t ->
+    val inRange = filterByRange(all, range)
+    val filtered = inRange.filter { t ->
         (filter == "all" || t.str("type").lowercase() == filter.lowercase()) &&
             (query.isBlank() || t.str("note").contains(query, true) || t.str("category").contains(query, true))
-    }
+    }.sortedByDescending { dateOf(it, "tx_date") }
+    val income = inRange.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
+    val expense = inRange.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
+
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text("খুঁজুন (নোট / ক্যাটাগরি)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        PeriodPicker(period, customFrom, customTo, onPeriod = { period = it }, onFrom = { customFrom = it }, onTo = { customTo = it })
         ChoiceChips(listOf("all" to "সব", "income" to "আয়", "expense" to "ব্যয়", "transfer" to "ট্রান্সফার"), filter) { filter = it }
-        if (filtered.isEmpty()) EmptyHint("কোনো লেনদেন পাওয়া যায়নি")
+        Text("${range.label} · আয় ${taka(income, state.privacy)} · ব্যয় ${taka(expense, state.privacy)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(Export.Format.XLSX to "Excel", Export.Format.PDF to "PDF", Export.Format.CSV to "CSV").forEach { (fmt, label) ->
+                OutlinedButton(enabled = !busy && filtered.isNotEmpty(), onClick = {
+                    busy = true
+                    scope.launch {
+                        try {
+                            val file = withContext(Dispatchers.IO) { Export.listFile(ctx, fmt, state, filtered, range.label) }
+                            Export.share(ctx, file, fmt.mime, "FinTrack - ${range.label}")
+                        } catch (e: Exception) {
+                            Toast.makeText(ctx, "এক্সপোর্ট ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
+                        } finally { busy = false }
+                    }
+                }) { Text("${label} এক্সপোর্ট") }
+            }
+        }
+        if (filtered.isEmpty()) EmptyHint("এই সময়সীমায় কোনো লেনদেন পাওয়া যায়নি")
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
             items(filtered, key = { it.id() }) { t ->
-                TxItem(t, state, onClick = { openTx(t) }, onDelete = { vm.remove("transactions", t.id()) })
+                TxItem(
+                    t, state,
+                    onClick = { openTx(t) },
+                    onDelete = { vm.remove("transactions", t.id()) },
+                    onShare = {
+                        scope.launch {
+                            try {
+                                val file = withContext(Dispatchers.IO) { Export.receiptFile(ctx, state, t) }
+                                Export.share(ctx, file, "application/pdf", "FinTrack লেনদেন ভাউচার")
+                            } catch (e: Exception) {
+                                Toast.makeText(ctx, "শেয়ার ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                )
             }
             item { Spacer(Modifier.height(90.dp)) }
         }

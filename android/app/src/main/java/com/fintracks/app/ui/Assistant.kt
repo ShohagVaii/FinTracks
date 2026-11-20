@@ -29,6 +29,9 @@ import com.fintracks.app.data.id
 import com.fintracks.app.data.num
 import com.fintracks.app.data.str
 import kotlin.math.ceil
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 /**
  * Offline assistant. It answers from the user's own data with no network and no API key.
@@ -105,24 +108,58 @@ object Assistant {
     }
 }
 
+/** Short financial summary sent to the AI (no raw rows; amounts hidden in privacy mode). */
+fun aiContext(state: UiState): String {
+    val p = state.privacy
+    fun m(v: Double) = if (p) "***" else fmtNum(v)
+    val month = monthPrefix()
+    val txs = state.rows("transactions").filter { dateOf(it, "tx_date").startsWith(month) }
+    val income = txs.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
+    val expense = txs.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
+    val cats = txs.filter { it.str("type") == "Expense" }.groupBy { it.str("category") }
+        .map { (k, v) -> k to v.sumOf { it.num("amount") } }.sortedByDescending { it.second }.take(5)
+    val debts = state.rows("debts").filter { !it.bool("settled") }
+    val owe = debts.filter { it.str("direction") == "owe" }.sumOf { it.num("amount") }
+    val owed = debts.filter { it.str("direction") == "owed" }.sumOf { it.num("amount") }
+    return buildString {
+        append("মুদ্রা: ${state.currency}. মাস: $month. মোট আয়: ${m(income)}. মোট ব্যয়: ${m(expense)}.\n")
+        append("শীর্ষ ব্যয়ের ক্যাটাগরি: ")
+        append(cats.joinToString(", ") { "${it.first} ${m(it.second)}" }.ifEmpty { "নেই" })
+        append(".\nআপনার ধার: ${m(owe)}. আপনার পাওনা: ${m(owed)}.\n")
+        append("বাজেট সংখ্যা: ${state.rows("budgets").size}, লক্ষ্য সংখ্যা: ${state.rows("goals").size}.")
+    }.take(3900)
+}
+
 @Composable
-fun ChatScreen(state: UiState) {
+fun ChatScreen(state: UiState, vm: AppViewModel) {
+    val scope = rememberCoroutineScope()
     val messages = remember { mutableStateListOf("assistant" to "আসসালামু আলাইকুম! আমি FinTrack সহকারী। আপনার খরচ, বাকি, ধার বা যাকাত নিয়ে প্রশ্ন করুন।") }
     var input by remember { mutableStateOf("") }
+    var thinking by remember { mutableStateOf(false) }
 
-    fun send() {
-        val q = input.trim()
-        if (q.isEmpty()) return
+    fun send(text: String) {
+        val q = text.trim().take(1000)
+        if (q.isEmpty() || thinking) return
         messages += "user" to q
-        messages += "assistant" to Assistant.answer(q, state)
         input = ""
+        thinking = true
+        scope.launch {
+            val reply = try {
+                vm.askAi(q, aiContext(state))
+            } catch (e: Exception) {
+                // Offline or AI not available: answer from local data instead.
+                Assistant.answer(q, state) + "\n\n(AI সংযোগ নেই, স্থানীয় হিসাব থেকে উত্তর দেওয়া হয়েছে)"
+            }
+            messages += "assistant" to reply
+            thinking = false
+        }
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         ChoiceChips(
             listOf("এই মাসে কত খরচ?" to "এই মাসে কত খরচ?", "বাজেট কেমন?" to "বাজেট কেমন?", "পরামর্শ দিন" to "পরামর্শ দিন", "বাকি কত?" to "বাকি কত?"),
             ""
-        ) { input = it; send() }
+        ) { send(it) }
         LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(messages) { (who, text) ->
                 val mine = who == "user"
@@ -137,10 +174,11 @@ fun ChatScreen(state: UiState) {
                     }
                 }
             }
+            if (thinking) item { Text("ভাবছি…", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp) }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextIn("প্রশ্ন লিখুন", input, { input = it }, modifier = Modifier.weight(1f))
-            Button(onClick = { send() }, enabled = input.isNotBlank()) { Text("পাঠান") }
+            Button(onClick = { send(input) }, enabled = input.isNotBlank() && !thinking) { Text("পাঠান") }
         }
     }
 }

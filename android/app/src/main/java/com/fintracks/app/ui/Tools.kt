@@ -17,6 +17,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
+import android.widget.Toast
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.fintracks.app.data.row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -275,16 +281,14 @@ fun LoanScreen(state: UiState, vm: AppViewModel) {
 
 @Composable
 fun ReportsScreen(state: UiState) {
-    var period by remember { mutableStateOf("monthly") }
-    val now = todayIso()
-    val txs = state.rows("transactions").filter { t ->
-        val d = dateOf(t, "tx_date")
-        when (period) {
-            "weekly" -> runCatching { java.time.LocalDate.parse(d) >= java.time.LocalDate.parse(now).minusDays(7) }.getOrDefault(false)
-            "monthly" -> d.startsWith(now.substring(0, 7))
-            else -> d.startsWith(now.substring(0, 4))
-        }
-    }
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var period by remember { mutableStateOf(Period.MONTH) }
+    var customFrom by remember { mutableStateOf(todayIso().substring(0, 8) + "01") }
+    var customTo by remember { mutableStateOf(todayIso()) }
+    var busy by remember { mutableStateOf(false) }
+    val range = rangeFor(period, customFrom, customTo)
+    val txs = filterByRange(state.rows("transactions"), range)
     val income = txs.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
     val expense = txs.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
     val cats = txs.filter { it.str("type") == "Expense" }
@@ -294,11 +298,13 @@ fun ReportsScreen(state: UiState) {
     val p = state.privacy
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        ChoiceChips(listOf("weekly" to "সাপ্তাহিক", "monthly" to "মাসিক", "yearly" to "বাৎসরিক"), period) { period = it }
+        PeriodPicker(period, customFrom, customTo, onPeriod = { period = it }, onFrom = { customFrom = it }, onTo = { customTo = it })
+        Text(range.label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         AppCard {
             KeyValue("আয়", taka(income, p), Color(0xFF10B981))
             KeyValue("ব্যয়", taka(expense, p), Color(0xFFF43F5E))
             KeyValue("নিট", taka(income - expense, p), Color(0xFF38BDF8))
+            KeyValue("লেনদেন সংখ্যা", txs.size.toString(), Color(0xFF94A3B8))
         }
         AppCard {
             Text("খাতওয়ারি ব্যয়", fontWeight = FontWeight.Bold)
@@ -317,6 +323,24 @@ fun ReportsScreen(state: UiState) {
             val byDay = txs.filter { it.str("type") == "Expense" }.groupBy { dateOf(it, "tx_date") }
                 .toSortedMap().values.map { list -> list.sumOf { it.num("amount") } }
             LineChart(byDay.ifEmpty { listOf(0.0) }, Color(0xFF0EA5E9))
+        }
+        AppCard {
+            Text("রিপোর্ট এক্সপোর্ট", fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(Export.Format.PDF to "PDF", Export.Format.XLSX to "Excel", Export.Format.CSV to "CSV").forEach { (fmt, label) ->
+                    OutlinedButton(enabled = !busy && txs.isNotEmpty(), onClick = {
+                        busy = true
+                        scope.launch {
+                            try {
+                                val file = withContext(Dispatchers.IO) { Export.listFile(ctx, fmt, state, txs, range.label) }
+                                Export.share(ctx, file, fmt.mime, "FinTrack রিপোর্ট - ${range.label}")
+                            } catch (e: Exception) {
+                                Toast.makeText(ctx, "এক্সপোর্ট ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
+                            } finally { busy = false }
+                        }
+                    }) { Text(label) }
+                }
+            }
         }
     }
 }
