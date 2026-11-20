@@ -43,7 +43,8 @@ val TABLES: List<Pair<String, String>> = listOf(
     "shopping_items" to "select=*",
     "mess_members" to "select=*",
     "mess_bazaars" to "select=*&order=bazaar_date.desc",
-    "mess_meals" to "select=*&order=meal_date.desc"
+    "mess_meals" to "select=*&order=meal_date.desc",
+    "mess_deposits" to "select=*&order=deposit_date.desc"
 )
 
 /** The last deleted row, kept for a few seconds so the user can undo. */
@@ -58,7 +59,7 @@ val UNDO_LABELS = mapOf(
     "transactions" to "লেনদেন", "accounts" to "অ্যাকাউন্ট", "budgets" to "বাজেট", "goals" to "লক্ষ্য",
     "debts" to "ধার", "loans" to "লোন", "subscriptions" to "সাবস্ক্রিপশন", "investments" to "বিনিয়োগ",
     "credit_entries" to "কেনা", "credit_payments" to "পরিশোধ", "shopping_items" to "শপিং আইটেম",
-    "bill_splits" to "বিল ভাগ", "mess_bazaars" to "বাজার", "mess_meals" to "মিল"
+    "bill_splits" to "বিল ভাগ", "mess_bazaars" to "বাজার", "mess_meals" to "মিল", "mess_deposits" to "জমা"
 )
 
 data class UiState(
@@ -83,6 +84,8 @@ data class UiState(
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = Repository(app)
+    /** Notepad: server copy plus offline cache and pending queue (see Notes.kt). */
+    val notes = NotesStore(app, repo, viewModelScope)
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
@@ -231,7 +234,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun clearLocalData() {
         val app = getApplication<Application>()
         AppLock.disable(app)
-        listOf("fintrack_lock", "fintrack_recurring", "fintrack_reminders").forEach {
+        listOf("fintrack_lock", "fintrack_recurring", "fintrack_reminders", "fintrack_notes", "fintrack_counter").forEach {
             app.getSharedPreferences(it, Context.MODE_PRIVATE).edit().clear().commit()
         }
         PendingSmsStore.save(app, emptyList())

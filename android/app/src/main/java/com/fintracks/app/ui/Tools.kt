@@ -31,6 +31,9 @@ import kotlinx.coroutines.withContext
 import com.fintracks.app.data.row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Cake
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.CreditCard
@@ -100,7 +103,10 @@ fun ToolsScreen(onOpen: (Overlay) -> Unit) {
         ToolTile(Overlay.CREDIT, "বাকি খাতা", Icons.Default.Receipt, Color(0xFFFBBF24)),
         ToolTile(Overlay.BUDGETS, "বাজেট", Icons.Default.Check, Color(0xFF2DD4BF)),
         ToolTile(Overlay.GOALS, "লক্ষ্য", Icons.Default.Star, Color(0xFFFB923C)),
-        ToolTile(Overlay.ACCOUNTS, "অ্যাকাউন্ট", Icons.Default.Add, Color(0xFF94A3B8))
+        ToolTile(Overlay.ACCOUNTS, "অ্যাকাউন্ট", Icons.Default.Add, Color(0xFF94A3B8)),
+        ToolTile(Overlay.COUNTER, "টাকা গণক", Icons.Default.Payments, Color(0xFF84CC16)),
+        ToolTile(Overlay.AGE, "বয়স ক্যালকুলেটর", Icons.Default.Cake, Color(0xFFE879F9)),
+        ToolTile(Overlay.NOTES, "নোটপ্যাড", Icons.Default.Description, Color(0xFFFACC15))
     )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Financial Hub", fontSize = 24.sp, fontWeight = FontWeight.Black)

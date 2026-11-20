@@ -66,7 +66,8 @@ enum class Overlay(val title: String) {
     ZAKAT("যাকাত ক্যালকুলেটর"), TAX("ট্যাক্স ক্যালকুলেটর"), CURRENCY("কারেন্সি কনভার্টার"),
     CHAT("AI সহকারী"), LOAN("লোন / EMI"), CREDIT("বাকি খাতা"), DEBTS("ধার ও পাওনা"),
     BUDGETS("বাজেট এনভেলপ"), GOALS("সঞ্চয় লক্ষ্য"), INVESTMENTS("ইনভেস্টমেন্ট"),
-    SUBSCRIPTIONS("সাবস্ক্রিপশন"), ACCOUNTS("অ্যাকাউন্ট ও ট্রান্সফার"), REPORTS("পরিসংখ্যান ও রিপোর্ট"), SETTINGS("সেটিংস")
+    SUBSCRIPTIONS("সাবস্ক্রিপশন"), ACCOUNTS("অ্যাকাউন্ট ও ট্রান্সফার"), REPORTS("পরিসংখ্যান ও রিপোর্ট"), SETTINGS("সেটিংস"),
+    COUNTER("টাকা গণক"), AGE("বয়স ক্যালকুলেটর"), NOTES("নোটপ্যাড")
 }
 
 @Composable
@@ -271,5 +272,8 @@ private fun OverlayContent(overlay: Overlay, state: UiState, vm: AppViewModel, o
         Overlay.ACCOUNTS -> AccountsScreen(state, vm)
         Overlay.REPORTS -> ReportsScreen(state)
         Overlay.SETTINGS -> SettingsScreen(state, vm)
+        Overlay.COUNTER -> MoneyCounterScreen()
+        Overlay.AGE -> AgeCalcScreen()
+        Overlay.NOTES -> NotesScreen(vm)
     }
 }

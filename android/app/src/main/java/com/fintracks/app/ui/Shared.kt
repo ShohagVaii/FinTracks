@@ -377,20 +377,23 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
     var editingMember by remember { mutableStateOf<JsonObject?>(null) }
     var addingBazaar by remember { mutableStateOf(false) }
     var addingMeal by remember { mutableStateOf(false) }
+    var addingDeposit by remember { mutableStateOf(false) }
 
     // Every figure below is for the selected month only.
     val prefix = ym.toString()
     val members = state.rows("mess_members")
     val bazaars = state.rows("mess_bazaars").filter { dateOf(it, "bazaar_date").startsWith(prefix) }
     val meals = state.rows("mess_meals").filter { dateOf(it, "meal_date").startsWith(prefix) }
+    val deposits = state.rows("mess_deposits").filter { dateOf(it, "deposit_date").startsWith(prefix) }
     val totalBazaar = bazaars.sumOf { it.num("amount") }
     val totalMeals = meals.sumOf { it.num("meal_count") }
     val rate = if (totalMeals > 0) totalBazaar / totalMeals else 0.0
-    // জমা = what a member spent on the bazaar this month; খরচ = their meals × rate; balance = জমা − খরচ.
+    // জমা মোট = bazaar spend + cash deposits this month; খরচ = meals × rate; balance = জমা মোট − খরচ.
     val balances = members.associate { m ->
         val paid = bazaars.filter { it.str("member_id") == m.id() }.sumOf { it.num("amount") }
+        val cash = deposits.filter { it.str("member_id") == m.id() }.sumOf { it.num("amount") }
         val mealN = meals.filter { it.str("member_id") == m.id() }.sumOf { it.num("meal_count") }
-        m.id() to (paid - mealN * rate)
+        m.id() to (paid + cash - mealN * rate)
     }
     val nameOf = members.associate { it.id() to it.str("name") }
     val payouts = settle(balances)
@@ -407,6 +410,12 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
             colors = ButtonDefaults.buttonColors(containerColor = Emerald500, contentColor = Color.White),
             modifier = Modifier.weight(1f)
         ) { Text("+ সদস্য") }
+        Button(
+            onClick = { addingDeposit = true },
+            enabled = members.isNotEmpty(),
+            colors = ButtonDefaults.buttonColors(containerColor = Amber500, contentColor = Color.White),
+            modifier = Modifier.weight(1f)
+        ) { Text("জমা এন্ট্রি") }
     }
     Button(
         onClick = { addingBazaar = true },
@@ -425,6 +434,7 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
     if (members.isEmpty()) EmptyHint("কোনো সদস্য নেই। উপরে '+ সদস্য' দিয়ে যোগ করুন।")
     members.forEach { m ->
         val paid = bazaars.filter { it.str("member_id") == m.id() }.sumOf { it.num("amount") }
+        val cash = deposits.filter { it.str("member_id") == m.id() }.sumOf { it.num("amount") }
         val mealN = meals.filter { it.str("member_id") == m.id() }.sumOf { it.num("meal_count") }
         val bal = balances[m.id()] ?: 0.0
         AppCard {
@@ -435,7 +445,9 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
                     DeleteButton { vm.remove("mess_members", m.id()) }
                 }
             }
-            KeyValue("জমা (বাজার)", taka(paid, p))
+            KeyValue("জমা মোট (বাজার + ক্যাশ)", taka(paid + cash, p))
+            KeyValue("  · বাজার এন্ট্রি", taka(paid, p))
+            KeyValue("  · ক্যাশ জমা", taka(cash, p))
             KeyValue("মিল", fmtNum(mealN))
             KeyValue("তার খরচ (মিল × রেট)", taka(mealN * rate, p))
             when {
@@ -453,6 +465,25 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
             payouts.isEmpty() -> Text("এই মাসে কারও কাছে কিছু পাওনা বা দেনা নেই।", fontSize = 13.sp)
             else -> payouts.forEach {
                 Text("${nameOf[it.from].orEmpty()} দেবেন ${nameOf[it.to].orEmpty()}-কে: ${taka(it.amount, p)}", fontSize = 14.sp)
+            }
+        }
+    }
+
+    SectionTitle("জমার হিসাব")
+    if (deposits.isEmpty()) EmptyHint("এই মাসে কোনো জমা এন্ট্রি নেই")
+    deposits.sortedByDescending { dateOf(it, "deposit_date") }.forEach { d ->
+        AppCard {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("${nameOf[d.str("member_id")].orEmpty()} · ক্যাশ জমা", fontWeight = FontWeight.Bold)
+                    Text(
+                        listOf(dateOf(d, "deposit_date"), d.str("note")).filter { it.isNotBlank() }.joinToString(" · "),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(taka(d.num("amount"), p), fontWeight = FontWeight.Bold)
+                DeleteButton { vm.remove("mess_deposits", d.id()) }
             }
         }
     }
@@ -486,6 +517,31 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
         }
     }
 
+    if (addingDeposit && members.isNotEmpty()) {
+        var member by remember { mutableStateOf(members.first().id()) }
+        var amount by remember { mutableStateOf("") }
+        var note by remember { mutableStateOf("") }
+        var date by remember { mutableStateOf(todayIso()) }
+        var error by remember { mutableStateOf<String?>(null) }
+        SharedDialog("জমা এন্ট্রি (ক্যাশ ডিপোজিট)", "সেভ", onDismiss = { addingDeposit = false }, onConfirm = {
+            val a = parseAmount(amount)
+            when {
+                a == null || a <= 0 -> error = "সঠিক টাকার পরিমাণ লিখুন"
+                !isValidIsoDate(date) -> error = "তারিখ লিখুন (YYYY-MM-DD)"
+                else -> {
+                    vm.save("mess_deposits", row("member_id" to member, "amount" to a, "deposit_date" to date.trim(), "note" to note.trim()), null)
+                    addingDeposit = false
+                }
+            }
+        }) {
+            Text("কে জমা দিয়েছেন", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ChoiceChips(members.map { it.id() to it.str("name") }, member) { member = it }
+            TextIn("টাকা (৳)", amount, { amount = it }, number = true)
+            TextIn("তারিখ (YYYY-MM-DD)", date, { date = it })
+            TextIn("নোট (ঐচ্ছিক)", note, { note = it })
+            error?.let { Text(it, color = Rose500, fontSize = 12.sp) }
+        }
+    }
     if (addingMember) {
         var name by remember { mutableStateOf("") }
         SharedDialog("নতুন সদস্য", "সেভ", onDismiss = { addingMember = false }, onConfirm = {
