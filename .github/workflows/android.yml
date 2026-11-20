@@ -1,4 +1,5 @@
 name: Android APK (Kotlin)
+# Release signing: CI reads KEYSTORE_BASE64, KEY_ALIAS, KEY_PASSWORD, STORE_PASSWORD from GitHub Secrets.
 
 on:
   push:
