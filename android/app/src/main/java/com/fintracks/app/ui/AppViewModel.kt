@@ -21,7 +21,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.IOException
+import java.time.LocalDate
 
 /** Every table the app reads, with its PostgREST query. Rows stay as JSON for generic CRUD. */
 val TABLES: List<Pair<String, String>> = listOf(
@@ -93,7 +96,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun loadAll() {
         val profile = repo.list("profiles", "select=*&id=eq.${repo.uid()}").firstOrNull()
         val tables = Sync.run(getApplication<Application>(), repo, profile?.bool("is_privacy_mode") == true)
-        Voucher.syncLocal(getApplication<Application>(), tables["transactions"].orEmpty(), profile)
         _state.update {
             it.copy(
                 signedIn = true,
@@ -102,13 +104,63 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 pendingSms = PendingSmsStore.load(getApplication())
             )
         }
+        syncRegistry(profile, tables["transactions"].orEmpty())
     }
 
     /** After a write: refetch the 16 tables only. Full sync (recurring, reminders, widget) runs on login and daily. */
     private suspend fun refreshTables() {
         val tables = Sync.fetchTables(repo)
-        Voucher.syncLocal(getApplication<Application>(), tables["transactions"].orEmpty(), state.value.profile)
         _state.update { it.copy(tables = tables) }
+        syncRegistry(state.value.profile, tables["transactions"].orEmpty())
+    }
+
+    /**
+     * Keeps the server voucher_registry in step with this device's saved TRX records.
+     * Every record is upserted each time (so the first run also back-fills old records); deleted
+     * transactions are sent as status "void". A network failure is retried on the next refresh.
+     */
+    private suspend fun syncRegistry(profile: JsonObject?, txs: List<JsonObject>) {
+        val records = Voucher.syncLocal(getApplication<Application>(), profile, txs)
+        if (records.isEmpty()) return
+        runCatching { repo.upsert("voucher_registry", records.map { Voucher.registryRow(it) }, "trx_id,checksum") }
+    }
+
+    /**
+     * Summary voucher reference. The same totals and period reuse their batch; otherwise the batch is
+     * STMT<YYYYMM>, then STMT<YYYYMM>-2, -3 ... for the same month. The checksum does not depend on the date of creation.
+     */
+    suspend fun summaryRef(txs: List<JsonObject>, range: DateRange): Voucher.SummaryRef {
+        val income = txs.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
+        val expense = txs.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
+        val from = range.from?.toString().orEmpty()
+        val to = range.to?.toString().orEmpty()
+        val period = Voucher.periodOf(from, to)
+        val chk = Voucher.summaryChecksum(income, expense, period)
+        val existing = repo.list("voucher_registry", "select=batch_id&type=eq.SUMMARY&checksum=eq.$chk&limit=1")
+            .firstOrNull()?.str("batch_id").orEmpty()
+        val batch = if (existing.isNotEmpty()) {
+            existing
+        } else {
+            val d = range.to ?: LocalDate.now()
+            val ym = "%04d%02d".format(d.year, d.monthValue)
+            val used = repo.list("voucher_registry", "select=batch_id&type=eq.SUMMARY&batch_id=like.STMT$ym*")
+                .map { it.str("batch_id") }.toSet()
+            if (used.isEmpty()) "STMT$ym" else "STMT$ym-${used.size + 1}"
+        }
+        val date = to.ifEmpty { LocalDate.now().toString() }
+        val row = buildJsonObject {
+            put("trx_id", batch)
+            put("checksum", chk)
+            put("type", "SUMMARY")
+            put("amount", income - expense)
+            put("date", date)
+            put("profile_name", Voucher.profileName(state.value.profile))
+            put("status", "active")
+            put("batch_id", batch)
+            put("period", period)
+        }
+        repo.upsert("voucher_registry", listOf(row), "trx_id,checksum")
+        return Voucher.SummaryRef(batch, chk, period, date)
     }
 
     /** Sends a question with a short financial summary to the server-side AI function. */

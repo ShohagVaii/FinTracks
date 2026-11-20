@@ -1,6 +1,7 @@
 package com.fintracks.app.ui
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -15,6 +16,8 @@ import com.fintracks.app.data.id
 import com.fintracks.app.data.num
 import com.fintracks.app.data.str
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
@@ -24,8 +27,8 @@ import java.util.Locale
 import kotlin.math.abs
 
 /**
- * FinTrack voucher: TRX ID, checksum, QR payload and the A4 renderer (single entry and summary).
- * Drawing uses PDF points on a 595 x 842 page. PNG output is the same drawing at 2x.
+ * FinTrack voucher: TRX ID, checksum, QR payload, the server registry record, and the A4 renderer
+ * (single entry and summary). Drawing uses PDF points on a 595 x 842 page; PNG output is 2x.
  */
 object Voucher {
     const val PAGE_W = 595f
@@ -36,11 +39,28 @@ object Voucher {
     private const val T = 28f
     private const val R = 567f
     private const val B = 814f
+    private const val SEP = "\u001F"
 
     private val MONTHS = listOf(
         "জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন",
         "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"
     )
+
+    /** One saved voucher record. The checksum is fixed at first save and never recomputed. */
+    data class Stored(
+        val trx: String,
+        val checksum: String,
+        val type: String,
+        val amount: Double,
+        val date: String,
+        val category: String,
+        val method: String,
+        val profile: String,
+        val status: String
+    )
+
+    /** Summary voucher reference, issued by the server registry (see AppViewModel.summaryRef). */
+    data class SummaryRef(val batch: String, val checksum: String, val period: String, val date: String)
 
     // ---------------- Data: TRX ID, checksum, QR payload ----------------
 
@@ -59,9 +79,15 @@ object Voucher {
         MessageDigest.getInstance("SHA-256").digest(s.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02X".format(it) }
 
-    /** Checksum = first 10 characters of SHA-256("TRX|TYPE|AMOUNT|DATE|PROFILE"). */
+    /** Transaction checksum = first 10 characters of SHA-256("TRX|TYPE|AMOUNT|DATE|PROFILE"). */
     fun checksum(trx: String, type: String, amount: Double, date: String, profile: String): String =
         sha256Hex("$trx|$type|${amount2(amount)}|$date|$profile").take(10)
+
+    /** Summary checksum = first 10 characters of SHA-256("BATCH|SUMMARY|INCOME|EXPENSE|PERIOD"). */
+    fun summaryChecksum(income: Double, expense: Double, period: String): String =
+        sha256Hex("BATCH|SUMMARY|${amount2(income)}|${amount2(expense)}|$period").take(10)
+
+    fun periodOf(from: String, to: String): String = "$from..$to"
 
     fun qrPayload(trx: String, type: String, amount: Double, date: String, checksum: String): String = listOf(
         "FINTRACK-VERIFY v1",
@@ -75,25 +101,83 @@ object Voucher {
 
     fun profileName(profile: JsonObject?): String = profile?.str("name").orEmpty()
 
-    /**
-     * Keeps TRX ID + checksum for every transaction on this device (SharedPreferences), so they can be
-     * uploaded to the server table later. Entries of deleted transactions are removed.
-     */
-    fun syncLocal(ctx: Context, txs: List<JsonObject>, profile: JsonObject?) {
+    // ---------------- Local store (per account on this device) ----------------
+
+    private fun prefsOf(ctx: Context, profile: JsonObject?): SharedPreferences {
+        val owner = profile?.str("id").orEmpty().ifEmpty { "anon" }
+        return ctx.getSharedPreferences("voucher_store_$owner", Context.MODE_PRIVATE)
+    }
+
+    private fun encode(r: Stored): String = listOf(
+        r.trx, r.checksum, r.type, amount2(r.amount), r.date, r.category, r.method, r.profile, r.status
+    ).joinToString(SEP)
+
+    private fun decode(s: String?): Stored? {
+        val p = s?.split(SEP) ?: return null
+        if (p.size != 9) return null
+        return Stored(p[0], p[1], p[2], p[3].toDoubleOrNull() ?: 0.0, p[4], p[5], p[6], p[7], p[8])
+    }
+
+    /** Keeps the saved checksum; refreshes the display details from the live row. New rows get a fresh checksum. */
+    private fun refresh(old: Stored?, profile: JsonObject?, t: JsonObject): Stored {
+        val type = typeCode(t)
+        val amt = t.num("amount")
+        val date = t.str("tx_date").take(10)
+        val cat = t.str("category")
+        val method = t.str("payment_mode")
+        if (old != null) {
+            return old.copy(type = type, amount = amt, date = date, category = cat, method = method, status = "active")
+        }
+        val trx = trxOf(t)
         val name = profileName(profile)
-        val prefs = ctx.getSharedPreferences("voucher_store", Context.MODE_PRIVATE)
+        return Stored(trx, checksum(trx, type, amt, date, name), type, amt, date, cat, method, name, "active")
+    }
+
+    /** The saved record for one transaction (created on first sight, then kept). */
+    fun storedFor(ctx: Context, profile: JsonObject?, t: JsonObject): Stored {
+        val prefs = prefsOf(ctx, profile)
+        val key = "tx_${t.id()}"
+        val rec = refresh(decode(prefs.getString(key, null)), profile, t)
+        prefs.edit().putString(key, encode(rec)).apply()
+        return rec
+    }
+
+    /**
+     * Brings the local store up to date with the live transactions and returns every record
+     * (active and void) for the server registry. A deleted transaction becomes "void"; it is never removed.
+     */
+    fun syncLocal(ctx: Context, profile: JsonObject?, txs: List<JsonObject>): List<Stored> {
+        val prefs = prefsOf(ctx, profile)
         val ed = prefs.edit()
         val live = txs.map { "tx_${it.id()}" }.toSet()
-        prefs.all.keys.filter { it.startsWith("tx_") && it !in live }.forEach { ed.remove(it) }
+        val out = mutableListOf<Stored>()
         txs.forEach { t ->
-            val trx = trxOf(t)
-            val type = typeCode(t)
-            val amt = t.num("amount")
-            val date = t.str("tx_date").take(10)
-            val sum = checksum(trx, type, amt, date, name)
-            ed.putString("tx_${t.id()}", listOf(trx, sum, type, amount2(amt), date, name).joinToString("|"))
+            val key = "tx_${t.id()}"
+            val rec = refresh(decode(prefs.getString(key, null)), profile, t)
+            ed.putString(key, encode(rec))
+            out.add(rec)
+        }
+        prefs.all.keys.filter { it.startsWith("tx_") && it !in live }.forEach { key ->
+            val old = decode(prefs.getString(key, null)) ?: return@forEach
+            val voided = old.copy(status = "void")
+            ed.putString(key, encode(voided))
+            out.add(voided)
         }
         ed.apply()
+        return out
+    }
+
+    /** Row for the voucher_registry table (the user id is added by the repository). */
+    fun registryRow(r: Stored): JsonObject = buildJsonObject {
+        put("trx_id", r.trx)
+        put("checksum", r.checksum)
+        put("type", r.type)
+        put("amount", r.amount)
+        put("date", r.date)
+        put("category", r.category)
+        put("method", r.method)
+        put("profile_name", r.profile)
+        put("status", r.status)
     }
 
     // ---------------- Dates and money ----------------
@@ -254,13 +338,10 @@ object Voucher {
     // ---------------- Single-entry voucher ----------------
 
     fun drawSingle(c: Canvas, ctx: Context, t: JsonObject, state: UiState, now: ZonedDateTime = ZonedDateTime.now()) {
-        val profile = profileName(state.profile)
+        val rec = storedFor(ctx, state.profile, t)
         val type = t.str("type")
-        val code = typeCode(t)
         val amt = t.num("amount")
-        val date = t.str("tx_date").take(10)
-        val trx = trxOf(t)
-        val sum = checksum(trx, code, amt, date, profile)
+        val date = rec.date
         val income = type == "Income"
         val expense = type == "Expense"
         val accent = when {
@@ -290,7 +371,7 @@ object Voucher {
         }
 
         base(c, ctx)
-        header(c, ctx, "TRX ID: #$trx", "অফিসিয়াল লেনদেন ভাউচার", "ইস্যু সময়: ${issueText(now)}")
+        header(c, ctx, "TRX ID: #${rec.trx}", "অফিসিয়াল লেনদেন ভাউচার", "ইস্যু সময়: ${issueText(now)}")
 
         // Amount card (green for income, red for expense)
         val box = RectF(60f, 180f, 535f, 326f)
@@ -327,7 +408,7 @@ object Voucher {
             "অ্যাকাউন্ট" to Export.accountName(state, t).ifEmpty { "-" },
             "মুড" to t.str("mood").ifEmpty { "-" },
             "নোট" to t.str("note").ifEmpty { "-" },
-            "প্রোফাইল" to profile.ifEmpty { "-" }
+            "প্রোফাইল" to rec.profile.ifEmpty { "-" }
         )
         val labelP = text(ctx, 12.5f, "#64748B")
         val valueP = text(ctx, 13f, "#0F172A", true, Paint.Align.RIGHT)
@@ -344,9 +425,9 @@ object Voucher {
         qrAndSecure(
             c, ctx,
             qrRect = RectF(84f, 584f, 224f, 724f),
-            payload = qrPayload(trx, code, amt, date, sum),
-            secureLabel = "FT-$trx-SECURE",
-            checksum = sum,
+            payload = qrPayload(rec.trx, typeCode(t), amt, date, rec.checksum),
+            secureLabel = "FT-${rec.trx}-SECURE",
+            checksum = rec.checksum,
             textX = 250f,
             textY = 616f
         )
@@ -356,15 +437,11 @@ object Voucher {
 
     // ---------------- Summary voucher (many entries) ----------------
 
-    fun drawSummary(c: Canvas, ctx: Context, txs: List<JsonObject>, label: String, state: UiState, now: ZonedDateTime = ZonedDateTime.now()) {
-        val profile = profileName(state.profile)
+    fun drawSummary(c: Canvas, ctx: Context, txs: List<JsonObject>, label: String, state: UiState, ref: SummaryRef, now: ZonedDateTime = ZonedDateTime.now()) {
         val income = txs.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
         val expense = txs.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
         val net = income - expense
         val netColor = if (net >= 0) "#0F172A" else "#BE123C"
-        val today = now.toLocalDate().toString()
-        val batch = sha256Hex("BATCH|$label|${txs.size}|${amount2(income)}|${amount2(expense)}|$profile").take(8)
-        val sum = checksum(batch, "SUMMARY", net, today, profile)
         val dash = line("#CBD5E1", 1.5f).apply { pathEffect = DashPathEffect(floatArrayOf(6f, 6f), 0f) }
 
         base(c, ctx)
@@ -372,7 +449,7 @@ object Voucher {
             "ইস্যু সময়: ${issueText(now)} · সময়কাল: $label",
             text(ctx, 11f, "#64748B", true, Paint.Align.CENTER), 500f
         )
-        header(c, ctx, "BATCH: #$batch", "লেনদেনের সারসংক্ষেপ ভাউচার", issue)
+        header(c, ctx, "BATCH: #${ref.batch}", "লেনদেনের সারসংক্ষেপ ভাউচার", issue)
 
         // Totals strip
         val strip = RectF(60f, 180f, 535f, 246f)
@@ -451,9 +528,9 @@ object Voucher {
         qrAndSecure(
             c, ctx,
             qrRect = RectF(84f, 604f, 200f, 720f),
-            payload = qrPayload(batch, "SUMMARY", net, today, sum),
-            secureLabel = "FT-$batch-SECURE",
-            checksum = sum,
+            payload = qrPayload(ref.batch, "SUMMARY", net, ref.date, ref.checksum),
+            secureLabel = "FT-${ref.batch}-SECURE",
+            checksum = ref.checksum,
             textX = 224f,
             textY = 630f
         )
@@ -473,9 +550,6 @@ object Voucher {
 
     fun renderSingle(ctx: Context, state: UiState, t: JsonObject): Bitmap =
         bitmap2x { drawSingle(it, ctx, t, state) }
-
-    fun renderSummary(ctx: Context, state: UiState, txs: List<JsonObject>, label: String): Bitmap =
-        bitmap2x { drawSummary(it, ctx, txs, label, state) }
 
     private fun newFile(ctx: Context, ext: String, prefix: String): File {
         val dir = File(ctx.cacheDir, "exports").apply { mkdirs() }
@@ -498,9 +572,9 @@ object Voucher {
         return file
     }
 
-    fun summaryPdf(ctx: Context, state: UiState, txs: List<JsonObject>, label: String): File {
+    fun summaryPdf(ctx: Context, state: UiState, txs: List<JsonObject>, label: String, ref: SummaryRef): File {
         val file = newFile(ctx, "pdf", "fintrack-summary")
-        pdfTo(file) { drawSummary(it, ctx, txs, label, state) }
+        pdfTo(file) { drawSummary(it, ctx, txs, label, state, ref) }
         return file
     }
 

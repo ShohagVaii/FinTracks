@@ -96,11 +96,11 @@ class Repository(context: Context) {
      * Restore: inserts rows, or updates rows with the same id. Every row is stamped with the
      * current user's id, so a backup from another account can never write outside this account.
      */
-    suspend fun upsert(table: String, rows: List<JsonObject>) {
+    suspend fun upsert(table: String, rows: List<JsonObject>, onConflict: String = "id") {
         val uid = uid()
         rows.chunked(400).forEach { chunk ->
             val body = JsonArray(chunk.map { JsonObject(it + ("user_id" to JsonPrimitive(uid))) })
-            authed("POST", "/rest/v1/$table?on_conflict=id", body, "resolution=merge-duplicates,return=minimal")
+            authed("POST", "/rest/v1/$table?on_conflict=$onConflict", body, "resolution=merge-duplicates,return=minimal")
         }
     }
 

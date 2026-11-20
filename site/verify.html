@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FinTrack ভাউচার যাচাই</title>
+<style>
+  :root { --bg:#0f0a1f; --card:#ffffff; --ink:#1e1b2e; --muted:#6b6780; --purple:#7c3aed; --green:#16a34a; --red:#dc2626; --amber:#b45309; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; font-family: "Noto Sans Bengali", "Hind Siliguri", system-ui, sans-serif;
+         background: radial-gradient(circle at 20% 0%, #4c1d95 0%, #1e1b4b 45%, #0f0a1f 100%); color:var(--ink); }
+  main { max-width: 460px; margin: 0 auto; padding: 28px 18px 40px; }
+  .brand { color:#fff; text-align:center; margin-bottom:18px; }
+  .brand h1 { font-size: 26px; margin:0; letter-spacing: .5px; }
+  .brand p { margin:6px 0 0; opacity:.8; font-size:14px; }
+  .panel { background: var(--card); border-radius: 22px; padding: 22px 20px; box-shadow: 0 20px 50px rgba(0,0,0,.35); }
+  label { display:block; font-size:13px; color:var(--muted); margin: 12px 0 6px; }
+  input { width:100%; font-size:17px; padding:12px 14px; border:1.5px solid #d6d3e4; border-radius:14px; outline:none; font-family:inherit; text-transform:uppercase; letter-spacing:1px; }
+  input:focus { border-color: var(--purple); }
+  button { width:100%; margin-top:18px; padding:14px; border:0; border-radius:16px; font-size:17px; font-weight:700; color:#fff; cursor:pointer;
+           background: linear-gradient(90deg, #7c3aed, #a855f7); }
+  button:disabled { opacity:.6; cursor:wait; }
+  .result { margin-top:18px; border-radius:18px; padding:16px; display:none; }
+  .result.show { display:block; }
+  .ok { background:#ecfdf3; border:1.5px solid #86efac; }
+  .ok h2 { color:var(--green); }
+  .void { background:#fffbeb; border:1.5px solid #fcd34d; }
+  .void h2 { color:var(--amber); }
+  .bad { background:#fef2f2; border:1.5px solid #fca5a5; }
+  .bad h2 { color:var(--red); }
+  .result h2 { margin:0 0 10px; font-size:18px; }
+  dl { display:grid; grid-template-columns: auto 1fr; gap:7px 12px; margin:0; font-size:14px; }
+  dt { color:var(--muted); }
+  dd { margin:0; font-weight:600; word-break: break-word; }
+  .foot { text-align:center; color:rgba(255,255,255,.6); font-size:12px; margin-top:20px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">
+    <h1>FinTrack</h1>
+    <p>ভাউচার যাচাই পাতা</p>
+  </div>
+
+  <section class="panel">
+    <form id="form" autocomplete="off">
+      <label for="trx">TRX আইডি</label>
+      <input id="trx" name="trx" maxlength="16" placeholder="যেমন FA611E53" required>
+      <label for="chk">চেকসাম</label>
+      <input id="chk" name="chk" maxlength="10" placeholder="যেমন BC9587FE60" required>
+      <button id="btn" type="submit">যাচাই করুন</button>
+    </form>
+    <div id="out" class="result" role="status" aria-live="polite"></div>
+  </section>
+
+  <p class="foot">© FINTRACK PREMIUM FINANCE</p>
+</main>
+
+<script>
+  // Only the public publishable key is used here. Data comes only from the verify-voucher function.
+  const FN_URL = "https://ennkvjmxyjztjszmfaag.supabase.co/functions/v1/verify-voucher";
+  const PUB_KEY = "sb_publishable_ZEs8TSPiUzrt8gKmlmOjDw_kkoKr8_h";
+  const TYPE_BN = { INCOME: "আয়", EXPENSE: "ব্যয়", SUMMARY: "সারসংক্ষেপ" };
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "-").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const bn = (s) => String(s).replace(/[0-9]/g, (d) => "০১২৩৪৫৬৭৮৯"[d]);
+
+  function show(kind, title, rows) {
+    const out = $("out");
+    out.className = "result show " + kind;
+    let html = "<h2>" + title + "</h2>";
+    if (rows) {
+      html += "<dl>" + rows.map(([k, v]) => "<dt>" + esc(k) + "</dt><dd>" + esc(v) + "</dd>").join("") + "</dl>";
+    }
+    out.innerHTML = html;
+  }
+
+  function fill() {
+    const p = new URLSearchParams(location.search);
+    if (p.get("trx")) $("trx").value = p.get("trx");
+    if (p.get("chk")) $("chk").value = p.get("chk");
+  }
+
+  async function verify(trx, chk) {
+    const btn = $("btn");
+    btn.disabled = true;
+    try {
+      const res = await fetch(FN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: PUB_KEY, Authorization: "Bearer " + PUB_KEY },
+        body: JSON.stringify({ trx, checksum: chk }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status !== 200 || !data.result) {
+        show("bad", "যাচাই সম্ভব হয়নি", [["বার্তা", "সার্ভার সমস্যা, পরে আবার চেষ্টা করুন"]]);
+        return;
+      }
+      if (data.result === "ok") {
+        const d = data.details;
+        const rows = [
+          ["TRX", d.trx],
+          ["ধরন", TYPE_BN[d.type] || d.type],
+          ["পরিমাণ", "৳ " + Number(d.amount).toFixed(2)],
+          ["তারিখ", d.date],
+          ["ক্যাটাগরি", d.category || "-"],
+          ["পেমেন্ট মেথড", d.method || "-"],
+          ["প্রোফাইল", d.profile || "-"],
+          ["স্ট্যাটাস", "সক্রিয়"],
+        ];
+        if (d.batch) rows.push(["ব্যাচ", d.batch]);
+        if (d.period) rows.push(["সময়কাল", d.period]);
+        show("ok", "✓ যাচাইকৃত — FinTrack সার্ভারে সংরক্ষিত", rows);
+      } else if (data.result === "void") {
+        show("void", "এই ভাউচারটি বাতিল করা হয়েছে", [["TRX", data.details?.trx || trx]]);
+      } else {
+        show("bad", "✕ ভাউচারটি পাওয়া যায়নি", [["বার্তা", "দেওয়া TRX বা চেকসাম মেলেনি"]]);
+      }
+    } catch (e) {
+      show("bad", "যাচাই সম্ভব হয়নি", [["বার্তা", "ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন"]]);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  $("form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const trx = $("trx").value.trim().replace(/^#/, "").toUpperCase();
+    const chk = $("chk").value.trim().toUpperCase();
+    if (!trx || !chk) { show("bad", "TRX ও চেকসাম দিন", null); return; }
+    verify(trx, chk);
+  });
+
+  fill();
+  if (new URLSearchParams(location.search).get("trx") && new URLSearchParams(location.search).get("chk")) {
+    verify($("trx").value.trim().toUpperCase(), $("chk").value.trim().toUpperCase());
+  }
+</script>
+</body>
+</html>

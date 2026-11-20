@@ -351,7 +351,8 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                 busy = true
                 scope.launch {
                     try {
-                        val file = withContext(Dispatchers.IO) { Voucher.summaryPdf(ctx, state, filtered, range.label) }
+                        val ref = vm.summaryRef(filtered, range)
+                        val file = withContext(Dispatchers.IO) { Voucher.summaryPdf(ctx, state, filtered, range.label, ref) }
                         Export.share(ctx, file, "application/pdf", "FinTrack সারসংক্ষেপ ভাউচার")
                     } catch (e: Exception) {
                         Toast.makeText(ctx, "ভাউচার ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
