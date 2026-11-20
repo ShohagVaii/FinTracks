@@ -43,6 +43,21 @@ val TABLES: List<Pair<String, String>> = listOf(
     "mess_meals" to "select=*&order=meal_date.desc"
 )
 
+/** The last deleted row, kept for a few seconds so the user can undo. */
+data class UndoEntry(val table: String, val row: JsonObject, val token: Long) {
+    val label: String get() = UNDO_LABELS[table] ?: "আইটেম"
+}
+
+/** Shown once when a goal crosses 25 / 50 / 75 / 100 %. */
+data class GoalCelebration(val goalName: String, val percent: Int, val saved: Double, val target: Double)
+
+val UNDO_LABELS = mapOf(
+    "transactions" to "লেনদেন", "accounts" to "অ্যাকাউন্ট", "budgets" to "বাজেট", "goals" to "লক্ষ্য",
+    "debts" to "ধার", "loans" to "লোন", "subscriptions" to "সাবস্ক্রিপশন", "investments" to "বিনিয়োগ",
+    "credit_entries" to "কেনা", "credit_payments" to "পরিশোধ", "shopping_items" to "শপিং আইটেম",
+    "bill_splits" to "বিল ভাগ", "mess_bazaars" to "বাজার", "mess_meals" to "মিল"
+)
+
 data class UiState(
     val checking: Boolean = true,
     val signedIn: Boolean = false,
@@ -51,7 +66,9 @@ data class UiState(
     val notice: String? = null,
     val profile: JsonObject? = null,
     val tables: Map<String, List<JsonObject>> = emptyMap(),
-    val pendingSms: List<SmsSuggestion> = emptyList()
+    val pendingSms: List<SmsSuggestion> = emptyList(),
+    val undo: UndoEntry? = null,
+    val celebration: GoalCelebration? = null
 ) {
     fun rows(table: String): List<JsonObject> = tables[table].orEmpty()
     val dark: Boolean get() = profile?.str("theme") != "light"
@@ -108,6 +125,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 _state.update { it.copy(message = friendly) }
             }
+        } catch (e: IllegalArgumentException) {
+            _state.update { it.copy(message = e.message ?: "ভুল তথ্য") }
         } catch (e: IOException) {
             _state.update { it.copy(message = "ইন্টারনেট সংযোগ চেক করুন") }
         } catch (e: Exception) {
@@ -171,9 +190,53 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         loadAll()
     }
 
+    /** Deletes a row and keeps a copy so it can be restored from the undo snackbar. */
     fun remove(table: String, id: String) = act {
+        val row = state.value.rows(table).firstOrNull { it.id() == id }
         repo.delete(table, id)
         loadAll()
+        // Shops delete their purchases and payments too, so they are not undoable.
+        if (row != null && table != "credit_shops") {
+            _state.update { it.copy(undo = UndoEntry(table, row, System.nanoTime())) }
+        }
+    }
+
+    fun undoRemove() = act {
+        val u = state.value.undo ?: return@act
+        _state.update { it.copy(undo = null) }
+        repo.upsert(u.table, listOf(u.row))
+        loadAll()
+    }
+
+    fun clearUndo() {
+        _state.update { it.copy(undo = null) }
+    }
+
+    fun dismissCelebration() {
+        _state.update { it.copy(celebration = null) }
+    }
+
+    /**
+     * Adds (delta > 0) or withdraws (delta < 0) money from a goal. Refuses to go past the target
+     * or below zero. Crossing a 25/50/75/100 % mark opens the celebration.
+     */
+    fun changeGoal(goal: JsonObject, delta: Double) = act {
+        val target = goal.num("target")
+        val before = goal.num("saved")
+        val after = before + delta
+        if (after > target + 0.005) throw IllegalArgumentException("লক্ষ্যের বেশি জমা করা যাবে না")
+        if (after < -0.005) throw IllegalArgumentException("জমার বেশি তোলা যাবে না")
+        val newSaved = after.coerceIn(0.0, target)
+        repo.update("goals", goal.id(), row("saved" to newSaved))
+        loadAll()
+        val oldPct = if (target > 0) (before / target * 100).toInt() else 0
+        val newPct = if (target > 0) (newSaved / target * 100).toInt() else 0
+        val crossed = listOf(100, 75, 50, 25).firstOrNull { oldPct < it && newPct >= it }
+        if (delta > 0 && crossed != null) {
+            _state.update {
+                it.copy(celebration = GoalCelebration(goal.str("name"), crossed, newSaved, target))
+            }
+        }
     }
 
     fun saveProfile(body: JsonObject) = act {

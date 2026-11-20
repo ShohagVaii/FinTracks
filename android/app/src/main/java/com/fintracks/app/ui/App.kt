@@ -30,7 +30,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarResult
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -98,6 +102,21 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
 
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it) } }
     LaunchedEffect(state.notice) { state.notice?.let { snackbar.showSnackbar(it) } }
+    // Undo: the deleted row can be brought back for 5 seconds.
+    LaunchedEffect(state.undo?.token) {
+        val u = state.undo ?: return@LaunchedEffect
+        val timer = launch {
+            delay(5_000)
+            snackbar.currentSnackbarData?.dismiss()
+        }
+        val result = snackbar.showSnackbar(
+            message = "${u.label} মুছে ফেলা হয়েছে",
+            actionLabel = "ফেরত আনুন",
+            duration = SnackbarDuration.Indefinite
+        )
+        timer.cancel()
+        if (result == SnackbarResult.ActionPerformed) vm.undoRemove() else vm.clearUndo()
+    }
 
     BackHandler(enabled = overlay != null) { overlayName = null }
 
