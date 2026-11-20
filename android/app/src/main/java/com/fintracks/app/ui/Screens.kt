@@ -39,6 +39,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.fintracks.app.data.bool
+import com.fintracks.app.data.strList
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import com.fintracks.app.data.id
 import com.fintracks.app.data.num
 import com.fintracks.app.data.row
@@ -89,6 +92,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             }
             if (income > 0) Text("সঞ্চয়ের হার: ${"%.0f".format(savingsRate)}%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        HeatmapCard(txs, p)
 
         if (state.pendingSms.isNotEmpty()) {
             SectionTitle("SMS থেকে নতুন লেনদেন")
@@ -192,7 +196,7 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
     val inRange = filterByRange(all, range)
     val filtered = inRange.filter { t ->
         (filter == "all" || t.str("type").lowercase() == filter.lowercase()) &&
-            (query.isBlank() || t.str("note").contains(query, true) || t.str("category").contains(query, true))
+            (query.isBlank() || t.str("note").contains(query, true) || t.str("category").contains(query, true) || t.strList("tags").any { it.contains(query, true) })
     }.sortedByDescending { dateOf(it, "tx_date") }
     val income = inRange.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
     val expense = inRange.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
@@ -254,9 +258,18 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
     var accountId by remember { mutableStateOf(existing?.accountId() ?: "") }
     var toAccountId by remember { mutableStateOf(existing?.toAccountId() ?: "") }
     var recurring by remember { mutableStateOf(existing?.bool("is_recurring") == true) }
+    var tagsText by remember { mutableStateOf(existing?.strList("tags")?.joinToString(", ") ?: "") }
+    var showCalc by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val cats = if (type == "Income") INCOME_CATS else EXPENSE_CATS
     val accounts = state.rows("accounts")
+
+    if (showCalc) {
+        CalculatorDialog(
+            onUse = { amount = fmtNum(it); showCalc = false },
+            onDismiss = { showCalc = false }
+        )
+    }
 
     FormDialog(
         title = if (existing == null) "নতুন লেনদেন" else "লেনদেন সম্পাদনা",
@@ -275,7 +288,8 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                             "category" to if (type == "Transfer") "ট্রান্সফার" else category,
                             "note" to note, "tx_date" to date, "payment_mode" to mode, "mood" to mood,
                             "account_id" to nonEmpty(accountId), "to_account_id" to if (type == "Transfer") nonEmpty(toAccountId) else null,
-                            "is_recurring" to recurring
+                            "is_recurring" to recurring,
+                            "tags" to JsonArray(tagsText.split(',', '#').map { it.trim() }.filter { it.isNotEmpty() }.distinct().map { JsonPrimitive(it) })
                         ),
                         existing?.id()
                     )
@@ -284,7 +298,10 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         }
     ) {
         ChoiceChips(listOf("Expense" to "ব্যয়", "Income" to "আয়", "Transfer" to "ট্রান্সফার"), type) { type = it; category = if (it == "Income") "বেতন" else "খাদ্য" }
-        TextIn("পরিমাণ (৳)", amount, { amount = it }, number = true)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextIn("পরিমাণ (৳)", amount, { amount = it }, number = true, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = { showCalc = true }) { Text("🧮") }
+        }
         if (type != "Transfer") {
             Text("ক্যাটাগরি", fontSize = 12.sp)
             ChoiceChips(cats.map { it.name to "${it.icon} ${it.name}" }, category) { category = it }
@@ -303,6 +320,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         Text("মুড", fontSize = 12.sp)
         ChoiceChips(MOODS.map { it to it }, mood) { mood = if (mood == it) "" else it }
         TextIn("নোট", note, { note = it })
+        TextIn("ট্যাগ (কমা দিয়ে, যেমন: জরুরি, বাজার)", tagsText, { tagsText = it })
         SwitchRow("প্রতি মাসে পুনরাবৃত্ত", recurring) { recurring = it }
         error?.let { Text(it, color = expenseRed, fontSize = 12.sp) }
     }

@@ -48,6 +48,12 @@ class Repository(context: Context) {
         session = api.signInWithGoogle(idToken)
     }
 
+    /** Permanently deletes the signed-in account and all of its data (server-side). */
+    suspend fun deleteAccount() {
+        authed("POST", "/functions/v1/delete-account", null)
+        session = null
+    }
+
     suspend fun signOut() {
         session?.let { runCatching { api.signOut(it.accessToken) } }
         session = null

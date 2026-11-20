@@ -1,6 +1,13 @@
 package com.fintracks.app.ui
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.platform.Font as PlatformFont
+import androidx.compose.runtime.remember
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -37,6 +44,21 @@ val Amber500 = Color(0xFFF59E0B)
 val Amber400 = Color(0xFFFBBF24)
 val Indigo400 = Color(0xFF818CF8)
 
+/** Hind Siliguri (bundled in assets/fonts) — the web app's font. */
+@Composable
+fun hindFamily(): FontFamily {
+    val assets = LocalContext.current.assets
+    return remember(assets) {
+        FontFamily(
+            PlatformFont("fonts/HindSiliguri-Light.ttf", assets, FontWeight.Light),
+            PlatformFont("fonts/HindSiliguri-Regular.ttf", assets, FontWeight.Normal),
+            PlatformFont("fonts/HindSiliguri-Medium.ttf", assets, FontWeight.Medium),
+            PlatformFont("fonts/HindSiliguri-SemiBold.ttf", assets, FontWeight.SemiBold),
+            PlatformFont("fonts/HindSiliguri-Bold.ttf", assets, FontWeight.Bold)
+        )
+    }
+}
+
 @Composable
 fun FinTracksTheme(dark: Boolean, accent: AccentColor, content: @Composable () -> Unit) {
     val scheme = if (dark) {
@@ -66,5 +88,5 @@ fun FinTracksTheme(dark: Boolean, accent: AccentColor, content: @Composable () -
             error = Rose500
         )
     }
-    MaterialTheme(colorScheme = scheme, content = content)
+    MaterialTheme(colorScheme = scheme, typography = Typography(defaultFontFamily = hindFamily()), content = content)
 }

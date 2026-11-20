@@ -1,6 +1,7 @@
 package com.fintracks.app.ui
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fintracks.app.data.PendingSmsStore
@@ -136,6 +137,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun signInWithGoogle(idToken: String) = act {
         repo.signInWithGoogle(idToken)
         loadAll()
+    }
+
+    /** Re-checks the password, deletes the account on the server, then clears every local store. */
+    fun deleteAccount(password: String) = act {
+        val email = state.value.profile?.str("email").orEmpty()
+        if (email.isBlank()) throw IllegalStateException("ইমেইল পাওয়া যায়নি, আবার লগইন করুন")
+        repo.signIn(email, password)
+        repo.deleteAccount()
+        clearLocalData()
+        _state.value = UiState(checking = false, notice = "আপনার অ্যাকাউন্ট ও সব ডেটা স্থায়ীভাবে মুছে ফেলা হয়েছে।")
+    }
+
+    private fun clearLocalData() {
+        val app = getApplication<Application>()
+        AppLock.disable(app)
+        listOf("fintrack_lock", "fintrack_recurring", "fintrack_reminders").forEach {
+            app.getSharedPreferences(it, Context.MODE_PRIVATE).edit().clear().commit()
+        }
+        PendingSmsStore.save(app, emptyList())
     }
 
     fun signOut() = act {

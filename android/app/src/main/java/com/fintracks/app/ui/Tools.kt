@@ -300,6 +300,7 @@ fun ReportsScreen(state: UiState) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PeriodPicker(period, customFrom, customTo, onPeriod = { period = it }, onFrom = { customFrom = it }, onTo = { customTo = it })
         Text(range.label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        InsightsCards(state)
         AppCard {
             KeyValue("আয়", taka(income, p), Color(0xFF10B981))
             KeyValue("ব্যয়", taka(expense, p), Color(0xFFF43F5E))

@@ -76,10 +76,31 @@ object AppLock {
         prefs(ctx).edit().putString("pin_salt", saltB64).putString("pin_hash", hash(saltB64, pin)).apply()
     }
 
+    /** Seconds left in the lock-out, or 0. Five wrong PINs lock input for 30 s, then 2 min, then 10 min. */
+    fun lockoutRemaining(ctx: Context): Int {
+        val until = prefs(ctx).getLong("lock_until", 0L)
+        val left = (until - System.currentTimeMillis()) / 1000
+        return if (left > 0) left.toInt() else 0
+    }
+
     fun checkPin(ctx: Context, pin: String): Boolean {
+        if (lockoutRemaining(ctx) > 0) return false
         val p = prefs(ctx)
         val salt = p.getString("pin_salt", null) ?: return false
-        return p.getString("pin_hash", null) == hash(salt, pin)
+        val ok = p.getString("pin_hash", null) == hash(salt, pin)
+        if (ok) {
+            p.edit().putInt("fails", 0).putLong("lock_until", 0L).apply()
+        } else {
+            val fails = p.getInt("fails", 0) + 1
+            val tiers = listOf(30L, 120L, 600L)
+            val editor = p.edit().putInt("fails", fails)
+            if (fails >= 5) {
+                val tier = minOf((fails - 5) / 5, tiers.lastIndex)
+                editor.putLong("lock_until", System.currentTimeMillis() + tiers[tier] * 1000)
+            }
+            editor.apply()
+        }
+        return ok
     }
 
     private fun hash(saltB64: String, pin: String): String {
@@ -140,6 +161,7 @@ fun LockScreen(onSignOut: () -> Unit) {
     }
 
     fun press(d: String) {
+        if (AppLock.lockoutRemaining(ctx) > 0) { error = "অনেকবার ভুল PIN। কিছুক্ষণ পর আবার চেষ্টা করুন"; return }
         if (pin.length >= 6) return
         pin += d
         if (pin.length >= 4 && AppLock.checkPin(ctx, pin)) {
@@ -171,6 +193,11 @@ fun LockScreen(onSignOut: () -> Unit) {
             }
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        var remaining by remember { mutableStateOf(AppLock.lockoutRemaining(ctx)) }
+        LaunchedEffect(remaining) {
+            if (remaining > 0) { kotlinx.coroutines.delay(1000); remaining = AppLock.lockoutRemaining(ctx) }
+        }
+        if (remaining > 0) Text("আবার চেষ্টা করুন: ${remaining} সেকেন্ড পর", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
         val keys = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"), listOf("bio", "0", "del"))
         keys.forEach { rowKeys ->
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(vertical = 6.dp)) {

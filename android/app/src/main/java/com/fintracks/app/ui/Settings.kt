@@ -6,9 +6,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +43,8 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
     var exporting by remember { mutableStateOf(false) }
     var showSetPin by remember { mutableStateOf(false) }
     var showDisable by remember { mutableStateOf(false) }
+    var showOldPin by remember { mutableStateOf(false) }
+    var showDelete by remember { mutableStateOf(false) }
 
     Page {
         AppCard {
@@ -74,7 +81,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                 Button(onClick = { showSetPin = true }) { Text("PIN সেট করুন") }
             } else {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { showSetPin = true }) { Text("PIN বদলান") }
+                    OutlinedButton(onClick = { showOldPin = true }) { Text("PIN বদলান") }
                 }
             }
             SwitchRow("অ্যাপ লক চালু", lockOn) {
@@ -118,6 +125,25 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
             }
         }
         AppCard {
+            Text("ব্যাকআপ", fontWeight = FontWeight.Bold)
+            Text("সব লেনদেন, বাকি, ধার, বাজেট, লক্ষ্য, বিনিয়োগ ও অন্য সব ডেটা একটি JSON ফাইলে। PIN ও লক সেটিং ব্যাকআপে থাকে না।", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(onClick = {
+                scope.launch {
+                    try {
+                        val file = withContext(Dispatchers.IO) { Backup.file(ctx, state) }
+                        Export.share(ctx, file, "application/json", "FinTrack ব্যাকআপ")
+                    } catch (e: Exception) {
+                        Toast.makeText(ctx, "ব্যাকআপ ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }) { Text("ব্যাকআপ ফাইল শেয়ার") }
+        }
+        AppCard {
+            Text("বিপজ্জনক এলাকা", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+            Text("অ্যাকাউন্ট মুছলে আপনার সব লেনদেন, বাকি, ধার, বাজেট ও অন্য সব ডেটা স্থায়ীভাবে চলে যাবে। এটি ফিরিয়ে আনা যাবে না।", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(onClick = { showDelete = true }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("অ্যাকাউন্ট স্থায়ীভাবে মুছুন") }
+        }
+        AppCard {
             Text("অ্যাকাউন্ট", fontWeight = FontWeight.Bold)
             Text(state.profile?.str("email").orEmpty().ifEmpty { "ইমেইল পাওয়া যায়নি" }, fontSize = 12.sp)
             OutlinedButton(onClick = { vm.signOut() }) { Text("লগআউট") }
@@ -131,6 +157,19 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
             showSetPin = false
         }
     }
+    if (showOldPin) {
+        PinVerifyDialog("পুরনো PIN দিন", onDismiss = { showOldPin = false }) {
+            showOldPin = false
+            showSetPin = true
+        }
+    }
+    if (showDelete) {
+        DeleteAccountDialog(
+            email = state.profile?.str("email").orEmpty(),
+            onDismiss = { showDelete = false },
+            onConfirm = { password -> vm.deleteAccount(password); showDelete = false }
+        )
+    }
     if (showDisable) {
         PinVerifyDialog("লক বন্ধ করতে PIN দিন", onDismiss = { showDisable = false }) {
             AppLock.disable(ctx)
@@ -138,4 +177,29 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
             showDisable = false
         }
     }
+}
+
+/** Two-step confirmation: type DELETE and the account password. */
+@Composable
+fun DeleteAccountDialog(email: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var word by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("অ্যাকাউন্ট মুছবেন?", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("এটি স্থায়ী। সব ডেটা মুছে যাবে এবং ফিরিয়ে আনা যাবে না। নিশ্চিত করতে নিচে DELETE লিখুন এবং পাসওয়ার্ড দিন।", fontSize = 13.sp)
+                OutlinedTextField(word, { word = it }, label = { Text("DELETE লিখুন") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(password, { password = it }, label = { Text("পাসওয়ার্ড") }, singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = word == "DELETE" && password.isNotEmpty(), onClick = { onConfirm(password) }) {
+                Text("স্থায়ীভাবে মুছুন", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+    )
 }

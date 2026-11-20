@@ -1,7 +1,7 @@
 # FinTrack – Android (Kotlin + Jetpack Compose)
 
 Native Android app, package `bd.shohagvai.fintrack`. Backend: **Supabase free tier** (Auth + Postgres + RLS + one Edge Function).
-Schema: `supabase/migrations/`. AI: Edge Function `ai-chat` (Gemini key kept as a Supabase secret, never in the app).
+Schema: `supabase/migrations/`. Edge Functions: `ai-chat` (Gemini key kept as a Supabase secret) and `delete-account`.
 
 ## Features
 - **Accounts:** email/password (with email confirmation) and Google sign-in.
@@ -18,7 +18,12 @@ Schema: `supabase/migrations/`. AI: Edge Function `ai-chat` (Gemini key kept as 
 - **Tools:** Zakat, tax (Bangladesh slabs), currency, loan/EMI, reports (daily, weekly, monthly, yearly, custom) with export.
 - **AI সহকারী:** chat over your finances. Uses the `ai-chat` Edge Function when online, and falls back to local answers.
 - **SMS import:** bKash / Nagad / Rocket / bank SMS become suggestions that you confirm. Nothing is saved automatically.
-- **Security:** app lock with PIN plus fingerprint or face (device credential on Android 11+), and auto-lock timeout. The PIN is stored only as a salted hash.
+- **Security:** app lock with PIN plus fingerprint or face (device credential on Android 11+), auto-lock timeout, and lock-out after 5 wrong PINs (30 s, then 2 min, then 10 min). Changing the PIN requires the old PIN. The PIN is stored only as a salted hash.
+- **Account deletion:** Settings → "অ্যাকাউন্ট স্থায়ীভাবে মুছুন". Requires the password and typing `DELETE`. The server deletes the auth user, and every user row is removed by `ON DELETE CASCADE`. Function: `supabase/functions/delete-account`.
+- **Calculator:** safe in-app evaluator (`+ − × ÷ % ( )`), opened from the transaction form. It does not use `eval`.
+- **Insights:** 30/60/90-day cash-flow forecast, unusual-spending alerts (more than 40% above the 3-month average), net worth, and a 30-day spending heatmap. These are local calculations.
+- **Tags:** comma-separated tags on transactions, searchable.
+- **Backup:** JSON file of every user table, shared from Settings. The PIN and session are never included.
 - **Home-screen widget:** balance widget.
 - **Settings:** profile, dark/light theme, accent colour, currency, privacy mode, security, export, sign out.
 
@@ -39,6 +44,9 @@ CI (`.github/workflows/android.yml`) builds the APK on every push that touches `
 
 ## Email confirmation
 Confirmation links go to the GitHub Pages page `https://shohagvaii.github.io/FinTracks/` (source: `site/`, deployed by `.github/workflows/pages.yml`). Supabase's custom SMTP is used to send email.
+
+## Typography
+Hind Siliguri (Light, Regular, Medium, SemiBold, Bold) is bundled in `app/src/main/assets/fonts`, the same font as the web app. The PDF export uses Noto Sans Bengali.
 
 ## Notes
 - The app uses only the **publishable** key, which is safe to ship. Never put the `service_role` key or the Gemini key in the app.
