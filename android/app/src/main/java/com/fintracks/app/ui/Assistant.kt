@@ -1,5 +1,21 @@
 package com.fintracks.app.ui
 
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -131,9 +147,10 @@ fun aiContext(state: UiState): String {
 }
 
 @Composable
-fun ChatScreen(state: UiState, vm: AppViewModel) {
+fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
-    val messages = remember { mutableStateListOf("assistant" to "আসসালামু আলাইকুম! আমি FinTrack সহকারী। আপনার খরচ, বাকি, ধার বা যাকাত নিয়ে প্রশ্ন করুন।") }
+    val greeting = "হ্যালো! আমি FinTrack AI। আমি আপনাকে বাজেট, সঞ্চয় বা বিনিয়োগের পরামর্শ দিয়ে সাহায্য করতে পারি। আপনি কী জানতে চান?"
+    val messages = remember { mutableStateListOf("assistant" to greeting) }
     var input by remember { mutableStateOf("") }
     var thinking by remember { mutableStateOf(false) }
 
@@ -147,7 +164,7 @@ fun ChatScreen(state: UiState, vm: AppViewModel) {
             val reply = try {
                 vm.askAi(q, aiContext(state))
             } catch (e: Exception) {
-                // Offline or AI not available: answer from local data instead.
+                // Offline or AI not available: answer from local data, and say so.
                 Assistant.answer(q, state) + "\n\n(AI সংযোগ নেই, স্থানীয় হিসাব থেকে উত্তর দেওয়া হয়েছে)"
             }
             messages += "assistant" to reply
@@ -155,30 +172,67 @@ fun ChatScreen(state: UiState, vm: AppViewModel) {
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    val purple = Color(0xFF7C3AED)
+    Column(Modifier.fillMaxSize()) {
+        // Purple advisor header, like the reference "Ask FinTrack AI" bar.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(Brush.horizontalGradient(listOf(Color(0xFF1E1B4B), Color(0xFF3730A3))))
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) { Icon(Icons.Default.SmartToy, contentDescription = null, tint = Color.White) }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Ask FinTrack AI", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("PREMIUM ADVISOR", color = Color(0xFFC7D2FE), fontSize = 10.sp, letterSpacing = 2.sp)
+            }
+            IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = "বন্ধ করুন", tint = Color.White) }
+        }
         ChoiceChips(
             listOf("এই মাসে কত খরচ?" to "এই মাসে কত খরচ?", "বাজেট কেমন?" to "বাজেট কেমন?", "পরামর্শ দিন" to "পরামর্শ দিন", "বাকি কত?" to "বাকি কত?"),
             ""
         ) { send(it) }
-        LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(
+            Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             items(messages) { (who, text) ->
                 val mine = who == "user"
                 Box(Modifier.fillMaxWidth(), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
                     Box(
                         Modifier
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(if (mine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
-                            .padding(12.dp)
+                            .fillMaxWidth(0.82f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (mine) purple else MaterialTheme.colorScheme.surface)
+                            .border(1.dp, if (mine) Color.Transparent else Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
+                            .padding(14.dp)
                     ) {
-                        Text(text, color = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
+                        Text(text, color = if (mine) Color.White else MaterialTheme.colorScheme.onSurface, lineHeight = 22.sp)
                     }
                 }
             }
             if (thinking) item { Text("ভাবছি…", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp) }
         }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextIn("প্রশ্ন লিখুন", input, { input = it }, modifier = Modifier.weight(1f))
-            Button(onClick = { send(input) }, enabled = input.isNotBlank() && !thinking) { Text("পাঠান") }
+        Row(
+            Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            TextIn("আপনার বিষয়টি লিখুন...", input, { input = it }, modifier = Modifier.weight(1f))
+            Box(
+                Modifier
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .background(Brush.linearGradient(listOf(Color(0xFF7C3AED), Color(0xFF4F46E5))))
+                    .clickable(enabled = input.isNotBlank() && !thinking) { send(input) },
+                contentAlignment = Alignment.Center
+            ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "পাঠান", tint = Color.White) }
         }
     }
 }

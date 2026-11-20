@@ -147,13 +147,13 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
                     onTogglePrivacy = { vm.saveProfile(row("is_privacy_mode" to !state.privacy)) },
                     onSettings = { overlayName = Overlay.SETTINGS.name }
                 )
-            } else {
+            } else if (overlay != Overlay.CHAT) {
                 OverlayHeader(overlay.title) { overlayName = null }
             }
 
             Box(Modifier.fillMaxSize()) {
                 if (overlay != null) {
-                    OverlayContent(overlay, state, vm, openTx)
+                    OverlayContent(overlay, state, vm, openTx) { overlayName = null }
                 } else when (tab) {
                     "dashboard" -> DashboardScreen(state, vm, openTx) { overlayName = it.name }
                     "transactions" -> TransactionsScreen(state, vm, openTx)
@@ -240,9 +240,9 @@ private fun OverlayHeader(title: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun OverlayContent(overlay: Overlay, state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit) {
+private fun OverlayContent(overlay: Overlay, state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit, onClose: () -> Unit) {
     when (overlay) {
-        Overlay.CHAT -> ChatScreen(state, vm)
+        Overlay.CHAT -> ChatScreen(state, vm, onClose)
         Overlay.ZAKAT -> ZakatScreen(state)
         Overlay.TAX -> TaxScreen(state)
         Overlay.CURRENCY -> CurrencyScreen()

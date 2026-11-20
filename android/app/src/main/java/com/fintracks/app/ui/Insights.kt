@@ -1,5 +1,13 @@
 package com.fintracks.app.ui
 
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -124,33 +132,58 @@ fun InsightsCards(state: UiState) {
     }
 }
 
-/** 30-day spending heatmap: one cell per day, darker = more spent. */
+/** Monthly expense calendar: S M T W T F S header, one cell per day, redder = more spent that day. */
 @Composable
 fun HeatmapCard(txs: List<JsonObject>, privacy: Boolean) {
-    val values = Insights.dailyExpense(txs, 30)
-    val max = (values.maxOrNull() ?: 0.0).coerceAtLeast(1.0)
+    val today = java.time.LocalDate.now()
+    val first = today.withDayOfMonth(1)
+    val days = first.lengthOfMonth()
+    val prefix = today.toString().substring(0, 7)
+    val perDay = DoubleArray(days + 1)
+    txs.forEach { t ->
+        if (t.str("type") != "Expense") return@forEach
+        val d = dateOf(t, "tx_date")
+        if (!d.startsWith(prefix)) return@forEach
+        val day = d.substring(8).toIntOrNull() ?: return@forEach
+        if (day in 1..days) perDay[day] += t.num("amount")
+    }
+    val max = (perDay.maxOrNull() ?: 0.0).coerceAtLeast(1.0)
     val base = Color(0xFFF43F5E)
+    val lead = first.dayOfWeek.value % 7 // Sunday = 0
+    val cells: List<Int?> = List(lead) { null } + (1..days).map { it }
+    fun shade(day: Int?): Float {
+        val v = if (day == null) 0.0 else perDay[day]
+        return if (v <= 0.0) 0.06f else (0.25f + 0.75f * (v / max).toFloat()).coerceAtMost(1f)
+    }
     AppCard {
-        Text("গত ৩০ দিনের খরচের হিটম্যাপ", fontWeight = FontWeight.Bold)
-        Text("ঘর যত গাঢ়, সেদিন তত বেশি খরচ", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        val rows = values.chunked(7)
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            rows.forEach { week ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    week.forEach { v ->
-                        val a = if (v <= 0.0) 0.08f else (0.2f + 0.8f * (v / max).toFloat()).coerceAtMost(1f)
-                        Box(
-                            Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
-                                .background(base.copy(alpha = a), RoundedCornerShape(6.dp)),
-                            contentAlignment = Alignment.Center
-                        ) { }
-                    }
-                    repeat(7 - week.size) { Box(Modifier.weight(1f)) }
-                }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.GridView, contentDescription = null, tint = Sky400, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("এক্সপেন্স হিটম্যাপ", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text("মাসের খরচ প্রবাহ", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Row(Modifier.fillMaxWidth()) {
+            listOf("S", "M", "T", "W", "T", "F", "S").forEach {
+                Text(it, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Text("মোট (৩০ দিন): ${taka(values.sum(), privacy)}", fontSize = 12.sp)
+        cells.chunked(7).forEach { week ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                week.forEach { day ->
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (day == null) Color.Transparent else base.copy(alpha = shade(day))),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (day != null) Text(bnDigits(day.toString()), fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
+                    }
+                }
+                repeat(7 - week.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+        Text("মোট (এই মাস): ${taka(perDay.sum(), privacy)}", fontSize = 12.sp)
     }
 }

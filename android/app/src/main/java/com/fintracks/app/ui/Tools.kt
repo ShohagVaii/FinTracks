@@ -1,5 +1,8 @@
 package com.fintracks.app.ui
 
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.foundation.clickable
@@ -415,7 +418,46 @@ private fun ToolsFooter() {
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(8.dp))
+        val uri = LocalUriHandler.current
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            SocialButton(FacebookGlyph, "Facebook") { uri.openUri(FACEBOOK_URL) }
+            SocialButton(TelegramGlyph, "Telegram") { uri.openUri(TELEGRAM_URL) }
+        }
+        Spacer(Modifier.height(8.dp))
         Text("CRAFTED WITH ❤ BY SHOHAG VAII", color = Slate500, fontSize = 10.sp, letterSpacing = 2.sp)
         Text("© 2024 FINTRACK PREMIUM FINANCE • ALL RIGHTS RESERVED", color = Slate600, fontSize = 9.sp, letterSpacing = 1.sp)
     }
+}
+
+// Profile links for the footer buttons. Replace with the real profile URLs.
+private const val FACEBOOK_URL = "https://www.facebook.com/"
+private const val TELEGRAM_URL = "https://t.me/"
+
+private val FacebookGlyph: ImageVector by lazy {
+    ImageVector.Builder(name = "Facebook", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+        .addPath(
+            pathData = addPathNodes("M9 8H6v4h3v12h5V12h3.642L18 8h-4V6.333C14 5.378 14.192 5 15.115 5H18V0h-3.808C10.596 0 9 1.583 9 4.615V8z"),
+            fill = SolidColor(Color.White)
+        ).build()
+}
+
+private val TelegramGlyph: ImageVector by lazy {
+    ImageVector.Builder(name = "Telegram", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+        .addPath(
+            pathData = addPathNodes("M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"),
+            fill = SolidColor(Color.White)
+        ).build()
+}
+
+@Composable
+private fun SocialButton(glyph: ImageVector, desc: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(56.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) { Icon(glyph, contentDescription = desc, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp)) }
 }

@@ -1,5 +1,29 @@
 package com.fintracks.app.ui
 
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.runtime.rememberSaveable
+import com.fintracks.app.data.SmsParser
+import com.fintracks.app.data.SmsSuggestion
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -97,11 +121,17 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
     val accounts = state.rows("accounts")
     val p = state.privacy
     val month = monthPrefix()
+    var span by rememberSaveable { mutableStateOf(HomeSpan.MONTH) }
+    var offset by rememberSaveable { mutableStateOf(0) }
+    val period = homePeriod(span, offset)
     // Computed once per data change, not on every recomposition (this was a main cause of lag).
     val monthTx = remember(state.tables) { txs.filter { dateOf(it, "tx_date").startsWith(month) } }
-    val stats = remember(state.tables) {
-        val income = monthTx.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
-        val expense = monthTx.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
+    val rangeTx = remember(state.tables, period.from, period.to) {
+        txs.filter { val d = dateOf(it, "tx_date"); d >= period.from && d <= period.to }
+    }
+    val stats = remember(state.tables, period.from, period.to) {
+        val income = rangeTx.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
+        val expense = rangeTx.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
         val total = accounts.sumOf { accountBalance(it, txs) } +
             (if (accounts.isEmpty()) txs.sumOf { if (it.str("type") == "Income") it.num("amount") else if (it.str("type") == "Expense") -it.num("amount") else 0.0 } else 0.0)
         DashStats(income, expense, total, if (income > 0) ((income - expense) / income * 100) else 0.0)
@@ -110,6 +140,38 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
     val net = income - expense
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        // Period tabs + timeline navigator, like the video's দৈনিক / মাসিক / বাৎসরিক pill.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(50))
+                .background(VideoCardLift.copy(alpha = 0.5f))
+                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
+                .padding(4.dp)
+        ) {
+            HomeSpan.values().forEach { sp ->
+                val on = sp == span
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(50))
+                        .background(if (on) Sky500 else Color.Transparent)
+                        .clickable { span = sp; offset = 0 }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(sp.label, color = if (on) Color.White else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            NavSquare(Icons.Default.ChevronLeft, enabled = true) { offset -= 1 }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(period.label, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("টাইমলাইন ভিউ", fontSize = 11.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            NavSquare(Icons.Default.ChevronRight, enabled = offset < 0) { offset += 1 }
+        }
         // Profit hero — like the video's "নিট লাভ (PROFIT)" card: large radius, green trend icon.
         Column(
             Modifier
@@ -153,6 +215,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
         }
         CreditDueCard(state) { openOverlay(Overlay.CREDIT) }
         HeatmapCard(txs, p)
+        SmsParserCard(state, vm)
 
         if (state.pendingSms.isNotEmpty()) {
             SectionTitle("SMS থেকে নতুন লেনদেন")
@@ -228,14 +291,17 @@ fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onDelete: (() -> 
     val sign = when (type) { "Income" -> "+"; "Expense" -> "-"; else -> "⇄" }
     AppCard(onClick = onClick) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(catIcon(t.str("category")), fontSize = 22.sp)
-            Spacer(Modifier.width(10.dp))
+            Box(
+                Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).background(VideoCardLift.copy(alpha = 0.8f)),
+                contentAlignment = Alignment.Center
+            ) { Text(t.str("mood").ifBlank { catIcon(t.str("category")) }, fontSize = 22.sp) }
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(t.strOrNull("note")?.takeIf { it.isNotBlank() } ?: t.str("category"), fontWeight = FontWeight.Bold, maxLines = 1)
-                Text("${dateOf(t, "tx_date")} · ${t.str("payment_mode")} ${t.str("mood")}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${dateOf(t, "tx_date")} · ${t.str("payment_mode")}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text("$sign ${taka(t.num("amount"), state.privacy)}", color = amountColor, fontWeight = FontWeight.Bold)
-            if (onShare != null) OutlinedButton(onClick = onShare, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)) { Text("শেয়ার", fontSize = 11.sp) }
+            if (onShare != null) IconButton(onClick = onShare) { Icon(Icons.Default.Share, contentDescription = "শেয়ার", tint = Sky400) }
             if (onDelete != null) DeleteButton(onDelete)
         }
     }
@@ -398,69 +464,166 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         )
     }
 
-    FormDialog(
-        title = if (existing == null) "নতুন লেনদেন" else "লেনদেন সম্পাদনা",
-        onDismiss = onDismiss,
-        onConfirm = {
-            val amt = parseAmount(amount)
-            when {
-                amt == null || amt <= 0 -> error = "সঠিক পরিমাণ লিখুন"
-                !isValidIsoDate(date) -> error = "তারিখ লিখুন (YYYY-MM-DD)"
-                type == "Transfer" && (accountId.isEmpty() || toAccountId.isEmpty() || accountId == toAccountId) ->
-                    error = "দুটি ভিন্ন অ্যাকাউন্ট বাছাই করুন"
-                else -> {
-                    onSave(
-                        row(
-                            "type" to type, "amount" to amt, "currency" to state.currency,
-                            "category" to if (type == "Transfer") "ট্রান্সফার" else category,
-                            "note" to note, "tx_date" to date, "payment_mode" to mode, "mood" to mood,
-                            "account_id" to nonEmpty(accountId), "to_account_id" to if (type == "Transfer") nonEmpty(toAccountId) else null,
-                            "is_recurring" to recurring,
-                            "tags" to JsonArray(tagsText.split(',', '#').map { it.trim() }.filter { it.isNotEmpty() }.distinct().map { JsonPrimitive(it) })
-                        ),
-                        existing?.id()
-                    )
+    fun trySave() {
+        val amt = parseAmount(amount)
+        when {
+            amt == null || amt <= 0 -> error = "সঠিক পরিমাণ লিখুন"
+            !isValidIsoDate(date) -> error = "তারিখ লিখুন (YYYY-MM-DD)"
+            type == "Transfer" && (accountId.isEmpty() || toAccountId.isEmpty() || accountId == toAccountId) ->
+                error = "দুটি ভিন্ন অ্যাকাউন্ট বাছাই করুন"
+            else -> onSave(
+                row(
+                    "type" to type, "amount" to amt, "currency" to state.currency,
+                    "category" to if (type == "Transfer") "ট্রান্সফার" else category,
+                    "note" to note, "tx_date" to date, "payment_mode" to mode, "mood" to mood,
+                    "account_id" to nonEmpty(accountId), "to_account_id" to if (type == "Transfer") nonEmpty(toAccountId) else null,
+                    "is_recurring" to recurring,
+                    "tags" to JsonArray(tagsText.split(',', '#').map { it.trim() }.filter { it.isNotEmpty() }.distinct().map { JsonPrimitive(it) })
+                ),
+                existing?.id()
+            )
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        var tagInput by remember { mutableStateOf("") }
+        Column(
+            Modifier
+                .fillMaxWidth(0.94f)
+                .clip(RoundedCornerShape(32.dp))
+                .background(Color(0xFF0B1220))
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(32.dp))
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (existing == null) "লেনদেন যোগ করুন" else "লেনদেন সম্পাদনা", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = "বন্ধ করুন") }
+            }
+            // Segmented toggle: ব্যয় red, আয় green, ট্রান্সফার sky.
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.05f)).padding(4.dp)) {
+                listOf(Triple("Expense", "ব্যয় (Expense)", expenseRed), Triple("Income", "আয় (Income)", incomeGreen), Triple("Transfer", "ট্রান্সফার", Sky500)).forEach { (key, label, c) ->
+                    val on = type == key
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (on) c else Color.Transparent)
+                            .clickable { type = key; category = if (key == "Income") "বেতন" else "খাদ্য" }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(label, color = if (on) Color.White else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
                 }
             }
-        }
-    ) {
-        ChoiceChips(listOf("Expense" to "ব্যয়", "Income" to "আয়", "Transfer" to "ট্রান্সফার"), type) { type = it; category = if (it == "Income") "বেতন" else "খাদ্য" }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextIn("পরিমাণ (৳)", amount, { amount = it }, number = true, modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = { showCalc = true }) { Text("🧮") }
-        }
-        if (existing == null) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(onClick = { launchVoice() }, modifier = Modifier.weight(1f)) { Text("🎙 বলুন", fontSize = 12.sp) }
-                OutlinedButton(onClick = { launchCamera() }, modifier = Modifier.weight(1f)) { Text("📷 রসিদ", fontSize = 12.sp) }
-                OutlinedButton(onClick = {
-                    galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }, modifier = Modifier.weight(1f)) { Text("🖼 ছবি", fontSize = 12.sp) }
+            // Amount with camera / mic / image / calculator, like the reference sheet.
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("৳", fontSize = 26.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    placeholder = { Text("0.00", fontSize = 30.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    textStyle = TextStyle(fontSize = 30.sp, fontWeight = FontWeight.Black),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+                if (existing == null) {
+                    RoundIcon(Icons.Default.PhotoCamera, "রসিদ ক্যামেরা") { launchCamera() }
+                    RoundIcon(Icons.Default.Mic, "ভয়েস") { launchVoice() }
+                    RoundIcon(Icons.Default.Image, "ছবি") { galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                }
+                RoundIcon(Icons.Default.Calculate, "ক্যালকুলেটর") { showCalc = true }
             }
             if (reading) Text("রসিদ পড়া হচ্ছে…", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            captureNote?.let { Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary) }
+            captureNote?.let { Text(it, fontSize = 12.sp, color = Sky400) }
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (type != "Transfer") {
+                    Column(Modifier.weight(1f)) {
+                        Text(if (type == "Income") "আয়ের উৎস" else "ক্যাটাগরি", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        PickerField(category, cats.map { it.name to "${it.icon} ${it.name}" }) { category = it }
+                    }
+                }
+                Column(Modifier.weight(1f)) {
+                    TextIn("তারিখ (YYYY-MM-DD)", date, { date = it })
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (accounts.isNotEmpty()) {
+                    Column(Modifier.weight(1f)) {
+                        Text(if (type == "Transfer") "কোথা থেকে" else "অ্যাকাউন্ট", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        PickerField(accountId, listOf("" to "কোনোটি নয়") + accounts.map { it.id() to it.str("name") }) { accountId = it }
+                    }
+                }
+                Column(Modifier.weight(1f)) {
+                    Text("পেমেন্ট মোড", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    PickerField(mode, PAYMENT_MODES.map { it to it }) { mode = it }
+                }
+            }
+            if (type == "Transfer" && accounts.isNotEmpty()) {
+                Column {
+                    Text("কোথায়", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    PickerField(toAccountId, accounts.map { it.id() to it.str("name") }) { toAccountId = it }
+                }
+            }
+            Text("মুড", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MOODS.forEach { m ->
+                    val on = mood == m
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(52.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (on) Sky500.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.05f))
+                            .border(1.dp, if (on) Sky500 else Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                            .clickable { mood = if (on) "" else m },
+                        contentAlignment = Alignment.Center
+                    ) { Text(m, fontSize = 22.sp) }
+                }
+            }
+            Text("হ্যাশ ট্যাগ", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextIn("ট্যাগ লিখুন (যেমন: জরুরি)", tagInput, { tagInput = it }, modifier = Modifier.weight(1f))
+                Box(
+                    Modifier
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Sky500)
+                        .clickable {
+                            val t = tagInput.trim().trimStart('#')
+                            if (t.isNotEmpty()) {
+                                tagsText = listOf(tagsText, t).filter { it.isNotBlank() }.joinToString(", ")
+                                tagInput = ""
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.Default.Add, contentDescription = "ট্যাগ যোগ করুন", tint = Color.White) }
+            }
+            val tagList = tagsText.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            if (tagList.isNotEmpty()) Text(tagList.joinToString("  ") { "#$it" }, fontSize = 12.sp, color = Sky400)
+            TextIn("নোট", note, { note = it })
+            SwitchRow("প্রতি মাসে পুনরাবৃত্ত", recurring) { recurring = it }
+            error?.let { Text(it, color = expenseRed, fontSize = 12.sp) }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Brush.horizontalGradient(listOf(Sky500, Blue600)))
+                    .clickable { trySave() },
+                contentAlignment = Alignment.Center
+            ) { Text("সেভ করুন", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
         }
-        if (type != "Transfer") {
-            Text("ক্যাটাগরি", fontSize = 12.sp)
-            ChoiceChips(cats.map { it.name to "${it.icon} ${it.name}" }, category) { category = it }
-        }
-        if (accounts.isNotEmpty()) {
-            Text(if (type == "Transfer") "কোথা থেকে" else "অ্যাকাউন্ট", fontSize = 12.sp)
-            ChoiceChips(listOf("" to "কোনোটি নয়") + accounts.map { it.id() to it.str("name") }, accountId) { accountId = it }
-        }
-        if (type == "Transfer") {
-            Text("কোথায়", fontSize = 12.sp)
-            ChoiceChips(accounts.map { it.id() to it.str("name") }, toAccountId) { toAccountId = it }
-        }
-        TextIn("তারিখ (YYYY-MM-DD)", date, { date = it })
-        Text("পেমেন্ট মোড", fontSize = 12.sp)
-        ChoiceChips(PAYMENT_MODES.map { it to it }, mode) { mode = it }
-        Text("মুড", fontSize = 12.sp)
-        ChoiceChips(MOODS.map { it to it }, mood) { mood = if (mood == it) "" else it }
-        TextIn("নোট", note, { note = it })
-        TextIn("ট্যাগ (কমা দিয়ে, যেমন: জরুরি, বাজার)", tagsText, { tagsText = it })
-        SwitchRow("প্রতি মাসে পুনরাবৃত্ত", recurring) { recurring = it }
-        error?.let { Text(it, color = expenseRed, fontSize = 12.sp) }
     }
 }
 
@@ -475,5 +638,161 @@ private fun StatPill(label: String, value: String, color: Color, modifier: Modif
     ) {
         Text(label, fontSize = 12.sp, color = color)
         Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
+    }
+}
+
+enum class HomeSpan(val label: String) { DAY("দৈনিক"), MONTH("মাসিক"), YEAR("বাৎসরিক") }
+
+private val BN_MONTHS = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
+
+/** ASCII digits to Bengali digits. */
+fun bnDigits(s: String): String = s.map { if (it in '0'..'9') '০' + (it - '0') else it }.joinToString("")
+
+data class HomePeriod(val from: String, val to: String, val label: String)
+
+/** Inclusive ISO range and Bengali label for the home period tab + offset. */
+fun homePeriod(span: HomeSpan, offset: Int): HomePeriod {
+    val today = java.time.LocalDate.now()
+    return when (span) {
+        HomeSpan.DAY -> {
+            val d = today.plusDays(offset.toLong())
+            HomePeriod(d.toString(), d.toString(), "${bnDigits(d.dayOfMonth.toString())} ${BN_MONTHS[d.monthValue - 1]} ${bnDigits(d.year.toString())}")
+        }
+        HomeSpan.MONTH -> {
+            val f = today.withDayOfMonth(1).plusMonths(offset.toLong())
+            val l = f.withDayOfMonth(f.lengthOfMonth())
+            HomePeriod(f.toString(), l.toString(), "${BN_MONTHS[f.monthValue - 1]} ${bnDigits(f.year.toString())}")
+        }
+        HomeSpan.YEAR -> {
+            val y = today.year + offset
+            HomePeriod("$y-01-01", "$y-12-31", bnDigits(y.toString()))
+        }
+    }
+}
+
+@Composable
+private fun NavSquare(icon: androidx.compose.ui.graphics.vector.ImageVector, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(52.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(VideoCardLift.copy(alpha = 0.5f))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = if (enabled) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.25f))
+    }
+}
+
+@Composable
+private fun RoundIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.06f))
+            .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) { Icon(icon, contentDescription = desc, tint = Sky400, modifier = Modifier.size(20.dp)) }
+}
+
+/** Dropdown-style picker used in the transaction sheet. */
+@Composable
+private fun PickerField(value: String, options: List<Pair<String, String>>, onPick: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val shown = options.firstOrNull { it.first == value }?.second ?: "বাছাই করুন"
+    Box {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White.copy(alpha = 0.05f))
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+                .clickable { open = true }
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(shown, modifier = Modifier.weight(1f), maxLines = 1)
+            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { (key, label) ->
+                DropdownMenuItem(text = { Text(label) }, onClick = { onPick(key); open = false })
+            }
+        }
+    }
+}
+
+/** SMART SMS PARSER card on the home screen; opens the paste-and-scan dialog. */
+@Composable
+private fun SmsParserCard(state: UiState, vm: AppViewModel) {
+    var open by remember { mutableStateOf(false) }
+    AppCard(onClick = { open = true }) {
+        Text("SMART SMS PARSER", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        Text("bKash, Nagad বা ব্যাংকের SMS থেকে লেনদেন বের করুন", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    if (open) SmsParserDialog(state, vm) { open = false }
+}
+
+@Composable
+private fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf("") }
+    var result by remember { mutableStateOf<SmsSuggestion?>(null) }
+    var message by remember { mutableStateOf<String?>(null) }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            Modifier
+                .fillMaxWidth(0.94f)
+                .clip(RoundedCornerShape(32.dp))
+                .background(Color(0xFF0B1220))
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(32.dp))
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("SMART SMS PARSER", fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = "বন্ধ করুন") }
+            }
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it; result = null; message = null },
+                label = { Text("SMS") },
+                placeholder = { Text("SMS এখানে পেস্ট করুন") },
+                minLines = 4,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Button(
+                onClick = {
+                    val parsed = SmsParser.parse(text)
+                    result = parsed
+                    message = if (parsed == null) "এই SMS থেকে লেনদেন বোঝা যায়নি" else null
+                },
+                enabled = text.isNotBlank(),
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("স্ক্যান করুন") }
+            result?.let { s ->
+                AppCard(borderColor = Sky400.copy(alpha = 0.4f)) {
+                    Text("${s.provider} · ${s.type} · ${taka(s.amount, state.privacy)}", fontWeight = FontWeight.Bold)
+                    Text(s.note, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick = {
+                        vm.save("transactions", row(
+                            "type" to s.type,
+                            "amount" to s.amount,
+                            "currency" to state.currency,
+                            "category" to "অন্যান্য",
+                            "note" to s.note,
+                            "tx_date" to todayIso(),
+                            "payment_mode" to (if (s.provider in PAYMENT_MODES) s.provider else "Bank"),
+                            "mood" to "",
+                            "is_recurring" to false
+                        ), null)
+                        onDismiss()
+                    }) { Text("লেনদেনে যোগ করুন") }
+                }
+            }
+            message?.let { Text(it, color = expenseRed, fontSize = 12.sp) }
+        }
     }
 }
