@@ -69,9 +69,34 @@ jobs:
       - name: Unit tests (parsers, backup, budgets, voucher checksum)
         run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
 
+      - name: Check release keystore opens with the secrets
+        if: steps.ks.outputs.has == 'true'
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          # Prints only pass/fail; no secret values are written to the log.
+          if ! openssl pkcs12 -in "$KEYSTORE_PATH" -passin env:STORE_PASSWORD -noout 2> ks_err.txt; then
+            echo "::error::Keystore cannot be opened with STORE_PASSWORD (wrong password or corrupt KEYSTORE_BASE64): $(tr '\n' ' ' < ks_err.txt | head -c 300)"
+            exit 1
+          fi
+          if ! openssl pkcs12 -in "$KEYSTORE_PATH" -passin env:STORE_PASSWORD -nocerts -nodes -out "$RUNNER_TEMP/key.pem" 2> ks_err.txt; then
+            echo "::error::Private key cannot be read with STORE_PASSWORD: $(tr '\n' ' ' < ks_err.txt | head -c 300)"
+            exit 1
+          fi
+          rm -f "$RUNNER_TEMP/key.pem"
+          echo "Keystore opens with the store password."
+          if [ "$KEY_PASSWORD" = "$STORE_PASSWORD" ]; then echo "KEY_PASSWORD matches STORE_PASSWORD."; else echo "::warning::KEY_PASSWORD differs from STORE_PASSWORD (PKCS12 usually needs them equal)."; fi
+
       - name: Build signed release APK
         if: steps.ks.outputs.has == 'true'
-        run: gradle :app:assembleRelease --no-daemon --stacktrace
+        run: |
+          set +e
+          gradle :app:assembleRelease --no-daemon --stacktrace > release.log 2>&1
+          rc=$?
+          grep -E "^e: |What went wrong|Could not|FAILURE|[Ss]igning|[Kk]eystore|[Pp]assword" -A4 release.log | head -c 6000 | sed ':a;N;$!ba;s/\n/%0A/g' > rerr.txt
+          if [ $rc -ne 0 ]; then echo "::error::$(cat rerr.txt)"; fi
+          exit $rc
 
       - name: Verify signature matches the release keystore
         if: steps.ks.outputs.has == 'true'
