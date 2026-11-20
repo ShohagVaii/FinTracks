@@ -310,7 +310,13 @@ object Voucher {
             else -> ""
         }
         c.drawText(money(amt, sign, twoDecimals = true), 297f, 266f, text(ctx, 42f, valueColor, true, Paint.Align.CENTER))
-        c.drawText("যাচাইকৃত ও FinTrack-এ সংরক্ষিত", 297f, 298f, text(ctx, 11f, accent, true, Paint.Align.CENTER))
+        val subText = "যাচাইকৃত ও FinTrack-এ সংরক্ষিত"
+        val subP = text(ctx, 11f, accent, true, Paint.Align.CENTER)
+        c.drawText(subText, 297f, 298f, subP)
+        // Check mark drawn as a path (the Bengali font may not include the glyph)
+        val tx = 297f - subP.measureText(subText) / 2 - 12f
+        val tick = line(accent, 1.6f).apply { strokeCap = Paint.Cap.ROUND }
+        c.drawPath(Path().apply { moveTo(tx, 293f); lineTo(tx + 3f, 296.5f); lineTo(tx + 8f, 289f) }, tick)
         stamp(c, ctx, 482f, 253f)
 
         // Detail table
