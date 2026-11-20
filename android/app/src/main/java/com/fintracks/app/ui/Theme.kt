@@ -24,6 +24,12 @@ enum class AccentColor(val key: String, val label: String, val darkPrimary: Colo
 }
 
 // Tailwind slate scale used by the web app.
+// Colour grading sampled from the FinTrack walkthrough video and screenshots (Drive "FinTrack" folder):
+// the dark background is a blue-black (#000010 to #080818), cards lift slightly to #101828 / #181828,
+// and the primary accent is a sky blue close to #08A0E8.
+val VideoBackground = Color(0xFF05060F)
+val VideoCardLift = Color(0xFF101828)
+val VideoAccent = Color(0xFF08A0E8)
 val Slate950 = Color(0xFF020617)
 val Slate900 = Color(0xFF0F172A)
 val Slate800 = Color(0xFF1E293B)
@@ -74,11 +80,11 @@ private fun Typography.withFamily(f: FontFamily) = Typography(
 fun FinTracksTheme(dark: Boolean, accent: AccentColor, content: @Composable () -> Unit) {
     val scheme = if (dark) {
         darkColorScheme(
-            primary = accent.darkPrimary,
+            primary = if (accent == AccentColor.SKY) VideoAccent else accent.darkPrimary,
             onPrimary = Slate950,
-            background = Slate950,
+            background = VideoBackground,
             onBackground = Color.White,
-            surface = Slate900.copy(alpha = 0.7f),
+            surface = VideoCardLift.copy(alpha = 0.6f),
             onSurface = Color.White,
             surfaceVariant = Slate800,
             onSurfaceVariant = Slate400,
