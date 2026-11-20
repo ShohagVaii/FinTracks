@@ -1,5 +1,12 @@
 package com.fintracks.app.ui
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.WbSunny
 import android.Manifest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -99,6 +106,7 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
     var txEditor by remember { mutableStateOf<TxEditor?>(null) }
     val overlay = overlayName?.let { runCatching { Overlay.valueOf(it) }.getOrNull() }
     val snackbar = remember { SnackbarHostState() }
+    var showCalc by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it) } }
     LaunchedEffect(state.notice) { state.notice?.let { snackbar.showSnackbar(it) } }
@@ -133,6 +141,9 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
             if (overlay == null) {
                 Header(
                     privacy = state.privacy,
+                    dark = state.dark,
+                    onCalc = { showCalc = true },
+                    onToggleTheme = { vm.saveProfile(row("theme" to if (state.dark) "light" else "dark")) },
                     onTogglePrivacy = { vm.saveProfile(row("is_privacy_mode" to !state.privacy)) },
                     onSettings = { overlayName = Overlay.SETTINGS.name }
                 )
@@ -149,9 +160,17 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
                     "shared" -> SharedScreen(state, vm)
                     else -> ToolsScreen { overlayName = it.name }
                 }
+                if (overlay == null) {
+                    FloatingAiButton(
+                        onClick = { overlayName = Overlay.CHAT.name },
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 12.dp)
+                    )
+                }
             }
         }
     }
+
+    if (showCalc) CalculatorDialog(onUse = { showCalc = false }, onDismiss = { showCalc = false })
 
     txEditor?.let { editor ->
         TransactionDialog(
@@ -167,19 +186,45 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
 class TxEditor(val row: JsonObject?)
 
 @Composable
-private fun Header(privacy: Boolean, onTogglePrivacy: () -> Unit, onSettings: () -> Unit) {
+private fun Header(
+    privacy: Boolean,
+    dark: Boolean,
+    onCalc: () -> Unit,
+    onToggleTheme: () -> Unit,
+    onTogglePrivacy: () -> Unit,
+    onSettings: () -> Unit
+) {
     Row(
         Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        GradientText("FinTrack", size = 22, modifier = Modifier.weight(1f))
-        IconButton(onClick = onTogglePrivacy) {
-            Icon(if (privacy) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = "প্রাইভেসি")
+        Column(Modifier.weight(1f)) {
+            Text("FinTrack", color = Sky400, fontSize = 26.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+            Text("PREMIUM FINANCE", color = Slate400, fontSize = 9.sp, letterSpacing = 3.sp)
         }
-        IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, contentDescription = "সেটিংস") }
+        HeaderIcon(Icons.Default.Calculate, "ক্যালকুলেটর", onCalc)
+        HeaderIcon(Icons.Default.WbSunny, if (dark) "লাইট থিম" else "ডার্ক থিম", onToggleTheme, tint = Amber400)
+        HeaderIcon(if (privacy) Icons.Default.VisibilityOff else Icons.Default.Visibility, "প্রাইভেসি", onTogglePrivacy)
+        HeaderIcon(Icons.Default.Settings, "সেটিংস", onSettings)
+    }
+}
+
+@Composable
+private fun HeaderIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, onClick: () -> Unit, tint: Color = MaterialTheme.colorScheme.onSurface) {
+    Box(
+        Modifier
+            .padding(start = 8.dp)
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = desc, tint = tint, modifier = Modifier.size(20.dp))
     }
 }
 

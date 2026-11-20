@@ -1,5 +1,7 @@
 package com.fintracks.app.ui
 
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -99,7 +101,7 @@ fun ToolsScreen(onOpen: (Overlay) -> Unit) {
     )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Financial Hub", fontSize = 24.sp, fontWeight = FontWeight.Black)
-        Text("FinTrack Premium Tools", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("FINTRACK PREMIUM TOOLS GRID", fontSize = 10.sp, letterSpacing = 2.sp, color = Slate500)
         tools.chunked(3).forEach { rowItems ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 rowItems.forEach { tile ->
@@ -107,27 +109,29 @@ fun ToolsScreen(onOpen: (Overlay) -> Unit) {
                         Modifier
                             .weight(1f)
                             .aspectRatio(1f)
-                            .clip(RoundedCornerShape(28.dp))
+                            .clip(RoundedCornerShape(32.dp))
                             .background(MaterialTheme.colorScheme.surface)
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(28.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(32.dp))
                             .clickable { onOpen(tile.overlay) }
-                            .padding(8.dp),
+                            .padding(10.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
                         Box(
-                            Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).background(tile.color.copy(alpha = 0.15f)),
+                            Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(tile.color.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(tile.icon, contentDescription = tile.label, tint = tile.color, modifier = Modifier.size(24.dp))
                         }
                         Spacer(Modifier.height(8.dp))
-                        Text(tile.label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        Text(tile.label, fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
                 repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
             }
         }
+        IntelligenceCard { onOpen(Overlay.REPORTS) }
+        ToolsFooter()
     }
 }
 
@@ -356,5 +360,62 @@ fun ReportsScreen(state: UiState) {
                 }
             }
         }
+    }
+}
+
+/** "Financial Intelligence" promo card from the video's Tools screen. */
+@Composable
+private fun IntelligenceCard(onOpen: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(40.dp))
+            .background(Indigo400.copy(alpha = 0.08f))
+            .border(1.dp, Indigo400.copy(alpha = 0.2f), RoundedCornerShape(40.dp))
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Indigo400.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.TrendingUp, contentDescription = null, tint = Indigo400, modifier = Modifier.size(22.dp))
+            }
+            Text("FINANCIAL INTELLIGENCE", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+        }
+        Text(
+            "FinTrack AI আপনার খরচ বিশ্লেষণ করে বাজেট ভারসাম্য বজায় রাখতে সাহায্য করে।",
+            fontSize = 14.sp,
+            lineHeight = 22.sp,
+            color = Slate400
+        )
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(Color(0xFF6D5BF5))
+                .clickable(onClick = onOpen)
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+        ) {
+            Text("বিস্তারিত বিশ্লেষণ", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+    }
+}
+
+@Composable
+private fun ToolsFooter() {
+    Column(
+        Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 96.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text("FinTrack AI", color = Sky400, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text(
+            "আপনার ব্যক্তিগত অর্থ ও লেনদেনের সবচেয়ে বুদ্ধিমান সমাধান।\nপ্রযুক্তির মাধ্যমে জীবন হোক আরও সহজ।",
+            color = Slate400,
+            fontSize = 13.sp,
+            lineHeight = 20.sp,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(8.dp))
+        Text("CRAFTED WITH ❤ BY SHOHAG VAII", color = Slate500, fontSize = 10.sp, letterSpacing = 2.sp)
+        Text("© 2024 FINTRACK PREMIUM FINANCE • ALL RIGHTS RESERVED", color = Slate600, fontSize = 9.sp, letterSpacing = 1.sp)
     }
 }

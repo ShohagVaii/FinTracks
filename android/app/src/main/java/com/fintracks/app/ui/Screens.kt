@@ -1,5 +1,16 @@
 package com.fintracks.app.ui
 
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -78,28 +89,67 @@ fun accountBalance(acc: JsonObject, txs: List<JsonObject>): Double {
     return b
 }
 
+private data class DashStats(val income: Double, val expense: Double, val total: Double, val savingsRate: Double)
+
 @Composable
 fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit, openOverlay: (Overlay) -> Unit) {
     val txs = state.rows("transactions")
     val accounts = state.rows("accounts")
-    val month = monthPrefix()
-    val monthTx = txs.filter { dateOf(it, "tx_date").startsWith(month) }
-    val income = monthTx.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
-    val expense = monthTx.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
-    val total = accounts.sumOf { accountBalance(it, txs) } +
-        (if (accounts.isEmpty()) txs.sumOf { if (it.str("type") == "Income") it.num("amount") else if (it.str("type") == "Expense") -it.num("amount") else 0.0 } else 0.0)
-    val savingsRate = if (income > 0) ((income - expense) / income * 100) else 0.0
     val p = state.privacy
+    // Computed once per data change, not on every recomposition (this was a main cause of lag).
+    val stats = remember(state.tables) {
+        val month = monthPrefix()
+        val monthTx = txs.filter { dateOf(it, "tx_date").startsWith(month) }
+        val income = monthTx.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
+        val expense = monthTx.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
+        val total = accounts.sumOf { accountBalance(it, txs) } +
+            (if (accounts.isEmpty()) txs.sumOf { if (it.str("type") == "Income") it.num("amount") else if (it.str("type") == "Expense") -it.num("amount") else 0.0 } else 0.0)
+        DashStats(income, expense, total, if (income > 0) ((income - expense) / income * 100) else 0.0)
+    }
+    val (income, expense, total, savingsRate) = stats
+    val net = income - expense
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        AppCard {
-            Text("মোট ব্যালেন্স", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-            Text(taka(total, p), fontSize = 30.sp, fontWeight = FontWeight.Black)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column { Text("আয় (এই মাস)", fontSize = 12.sp, color = incomeGreen); Text(taka(income, p), fontWeight = FontWeight.Bold) }
-                Column(horizontalAlignment = Alignment.End) { Text("ব্যয় (এই মাস)", fontSize = 12.sp, color = expenseRed); Text(taka(expense, p), fontWeight = FontWeight.Bold) }
+        // Profit hero — like the video's "নিট লাভ (PROFIT)" card: large radius, green trend icon.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(40.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF0B1F1C), VideoCardLift.copy(alpha = 0.6f))))
+                .border(1.dp, incomeGreen.copy(alpha = 0.22f), RoundedCornerShape(40.dp))
+                .padding(24.dp)
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Text("নিট লাভ (PROFIT)", fontSize = 12.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(taka(net, p), fontSize = 36.sp, fontWeight = FontWeight.Black, color = if (net >= 0) incomeGreen else expenseRed)
+                }
+                Box(Modifier.size(64.dp).clip(CircleShape).background(incomeGreen.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.TrendingUp, contentDescription = null, tint = incomeGreen, modifier = Modifier.size(30.dp))
+                }
             }
-            if (income > 0) Text("সঞ্চয়ের হার: ${"%.0f".format(savingsRate)}%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (income > 0) Text("সঞ্চয়ের হার: ${"%.0f".format(savingsRate)}%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatPill("মোট আয়", taka(income, p), incomeGreen, Modifier.weight(1f))
+            StatPill("মোট ব্যয়", taka(expense, p), expenseRed, Modifier.weight(1f))
+        }
+        // Wallet card — all-time balance.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(40.dp))
+                .background(VideoCardLift.copy(alpha = 0.55f))
+                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(40.dp))
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text("অবশিষ্ট ব্যালেন্স (ALL TIME)", fontSize = 11.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(taka(total, p), fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            }
+            Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Sky400.copy(alpha = 0.6f), modifier = Modifier.size(32.dp))
         }
         CreditDueCard(state) { openOverlay(Overlay.CREDIT) }
         HeatmapCard(txs, p)
@@ -411,5 +461,19 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         TextIn("ট্যাগ (কমা দিয়ে, যেমন: জরুরি, বাজার)", tagsText, { tagsText = it })
         SwitchRow("প্রতি মাসে পুনরাবৃত্ত", recurring) { recurring = it }
         error?.let { Text(it, color = expenseRed, fontSize = 12.sp) }
+    }
+}
+
+@Composable
+private fun StatPill(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(40.dp))
+            .background(color.copy(alpha = 0.06f))
+            .border(1.dp, color.copy(alpha = 0.18f), RoundedCornerShape(40.dp))
+            .padding(horizontal = 20.dp, vertical = 18.dp)
+    ) {
+        Text(label, fontSize = 12.sp, color = color)
+        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
     }
 }

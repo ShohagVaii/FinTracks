@@ -103,6 +103,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** After a write: refetch the 16 tables only. Full sync (recurring, reminders, widget) runs on login and daily. */
+    private suspend fun refreshTables() {
+        val tables = Sync.fetchTables(repo)
+        _state.update { it.copy(tables = tables) }
+    }
+
     /** Sends a question with a short financial summary to the server-side AI function. */
     suspend fun askAi(question: String, context: String): String = repo.askAi(question, context)
 
@@ -187,14 +193,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Insert when id is null, otherwise update the row. */
     fun save(table: String, body: JsonObject, id: String?) = act {
         if (id == null) repo.insert(table, body) else repo.update(table, id, body)
-        loadAll()
+        refreshTables()
     }
 
     /** Deletes a row and keeps a copy so it can be restored from the undo snackbar. */
     fun remove(table: String, id: String) = act {
         val row = state.value.rows(table).firstOrNull { it.id() == id }
         repo.delete(table, id)
-        loadAll()
+        refreshTables()
         // Shops delete their purchases and payments too, so they are not undoable.
         if (row != null && table != "credit_shops") {
             _state.update { it.copy(undo = UndoEntry(table, row, System.nanoTime())) }
@@ -205,7 +211,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val u = state.value.undo ?: return@act
         _state.update { it.copy(undo = null) }
         repo.upsert(u.table, listOf(u.row))
-        loadAll()
+        refreshTables()
     }
 
     fun clearUndo() {
@@ -228,7 +234,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (after < -0.005) throw IllegalArgumentException("জমার বেশি তোলা যাবে না")
         val newSaved = after.coerceIn(0.0, target)
         repo.update("goals", goal.id(), row("saved" to newSaved))
-        loadAll()
+        refreshTables()
         val oldPct = if (target > 0) (before / target * 100).toInt() else 0
         val newPct = if (target > 0) (newSaved / target * 100).toInt() else 0
         val crossed = listOf(100, 75, 50, 25).firstOrNull { oldPct < it && newPct >= it }
@@ -241,7 +247,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveProfile(body: JsonObject) = act {
         repo.updateProfile(body)
-        loadAll()
+        refreshTables()
     }
 
     /** Several writes in order, then one reload (used for things like shop + entry). */
@@ -249,7 +255,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         writes.forEach { (table, body, id) ->
             if (id == null) repo.insert(table, body) else repo.update(table, id, body)
         }
-        loadAll()
+        refreshTables()
     }
 
     /** Restores a validated backup. Existing rows stay; rows with the same id are updated. */
@@ -258,7 +264,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val rows = plan.tables[table].orEmpty()
             if (rows.isNotEmpty()) repo.upsert(table, rows)
         }
-        loadAll()
+        refreshTables()
         _state.update { it.copy(notice = "ব্যাকআপ থেকে ${plan.total}টি সারি ফিরিয়ে আনা হয়েছে") }
     }
 

@@ -1,5 +1,10 @@
 package com.fintracks.app.ui
 
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.automirrored.outlined.List
+import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.Work
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -174,32 +179,51 @@ fun FormDialog(
     )
 }
 
-/** Bottom bar with a raised centre "+" button, like the web Layout. */
+/** Glass bottom bar with a blue halo, outlined icons and a raised centre "+" — matches the video's nav. */
 @Composable
 fun BottomBar(selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
-    val items = listOf("dashboard" to ("হোম" to Icons.Default.Home), "transactions" to ("লেনদেন" to Icons.AutoMirrored.Filled.List),
-        "shared" to ("শেয়ারড" to Icons.Default.Group), "tools" to ("টুলস" to Icons.Default.Work))
-    Box(Modifier.fillMaxWidth().height(78.dp)) {
+    val items = listOf(
+        "dashboard" to ("হোম" to Icons.Outlined.Home),
+        "transactions" to ("লেনদেন" to Icons.AutoMirrored.Outlined.List),
+        "shared" to ("শেয়ারড" to Icons.Outlined.Group),
+        "tools" to ("টুলস" to Icons.Outlined.Work)
+    )
+    val barShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    Box(Modifier.fillMaxWidth().height(100.dp)) {
+        // Blue halo above the bar.
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(100.dp)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Sky500.copy(alpha = 0.16f))))
+        )
         Row(
             Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 6.dp),
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(68.dp)
+                .clip(barShape)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
+                .border(1.dp, Color.White.copy(alpha = 0.08f), barShape)
+                .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceAround
         ) {
-            items.take(2).forEach { (id, pair) -> NavItem(id, pair.first, pair.second, selected == id) { onSelect(id) } }
+            items.take(2).forEach { (id, pair) -> NavItem(pair.first, pair.second, selected == id) { onSelect(id) } }
             Spacer(Modifier.width(72.dp))
-            items.drop(2).forEach { (id, pair) -> NavItem(id, pair.first, pair.second, selected == id) { onSelect(id) } }
+            items.drop(2).forEach { (id, pair) -> NavItem(pair.first, pair.second, selected == id) { onSelect(id) } }
         }
+        // Centre "+" sits on the bar's top edge with a dark ring and a sky glow.
         Box(
             Modifier
                 .align(Alignment.TopCenter)
-                .offset(y = (-26).dp)
-                .size(62.dp)
+                .size(68.dp)
                 .clip(CircleShape)
-                .background(Brush.linearGradient(listOf(Sky500, Blue600)))
-                .border(4.dp, Slate950, CircleShape)
+                .background(Slate950)
+                .padding(4.dp)
+                .clip(CircleShape)
+                .background(Brush.linearGradient(listOf(Sky400, Sky500, Blue600)))
                 .clickable(onClick = onAdd),
             contentAlignment = Alignment.Center
         ) {
@@ -209,12 +233,29 @@ fun BottomBar(selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
 }
 
 @Composable
-private fun NavItem(id: String, label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, active: Boolean, onClick: () -> Unit) {
+private fun NavItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, active: Boolean, onClick: () -> Unit) {
+    val tint = if (active) Sky400 else Slate500
     Column(
-        Modifier.clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 6.dp),
+        Modifier.clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        M3Icon(icon, contentDescription = label, tint = if (active) Sky400 else Slate500, modifier = Modifier.size(24.dp))
-        Text(label, fontSize = 10.sp, fontWeight = FontWeight.Black, color = if (active) Sky400 else Slate500)
+        M3Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(24.dp))
+        Text(label, fontSize = 11.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium, color = tint)
+    }
+}
+
+/** Round AI chat button that floats above the bottom bar, like the video's chat bubble. */
+@Composable
+fun FloatingAiButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .size(56.dp)
+            .clip(CircleShape)
+            .background(Slate950.copy(alpha = 0.9f))
+            .border(2.dp, Sky500.copy(alpha = 0.7f), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        M3Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = "AI সহকারী", tint = Sky400, modifier = Modifier.size(24.dp))
     }
 }
