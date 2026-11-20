@@ -11,6 +11,7 @@ import com.fintracks.app.data.row
 import com.fintracks.app.data.str
 import com.fintracks.app.data.num
 import com.fintracks.app.data.bool
+import com.fintracks.app.data.strOrNull
 import com.fintracks.app.data.strList
 import com.fintracks.app.data.id
 import kotlinx.coroutines.async
@@ -23,6 +24,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import java.io.IOException
+import java.time.YearMonth
+import android.content.Context
 
 /** Every table the app reads, with its PostgREST query. Rows stay as JSON for generic CRUD. */
 val TABLES: List<Pair<String, String>> = listOf(
@@ -74,11 +77,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private suspend fun fetchTables(): Map<String, List<JsonObject>> = coroutineScope {
+        TABLES.map { (t, q) -> async { t to repo.list(t, q) } }.awaitAll().toMap()
+    }
+
     private suspend fun loadAll() {
         val profile = repo.list("profiles", "select=*&id=eq.${repo.uid()}").firstOrNull()
-        val tables = coroutineScope {
-            TABLES.map { (t, q) -> async { t to repo.list(t, q) } }.awaitAll().toMap()
-        }
+        var tables = fetchTables()
+        if (materializeRecurring(tables["transactions"].orEmpty())) tables = fetchTables()
+        val app = getApplication<Application>()
+        Reminders.check(app, tables)
+        FinTrackWidgetProvider.refresh(app, tables, profile?.bool("is_privacy_mode") == true)
         _state.update {
             it.copy(
                 signedIn = true,
@@ -87,6 +96,40 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 pendingSms = PendingSmsStore.load(getApplication())
             )
         }
+    }
+
+    /**
+     * Monthly auto-recurring: each transaction marked is_recurring is copied once per month
+     * into the current month (same day, clamped to month length). Copies are not recurring themselves.
+     */
+    private suspend fun materializeRecurring(txs: List<JsonObject>): Boolean {
+        val prefs = getApplication<Application>().getSharedPreferences("fintrack_recurring", Context.MODE_PRIVATE)
+        val month = monthPrefix()
+        val key = "done-$month"
+        val done = (prefs.getStringSet(key, null) ?: emptySet()).toMutableSet()
+        var created = false
+        for (t in txs.filter { it.bool("is_recurring") }) {
+            val day = dateOf(t, "tx_date")
+            if (day.length < 10 || day.take(7) >= month) continue
+            if (!done.add(t.id())) continue
+            val dd = minOf(day.substring(8).toInt(), YearMonth.parse(month).lengthOfMonth())
+            repo.insert("transactions", row(
+                "type" to t.str("type"),
+                "amount" to t.num("amount"),
+                "currency" to t.str("currency").ifEmpty { "BDT" },
+                "category" to t.str("category"),
+                "note" to t.str("note"),
+                "tx_date" to "$month-${dd.toString().padStart(2, '0')}",
+                "payment_mode" to t.str("payment_mode"),
+                "mood" to t.str("mood"),
+                "account_id" to t.strOrNull("account_id"),
+                "to_account_id" to t.strOrNull("to_account_id"),
+                "is_recurring" to false
+            ))
+            created = true
+        }
+        prefs.edit().putStringSet(key, done).apply()
+        return created
     }
 
     /** Shows busy state, converts errors into readable messages, and signs out on expired sessions. */

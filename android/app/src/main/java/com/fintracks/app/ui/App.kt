@@ -52,7 +52,7 @@ import kotlinx.serialization.json.JsonObject
 /** Full-screen tools opened from the Tools tab or the header. */
 enum class Overlay(val title: String) {
     ZAKAT("যাকাত ক্যালকুলেটর"), TAX("ট্যাক্স ক্যালকুলেটর"), CURRENCY("কারেন্সি কনভার্টার"),
-    LOAN("লোন / EMI"), CREDIT("বাকি (দোকানের হিসাব)"), DEBTS("ধার ও পাওনা"),
+    CHAT("AI সহকারী"), LOAN("লোন / EMI"), CREDIT("বাকি (দোকানের হিসাব)"), DEBTS("ধার ও পাওনা"),
     BUDGETS("বাজেট এনভেলপ"), GOALS("সঞ্চয় লক্ষ্য"), INVESTMENTS("ইনভেস্টমেন্ট"),
     SUBSCRIPTIONS("সাবস্ক্রিপশন"), ACCOUNTS("অ্যাকাউন্ট ও ট্রান্সফার"), REPORTS("পরিসংখ্যান ও রিপোর্ট"), SETTINGS("সেটিংস")
 }
@@ -60,6 +60,7 @@ enum class Overlay(val title: String) {
 @Composable
 fun FinTracksApp(vm: AppViewModel = viewModel()) {
     val state by vm.state.collectAsState()
+    val locked by AppLock.locked.collectAsState()
 
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
     LaunchedEffect(state.signedIn) {
@@ -80,6 +81,7 @@ fun FinTracksApp(vm: AppViewModel = viewModel()) {
                     onSignUp = { n, e, p -> vm.signUp(n, e, p) },
                     onGoogle = { token -> vm.signInWithGoogle(token) }
                 )
+                locked -> LockScreen(onSignOut = { AppLock.unlock(); vm.signOut() })
                 else -> MainScaffold(state, vm)
             }
         }
@@ -154,7 +156,7 @@ private fun Header(privacy: Boolean, onTogglePrivacy: () -> Unit, onSettings: ()
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        GradientText("SritiSetu", size = 22, modifier = Modifier.weight(1f))
+        GradientText("FinTrack", size = 22, modifier = Modifier.weight(1f))
         IconButton(onClick = onTogglePrivacy) {
             Icon(if (privacy) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = "প্রাইভেসি")
         }
@@ -176,6 +178,7 @@ private fun OverlayHeader(title: String, onBack: () -> Unit) {
 @Composable
 private fun OverlayContent(overlay: Overlay, state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit) {
     when (overlay) {
+        Overlay.CHAT -> ChatScreen(state)
         Overlay.ZAKAT -> ZakatScreen(state)
         Overlay.TAX -> TaxScreen(state)
         Overlay.CURRENCY -> CurrencyScreen()

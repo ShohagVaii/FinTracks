@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Work
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +70,7 @@ fun fmtMoney(v: Double): String = "৳ " + String.format(Locale.US, "%,.0f", v)
 @Composable
 fun ToolsScreen(onOpen: (Overlay) -> Unit) {
     val tools = listOf(
+        Triple(Overlay.CHAT, "AI সহকারী", Icons.Default.Info),
         Triple(Overlay.REPORTS, "রিপোর্ট", Icons.Default.Star),
         Triple(Overlay.LOAN, "লোন", Icons.Default.CreditCard),
         Triple(Overlay.ZAKAT, "যাকাত", Icons.Default.AccountBalance),

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">FinTracks</string>
+    <string name="app_name">FinTrack</string>
+    <string name="widget_name">FinTrack ব্যালেন্স</string>
 </resources>

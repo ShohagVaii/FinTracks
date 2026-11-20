@@ -30,6 +30,7 @@ import com.fintracks.app.data.row
 import com.fintracks.app.data.str
 import com.fintracks.app.data.strOrNull
 import kotlinx.serialization.json.JsonObject
+import kotlin.math.ceil
 
 private val green = Color(0xFF10B981)
 private val red = Color(0xFFF43F5E)
@@ -217,6 +218,7 @@ fun DebtsScreen(state: UiState, vm: AppViewModel) {
             KeyValue("আমি ধারি", taka(owe, p), red)
             KeyValue("আমার পাওনা", taka(owed, p), green)
         }
+        DebtPlanner(debts, p)
         AddButton("নতুন ধার / পাওনা") { adding = true }
         if (debts.isEmpty()) EmptyHint("কোনো ধার বা পাওনা নেই")
         debts.forEach { d ->
@@ -503,6 +505,30 @@ fun AccountsScreen(state: UiState, vm: AppViewModel) {
             TextIn("নাম", name, { name = it })
             ChoiceChips(listOf("Cash", "Bkash", "Nagad", "Rocket", "Bank", "Card").map { it to it }, kind) { kind = it }
             TextIn("শুরুর ব্যালেন্স (৳)", opening, { opening = it }, number = true)
+        }
+    }
+}
+
+/** Debt payoff plan (snowball: smallest debt first). Interest-free estimate: months = cumulative debt / monthly payment. */
+@Composable
+fun DebtPlanner(debts: List<JsonObject>, privacy: Boolean) {
+    var monthly by remember { mutableStateOf("") }
+    val owes = debts.filter { !it.bool("settled") && it.str("direction") == "owe" }.sortedBy { it.num("amount") }
+    val m = parseAmount(monthly) ?: 0.0
+    AppCard {
+        Text("ধার পরিশোধের পরিকল্পনা (ছোট ধার আগে)", fontWeight = FontWeight.Bold)
+        TextIn("প্রতি মাসে কত দিতে পারবেন (৳)", monthly, { monthly = it }, number = true)
+        when {
+            owes.isEmpty() -> Text("কোনো ধার নেই", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            m <= 0 -> Text("মাসিক পরিমাণ লিখুন", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else -> {
+                var cumulative = 0.0
+                owes.forEach { d ->
+                    cumulative += d.num("amount")
+                    Text("${d.str("person")}: ${taka(d.num("amount"), privacy)} → ${ceil(cumulative / m).toInt()} মাসে শেষ", fontSize = 13.sp)
+                }
+                Text("সব ধার শেষ হবে ${ceil(cumulative / m).toInt()} মাসে (সুদ ছাড়া হিসাব)", fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
