@@ -108,6 +108,7 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
     val overlay = overlayName?.let { runCatching { Overlay.valueOf(it) }.getOrNull() }
     val snackbar = remember { SnackbarHostState() }
     var showCalc by remember { mutableStateOf(false) }
+    var smsOpen by remember { mutableStateOf(false) }
     var receipt by remember { mutableStateOf<JsonObject?>(null) }
     var txAction by remember { mutableStateOf<JsonObject?>(null) }
 
@@ -164,8 +165,8 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
                     else -> ToolsScreen { overlayName = it.name }
                 }
                 if (overlay == null) {
-                    FloatingAiButton(
-                        onClick = { overlayName = Overlay.CHAT.name },
+                    FloatingSmsButton(
+                        onClick = { smsOpen = true },
                         modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 12.dp)
                     )
                 }
@@ -173,6 +174,7 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
         }
     }
 
+    if (smsOpen) SmsParserDialog(state, vm) { smsOpen = false }
     if (showCalc) CalculatorDialog(onUse = { showCalc = false }, onDismiss = { showCalc = false })
 
     receipt?.let { r -> ReceiptDialog(r, state) { receipt = null } }

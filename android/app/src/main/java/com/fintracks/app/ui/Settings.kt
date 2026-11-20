@@ -164,6 +164,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
             Text(state.profile?.str("email").orEmpty().ifEmpty { "ইমেইল পাওয়া যায়নি" }, fontSize = 12.sp)
             OutlinedButton(onClick = { vm.signOut() }) { Text("লগআউট") }
         }
+        ToolsFooter()
     }
 
     if (showSetPin) {

@@ -1,6 +1,9 @@
 package com.fintracks.app.ui
 
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Spacer
@@ -132,13 +135,15 @@ fun InsightsCards(state: UiState) {
     }
 }
 
-/** Monthly expense calendar: S M T W T F S header, one cell per day, redder = more spent that day. */
+/**
+ * Monthly expense calendar for [ym]. ‹ › change the month; the caller keeps the home timeline in sync.
+ * Only the days of [ym] are drawn; leading cells before day 1 stay empty, so no other month's data appears.
+ */
 @Composable
-fun HeatmapCard(txs: List<JsonObject>, privacy: Boolean) {
-    val today = java.time.LocalDate.now()
-    val first = today.withDayOfMonth(1)
-    val days = first.lengthOfMonth()
-    val prefix = today.toString().substring(0, 7)
+fun HeatmapCard(txs: List<JsonObject>, privacy: Boolean, ym: YearMonth, onPrev: () -> Unit, onNext: (() -> Unit)?) {
+    val first = ym.atDay(1)
+    val days = ym.lengthOfMonth()
+    val prefix = ym.toString() // yyyy-MM
     val perDay = DoubleArray(days + 1)
     txs.forEach { t ->
         if (t.str("type") != "Expense") return@forEach
@@ -157,10 +162,20 @@ fun HeatmapCard(txs: List<JsonObject>, privacy: Boolean) {
     }
     AppCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.GridView, contentDescription = null, tint = Sky400, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("এক্সপেন্স হিটম্যাপ", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Text("মাসের খরচ প্রবাহ", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            IconButton(onClick = onPrev, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.ChevronLeft, contentDescription = "আগের মাস")
+            }
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("এক্সপেন্স হিটম্যাপ", fontWeight = FontWeight.Bold)
+                Text(
+                    "${BN_MONTHS[ym.monthValue - 1]} ${bnDigits(ym.year.toString())}",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = { onNext?.invoke() }, enabled = onNext != null, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.ChevronRight, contentDescription = "পরের মাস")
+            }
         }
         Row(Modifier.fillMaxWidth()) {
             listOf("S", "M", "T", "W", "T", "F", "S").forEach {
@@ -184,6 +199,6 @@ fun HeatmapCard(txs: List<JsonObject>, privacy: Boolean) {
                 repeat(7 - week.size) { Spacer(Modifier.weight(1f)) }
             }
         }
-        Text("মোট (এই মাস): ${taka(perDay.sum(), privacy)}", fontSize = 12.sp)
+        Text("মোট ব্যয় (এই মাস): ${taka(perDay.sum(), privacy)}", fontSize = 12.sp)
     }
 }

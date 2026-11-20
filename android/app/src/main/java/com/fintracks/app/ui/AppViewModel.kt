@@ -250,13 +250,49 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         refreshTables()
     }
 
+    /**
+     * Records a বাকি payment and the expense that goes with it, in one batch.
+     * The expense (category বাকি পরিশোধ) is linked by source = debt_payment and source_ref = payment id.
+     * Purchases on credit do not create expenses, so the money is counted once, when it is paid.
+     */
+    fun recordDebtPayment(shopName: String, amount: Double, date: String, note: String, shopId: String) {
+        val paymentId = java.util.UUID.randomUUID().toString()
+        val label = "দোকান: $shopName" + if (note.isNotBlank()) " · $note" else ""
+        batch(
+            listOf(
+                Triple("credit_payments", row("id" to paymentId, "shop_id" to shopId, "amount" to amount, "paid_on" to date, "note" to note), null),
+                Triple(
+                    "transactions",
+                    row(
+                        "type" to "Expense", "amount" to amount, "currency" to state.value.currency,
+                        "category" to "বাকি পরিশোধ", "note" to label, "tx_date" to date, "payment_mode" to "Cash",
+                        "mood" to "", "is_recurring" to false,
+                        "source" to "debt_payment", "source_ref" to paymentId
+                    ),
+                    null
+                )
+            )
+        )
+    }
+
     /** Deletes a row and keeps a copy so it can be restored from the undo snackbar. */
     fun remove(table: String, id: String) = act {
         val row = state.value.rows(table).firstOrNull { it.id() == id }
+        // A বাকি payment and the expense it created are removed together, so the two never disagree.
+        val linked: List<Pair<String, String>> = when {
+            table == "credit_payments" -> state.value.rows("transactions")
+                .filter { it.str("source") == "debt_payment" && it.str("source_ref") == id }
+                .map { "transactions" to it.id() }
+            table == "transactions" && row?.str("source") == "debt_payment" -> listOfNotNull(
+                row?.str("source_ref")?.takeIf { it.isNotEmpty() }?.let { "credit_payments" to it }
+            )
+            else -> emptyList()
+        }
         repo.delete(table, id)
+        linked.forEach { (t, i) -> repo.delete(t, i) }
         refreshTables()
-        // Shops delete their purchases and payments too, so they are not undoable.
-        if (row != null && table != "credit_shops") {
+        // Shops delete their purchases and payments too, so they are not undoable. Linked rows are not undoable either.
+        if (row != null && table != "credit_shops" && linked.isEmpty()) {
             _state.update { it.copy(undo = UndoEntry(table, row, System.nanoTime())) }
         }
     }
@@ -332,6 +368,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         save(
             "transactions",
             row(
+                "source" to "sms",
                 "type" to s.type,
                 "amount" to s.amount,
                 "category" to "অন্যান্য",

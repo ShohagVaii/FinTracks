@@ -403,7 +403,7 @@ private fun IntelligenceCard(onOpen: () -> Unit) {
 }
 
 @Composable
-private fun ToolsFooter() {
+internal fun ToolsFooter() {
     Column(
         Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 96.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -425,13 +425,13 @@ private fun ToolsFooter() {
         }
         Spacer(Modifier.height(8.dp))
         Text("CRAFTED WITH ❤ BY SHOHAG VAII", color = Slate500, fontSize = 10.sp, letterSpacing = 2.sp)
-        Text("© 2024 FINTRACK PREMIUM FINANCE • ALL RIGHTS RESERVED", color = Slate600, fontSize = 9.sp, letterSpacing = 1.sp)
+        Text("© FINTRACK PREMIUM FINANCE", color = Slate600, fontSize = 9.sp, letterSpacing = 1.sp)
     }
 }
 
-// Profile links for the footer buttons. Replace with the real profile URLs.
-private const val FACEBOOK_URL = "https://www.facebook.com/"
-private const val TELEGRAM_URL = "https://t.me/"
+// Profile links for the footer buttons.
+internal const val FACEBOOK_URL = "https://www.facebook.com/shohag.vai.ofc"
+internal const val TELEGRAM_URL = "https://t.me/shohag_vaii"
 
 private val FacebookGlyph: ImageVector by lazy {
     ImageVector.Builder(name = "Facebook", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)

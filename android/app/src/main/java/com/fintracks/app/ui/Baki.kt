@@ -287,7 +287,7 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
 
     if (addingPurchase) PurchaseDialog(shop.id(), null, vm) { addingPurchase = false }
     editingPurchase?.let { PurchaseDialog(shop.id(), it, vm) { editingPurchase = null } }
-    if (addingPayment) PaymentDialog(shop.id(), balance, vm) { addingPayment = false }
+    if (addingPayment) PaymentDialog(shop.id(), shop.str("name"), balance, vm) { addingPayment = false }
     if (editingShop) ShopDialog(shop, vm) { editingShop = false }
     if (confirmDelete) {
         AlertDialog(
@@ -382,7 +382,7 @@ private fun PurchaseDialog(shopId: String, existing: JsonObject?, vm: AppViewMod
 // ---------- Payment (কিস্তি) ----------
 
 @Composable
-private fun PaymentDialog(shopId: String, balance: Double, vm: AppViewModel, onDismiss: () -> Unit) {
+private fun PaymentDialog(shopId: String, shopName: String, balance: Double, vm: AppViewModel, onDismiss: () -> Unit) {
     var amount by remember { mutableStateOf("") }
     var date by remember { mutableStateOf(todayIso()) }
     var note by remember { mutableStateOf("") }
@@ -392,7 +392,7 @@ private fun PaymentDialog(shopId: String, balance: Double, vm: AppViewModel, onD
 
     FormDialog("পরিশোধ / কিস্তি", confirmEnabled = valid, onDismiss = onDismiss, onConfirm = {
         if (a != null) {
-            vm.save("credit_payments", row("shop_id" to shopId, "amount" to a, "paid_on" to date.trim(), "note" to note.trim()), null)
+            vm.recordDebtPayment(shopName, a, date.trim(), note.trim(), shopId)
             onDismiss()
         }
     }) {

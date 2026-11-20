@@ -24,7 +24,7 @@ val ALL_CATS = (EXPENSE_CATS + INCOME_CATS).distinctBy { it.name }
 fun catIcon(name: String): String = ALL_CATS.firstOrNull { it.name == name }?.icon ?: "📦"
 
 val PAYMENT_MODES = listOf("Cash", "Card", "Bkash", "Nagad", "Rocket", "Bank")
-val MOODS = listOf("😊", "😐", "😔", "😡", "🤑")
+val MOODS = listOf("😊", "😐", "😞", "😡")
 
 /** Parses user input like "১২০০" or "1,200.50". Returns null when it is not a number. */
 fun parseAmount(text: String): Double? = text.replace(",", "").trim().toDoubleOrNull()

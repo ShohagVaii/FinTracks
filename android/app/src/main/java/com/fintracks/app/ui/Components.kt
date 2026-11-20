@@ -5,6 +5,7 @@ import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Work
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Sms
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -249,7 +250,7 @@ private fun NavItem(label: String, icon: androidx.compose.ui.graphics.vector.Ima
 
 /** Round AI chat button that floats above the bottom bar, like the video's chat bubble. */
 @Composable
-fun FloatingAiButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun FloatingSmsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier
             .size(56.dp)
@@ -259,6 +260,6 @@ fun FloatingAiButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        M3Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = "AI সহকারী", tint = Sky400, modifier = Modifier.size(24.dp))
+        M3Icon(Icons.Outlined.Sms, contentDescription = "SMART SMS PARSER", tint = Sky400, modifier = Modifier.size(24.dp))
     }
 }

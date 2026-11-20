@@ -125,6 +125,10 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
     var span by rememberSaveable { mutableStateOf(HomeSpan.MONTH) }
     var offset by rememberSaveable { mutableStateOf(0) }
     val period = homePeriod(span, offset)
+    val jumpToMonth: (java.time.YearMonth) -> Unit = { target ->
+        span = HomeSpan.MONTH
+        offset = java.time.YearMonth.now().until(target, java.time.temporal.ChronoUnit.MONTHS).toInt()
+    }
     // Computed once per data change, not on every recomposition (this was a main cause of lag).
     val monthTx = remember(state.tables) { txs.filter { dateOf(it, "tx_date").startsWith(month) } }
     val rangeTx = remember(state.tables, period.from, period.to) {
@@ -215,7 +219,10 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Sky400.copy(alpha = 0.6f), modifier = Modifier.size(32.dp))
         }
         CreditDueCard(state) { openOverlay(Overlay.CREDIT) }
-        HeatmapCard(txs, p)
+        // Heatmap follows the timeline month; its ‹ › buttons move the timeline too (one shared state).
+        val heatMonth = heatmapMonthOf(span, offset, period)
+        val nextMonth: (() -> Unit)? = if (heatMonth < java.time.YearMonth.now()) ({ jumpToMonth(heatMonth.plusMonths(1)) }) else null
+        HeatmapCard(txs, p, heatMonth, onPrev = { jumpToMonth(heatMonth.minusMonths(1)) }, onNext = nextMonth)
         SmsParserCard(state, vm)
 
         if (state.pendingSms.isNotEmpty()) {
@@ -314,25 +321,38 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("all") }
+    var segment by remember { mutableStateOf("history") } // history | auto (created from বাকি / SMS)
+    var modeFilter by remember { mutableStateOf("") }
     var period by remember { mutableStateOf(Period.MONTH) }
     var customFrom by remember { mutableStateOf(todayIso().substring(0, 8) + "01") }
     var customTo by remember { mutableStateOf(todayIso()) }
     var busy by remember { mutableStateOf(false) }
     val range = rangeFor(period, customFrom, customTo)
-    val all = state.rows("transactions")
+    val all = state.rows("transactions").filter { segment == "history" || it.str("source").isNotEmpty() }
     val inRange = filterByRange(all, range)
+    // "#জরুরি" and "জরুরি" both find the tag জরুরি.
+    val q = query.trim().removePrefix("#").trim()
     val filtered = inRange.filter { t ->
         (filter == "all" || t.str("type").lowercase() == filter.lowercase()) &&
-            (query.isBlank() || t.str("note").contains(query, true) || t.str("category").contains(query, true) || t.strList("tags").any { it.contains(query, true) })
+            (modeFilter.isEmpty() || t.str("payment_mode") == modeFilter) &&
+            (q.isEmpty() || t.str("note").contains(q, true) || t.str("category").contains(q, true) || t.strList("tags").any { it.contains(q, true) })
     }.sortedByDescending { dateOf(it, "tx_date") }
+    // Transfers are not income or expense, so they are left out of these totals.
     val income = inRange.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
     val expense = inRange.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text("খুঁজুন (নোট / ক্যাটাগরি)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        ChoiceChips(listOf("history" to "লেনদেনের ইতিহাস", "auto" to "অটো-লেনদেন"), segment) { segment = it }
+        OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text("খুঁজুন (নোট / ক্যাটাগরি / #ট্যাগ)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         PeriodPicker(period, customFrom, customTo, onPeriod = { period = it }, onFrom = { customFrom = it }, onTo = { customTo = it })
         ChoiceChips(listOf("all" to "সব", "income" to "আয়", "expense" to "ব্যয়", "transfer" to "ট্রান্সফার"), filter) { filter = it }
-        Text("${range.label} · আয় ${taka(income, state.privacy)} · ব্যয় ${taka(expense, state.privacy)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ChoiceChips(listOf("" to "সব মাধ্যম") + PAYMENT_MODES.map { it to it }, modeFilter) { modeFilter = it }
+        Text(range.label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatPill("আয়", taka(income, state.privacy), incomeGreen, Modifier.weight(1f))
+            StatPill("ব্যয়", taka(expense, state.privacy), expenseRed, Modifier.weight(1f))
+            StatPill("নিট", taka(income - expense, state.privacy), Sky400, Modifier.weight(1f))
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf(Export.Format.XLSX to "Excel", Export.Format.PDF to "PDF", Export.Format.CSV to "CSV").forEach { (fmt, label) ->
                 OutlinedButton(modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 4.dp), enabled = !busy && filtered.isNotEmpty(), onClick = {
@@ -361,7 +381,8 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
             }) { Text("ভাউচার", maxLines = 1, softWrap = false, fontSize = 13.sp) }
         }
         if (filtered.isEmpty()) EmptyHint("এই সময়সীমায় কোনো লেনদেন পাওয়া যায়নি")
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
+        // weight() keeps the list inside the remaining height; the bottom padding keeps the last row above the nav bar and the + button.
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f), contentPadding = PaddingValues(bottom = 120.dp)) {
             items(filtered, key = { it.id() }) { t ->
                 TxItem(
                     t, state,
@@ -380,7 +401,6 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                     }
                 )
             }
-            item { Spacer(Modifier.height(90.dp)) }
         }
     }
 }
@@ -401,6 +421,8 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
     var tagsText by remember { mutableStateOf(existing?.strList("tags")?.joinToString(", ") ?: "") }
     var showCalc by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // A বাকি-পরিশোধ expense is changed from the বাকি খাতা (delete the payment and add it again), so it cannot drift from the debt.
+    val locked = existing?.str("source") == "debt_payment"
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var reading by remember { mutableStateOf(false) }
@@ -479,6 +501,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
     }
 
     fun trySave() {
+        if (locked) return
         val amt = parseAmount(amount)
         when {
             amt == null || amt <= 0 -> error = "সঠিক পরিমাণ লিখুন"
@@ -628,15 +651,16 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
             TextIn("নোট", note, { note = it })
             SwitchRow("প্রতি মাসে পুনরাবৃত্ত", recurring) { recurring = it }
             error?.let { Text(it, color = expenseRed, fontSize = 12.sp) }
+            if (locked) Text("এটি বাকি পরিশোধ থেকে তৈরি। পরিবর্তন করতে বাকি খাতা থেকে এই পরিশোধ মুছে আবার যোগ করুন।", fontSize = 12.sp, color = Sky400)
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(54.dp)
                     .clip(RoundedCornerShape(50))
                     .background(Brush.horizontalGradient(listOf(Sky500, Blue600)))
-                    .clickable { trySave() },
+                    .clickable { if (locked) onDismiss() else trySave() },
                 contentAlignment = Alignment.Center
-            ) { Text("সেভ করুন", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+            ) { Text(if (locked) "বন্ধ করুন" else "সেভ করুন", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
         }
     }
 }
@@ -657,7 +681,7 @@ private fun StatPill(label: String, value: String, color: Color, modifier: Modif
 
 enum class HomeSpan(val label: String) { DAY("দৈনিক"), MONTH("মাসিক"), YEAR("বাৎসরিক") }
 
-private val BN_MONTHS = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
+internal val BN_MONTHS = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
 
 /** ASCII digits to Bengali digits. */
 fun bnDigits(s: String): String = s.map { if (it in '0'..'9') '০' + (it - '0') else it }.joinToString("")
@@ -739,6 +763,13 @@ private fun PickerField(value: String, options: List<Pair<String, String>>, onPi
     }
 }
 
+/** Month shown by the heatmap for the current timeline selection. */
+fun heatmapMonthOf(span: HomeSpan, offset: Int, period: HomePeriod): java.time.YearMonth = when (span) {
+    HomeSpan.MONTH -> java.time.YearMonth.now().plusMonths(offset.toLong())
+    HomeSpan.DAY -> java.time.YearMonth.from(java.time.LocalDate.parse(period.from))
+    HomeSpan.YEAR -> java.time.YearMonth.of(period.from.substring(0, 4).toInt(), java.time.YearMonth.now().monthValue)
+}
+
 /** SMART SMS PARSER card on the home screen; opens the paste-and-scan dialog. */
 @Composable
 private fun SmsParserCard(state: UiState, vm: AppViewModel) {
@@ -751,7 +782,7 @@ private fun SmsParserCard(state: UiState, vm: AppViewModel) {
 }
 
 @Composable
-private fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
+fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
     var text by remember { mutableStateOf("") }
     var result by remember { mutableStateOf<SmsSuggestion?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -800,7 +831,8 @@ private fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> U
                             "tx_date" to todayIso(),
                             "payment_mode" to (if (s.provider in PAYMENT_MODES) s.provider else "Bank"),
                             "mood" to "",
-                            "is_recurring" to false
+                            "is_recurring" to false,
+                            "source" to "sms"
                         ), null)
                         onDismiss()
                     }) { Text("লেনদেনে যোগ করুন") }
