@@ -1,3 +1,4 @@
+# FinTrack confirmation page deploy. Environment github-pages allows branch arena/b38877e8-fintracks.
 name: Deploy site (GitHub Pages)
 
 on:
