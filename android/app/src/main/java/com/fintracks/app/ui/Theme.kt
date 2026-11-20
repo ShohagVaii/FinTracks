@@ -2,16 +2,14 @@ package com.fintracks.app.ui
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.platform.Font as PlatformFont
-import androidx.compose.runtime.remember
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import com.fintracks.app.R
 
 /** Accent palettes from the web app (sky / emerald / rose / amber). */
 enum class AccentColor(val key: String, val label: String, val darkPrimary: Color, val lightPrimary: Color, val gradientEnd: Color) {
@@ -44,20 +42,33 @@ val Amber500 = Color(0xFFF59E0B)
 val Amber400 = Color(0xFFFBBF24)
 val Indigo400 = Color(0xFF818CF8)
 
-/** Hind Siliguri (bundled in assets/fonts) — the web app's font. */
-@Composable
-fun hindFamily(): FontFamily {
-    val assets = LocalContext.current.assets
-    return remember(assets) {
-        FontFamily(
-            PlatformFont("fonts/HindSiliguri-Light.ttf", assets, FontWeight.Light),
-            PlatformFont("fonts/HindSiliguri-Regular.ttf", assets, FontWeight.Normal),
-            PlatformFont("fonts/HindSiliguri-Medium.ttf", assets, FontWeight.Medium),
-            PlatformFont("fonts/HindSiliguri-SemiBold.ttf", assets, FontWeight.SemiBold),
-            PlatformFont("fonts/HindSiliguri-Bold.ttf", assets, FontWeight.Bold)
-        )
-    }
-}
+/** Hind Siliguri (res/font) — the web app's font. */
+val HindFamily = FontFamily(
+    Font(R.font.hind_siliguri_light, FontWeight.Light),
+    Font(R.font.hind_siliguri_regular, FontWeight.Normal),
+    Font(R.font.hind_siliguri_medium, FontWeight.Medium),
+    Font(R.font.hind_siliguri_semibold, FontWeight.SemiBold),
+    Font(R.font.hind_siliguri_bold, FontWeight.Bold)
+)
+
+/** Same styles as the Material defaults, with the Hind family applied to every one. */
+private fun Typography.withFamily(f: FontFamily) = Typography(
+    displayLarge = displayLarge.copy(fontFamily = f),
+    displayMedium = displayMedium.copy(fontFamily = f),
+    displaySmall = displaySmall.copy(fontFamily = f),
+    headlineLarge = headlineLarge.copy(fontFamily = f),
+    headlineMedium = headlineMedium.copy(fontFamily = f),
+    headlineSmall = headlineSmall.copy(fontFamily = f),
+    titleLarge = titleLarge.copy(fontFamily = f),
+    titleMedium = titleMedium.copy(fontFamily = f),
+    titleSmall = titleSmall.copy(fontFamily = f),
+    bodyLarge = bodyLarge.copy(fontFamily = f),
+    bodyMedium = bodyMedium.copy(fontFamily = f),
+    bodySmall = bodySmall.copy(fontFamily = f),
+    labelLarge = labelLarge.copy(fontFamily = f),
+    labelMedium = labelMedium.copy(fontFamily = f),
+    labelSmall = labelSmall.copy(fontFamily = f)
+)
 
 @Composable
 fun FinTracksTheme(dark: Boolean, accent: AccentColor, content: @Composable () -> Unit) {
@@ -88,5 +99,5 @@ fun FinTracksTheme(dark: Boolean, accent: AccentColor, content: @Composable () -
             error = Rose500
         )
     }
-    MaterialTheme(colorScheme = scheme, typography = Typography(defaultFontFamily = hindFamily()), content = content)
+    MaterialTheme(colorScheme = scheme, typography = Typography().withFamily(HindFamily), content = content)
 }
