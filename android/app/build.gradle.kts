@@ -20,7 +20,7 @@ android {
         targetSdk = 35
         // CI sets VERSION_CODE to the Actions run number, so every CI build is newer than the last one.
         versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
-        versionName = "1.0.0"
+        versionName = "1.1.0"
 
         // Public values only. The publishable key is safe to ship; RLS protects the data.
         buildConfigField("String", "SUPABASE_URL", "\"https://ennkvjmxyjztjszmfaag.supabase.co\"")
