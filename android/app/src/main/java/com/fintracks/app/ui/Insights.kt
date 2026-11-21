@@ -119,16 +119,16 @@ fun InsightsCards(state: UiState) {
     val unusual = Insights.unusual(txs)
 
     AppCard {
-        Text("ক্যাশফ্লো পূর্বাভাস", fontWeight = FontWeight.Bold)
-        Text("গত ৯০ দিনের গড় অনুযায়ী আনুমানিক ব্যালেন্স। এটি একটি অনুমান, নিশ্চিত হিসাব নয়।", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(tr("ক্যাশফ্লো পূর্বাভাস", "Cash-flow forecast"), fontWeight = FontWeight.Bold)
+        Text(tr("গত ৯০ দিনের গড় অনুযায়ী আনুমানিক ব্যালেন্স। এটি একটি অনুমান, নিশ্চিত হিসাব নয়।", "Estimated balance from the last 90 days' average. This is an estimate, not a confirmed figure."), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         listOf(30, 60, 90).forEach { d ->
-            KeyValue("$d দিন পর", taka(Insights.forecast(txs, balance, d), p))
+            KeyValue(tr("$d দিন পর", "in $d days"), taka(Insights.forecast(txs, balance, d), p))
         }
     }
     AppCard {
-        Text("অস্বাভাবিক খরচ", fontWeight = FontWeight.Bold)
+        Text(tr("অস্বাভাবিক খরচ", "Unusual spending"), fontWeight = FontWeight.Bold)
         if (unusual.isEmpty()) {
-            Text("এই মাসে কোনো ক্যাটাগরি স্বাভাবিকের চেয়ে বেশি খরচ হয়নি।", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("এই মাসে কোনো ক্যাটাগরি স্বাভাবিকের চেয়ে বেশি খরচ হয়নি।", "No category spent above normal this month."), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             unusual.take(5).forEach { u ->
                 val pct = ((u.thisMonth - u.average) / u.average * 100).toInt()
@@ -137,9 +137,9 @@ fun InsightsCards(state: UiState) {
         }
     }
     AppCard {
-        Text("নেট ওয়ার্থ", fontWeight = FontWeight.Bold)
-        KeyValue("মোট সম্পদ − দেনা", taka(Insights.netWorth(state), p), Color(0xFF38BDF8))
-        Text("সম্পদ: অ্যাকাউন্ট ব্যালেন্স + বিনিয়োগ। দেনা: অপরিশোধিত ধার ও লোনের বাকি।", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(tr("নেট ওয়ার্থ", "Net worth"), fontWeight = FontWeight.Bold)
+        KeyValue(tr("মোট সম্পদ − দেনা", "Total assets − debts"), taka(Insights.netWorth(state), p), Color(0xFF38BDF8))
+        Text(tr("সম্পদ: অ্যাকাউন্ট ব্যালেন্স + বিনিয়োগ। দেনা: অপরিশোধিত ধার ও লোনের বাকি।", "Assets: account balances + investments. Debts: unpaid loans and dues."), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -171,7 +171,7 @@ fun HeatmapCard(txs: List<JsonObject>, privacy: Boolean, ym: YearMonth, onPrev: 
     AppCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onPrev, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.ChevronLeft, contentDescription = "আগের মাস")
+                Icon(Icons.Default.ChevronLeft, contentDescription = tr("আগের মাস", "Previous month"))
             }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(tr("এক্সপেন্স হিটম্যাপ", "Expense heatmap"), fontWeight = FontWeight.Bold)
@@ -182,7 +182,7 @@ fun HeatmapCard(txs: List<JsonObject>, privacy: Boolean, ym: YearMonth, onPrev: 
                 )
             }
             IconButton(onClick = { onNext?.invoke() }, enabled = onNext != null, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.ChevronRight, contentDescription = "পরের মাস")
+                Icon(Icons.Default.ChevronRight, contentDescription = tr("পরের মাস", "Next month"))
             }
         }
         Row(Modifier.fillMaxWidth()) {
@@ -259,7 +259,7 @@ fun ExpenseTrendCard(txs: List<JsonObject>, privacy: Boolean) {
     val average = if (buckets.isNotEmpty()) buckets.sumOf { it.total } / buckets.size else 0.0
 
     AppCard {
-        Text("ব্যয়ের ট্রেন্ড", fontWeight = FontWeight.Bold)
+        Text(tr("ব্যয়ের ট্রেন্ড", "Expense trend"), fontWeight = FontWeight.Bold)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("week" to tr("সাপ্তাহিক", "Weekly"), "month" to tr("মাসিক", "Monthly"), "year" to tr("বাৎসরিক", "Yearly")).forEach { (key, label) ->
                 val on = view == key
@@ -277,7 +277,7 @@ fun ExpenseTrendCard(txs: List<JsonObject>, privacy: Boolean) {
             }
         }
         if (max <= 0) {
-            EmptyHint("এই সময়ে কোনো ব্যয় নেই")
+            EmptyHint(tr("এই সময়ে কোনো ব্যয় নেই", "No expenses in this period"))
         } else {
             Row(Modifier.fillMaxWidth().height(150.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                 buckets.forEachIndexed { i, b ->
@@ -317,7 +317,7 @@ fun ExpenseTrendCard(txs: List<JsonObject>, privacy: Boolean) {
                     color = Rose500
                 )
             }
-            Text("গড় (প্রতি ${if (view == "year") "মাসে" else "দিনে"}): ${taka(average, privacy)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("গড় (প্রতি ${if (view == "year") tr("মাসে", "per month") else tr("দিনে", "per day")}): ${taka(average, privacy)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

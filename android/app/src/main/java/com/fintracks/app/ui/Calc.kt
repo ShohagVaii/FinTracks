@@ -148,7 +148,7 @@ fun CalculatorDialog(onUse: (Double) -> Unit, onDismiss: () -> Unit) {
                     .padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("ক্যালকুলেটর", fontWeight = FontWeight.Bold, color = Color.White)
+                Text(tr("ক্যালকুলেটর", "Calculator"), fontWeight = FontWeight.Bold, color = Color.White)
                 Text(if (expr.isEmpty()) "0" else expr, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.fillMaxWidth())
                 Text(
                     live?.let { "= " + fmtNum(it) } ?: "সম্পূর্ণ বা সঠিক নয়",
@@ -169,7 +169,7 @@ fun CalculatorDialog(onUse: (Double) -> Unit, onDismiss: () -> Unit) {
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("বাতিল", color = Color.White) }
+                    TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel"), color = Color.White) }
                     Spacer(Modifier.width(8.dp))
                     TextButton(enabled = live != null && live > 0, onClick = { onUse(live!!) }) { Text("ব্যবহার") }
                 }

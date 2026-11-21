@@ -72,7 +72,7 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onDismiss: () -> Unit) {
                     Export.share(ctx, file, "image/png", "FinTrack লেনদেন ভাউচার")
                 }
             } catch (e: Exception) {
-                Toast.makeText(ctx, "শেয়ার ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(ctx, tr("শেয়ার ব্যর্থ: ${e.message}", "Share failed: ${e.message}"), Toast.LENGTH_LONG).show()
             } finally {
                 busy = false
             }
@@ -84,14 +84,14 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onDismiss: () -> Unit) {
             Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("লেনদেনের ভাউচার", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = "বন্ধ করুন") }
+                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close")) }
                 }
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val bmp = preview
                     if (bmp != null) {
                         Image(
                             bitmap = bmp.asImageBitmap(),
-                            contentDescription = "ভাউচার",
+                            contentDescription = tr("ভাউচার", "Voucher"),
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -131,6 +131,6 @@ fun TxActionDialog(t: JsonObject, onEdit: () -> Unit, onDelete: () -> Unit, onDi
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }

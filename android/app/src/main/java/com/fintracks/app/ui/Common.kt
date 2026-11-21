@@ -56,7 +56,7 @@ fun KeyValue(label: String, value: String, valueColor: Color = Color.Unspecified
 
 @Composable
 fun DeleteButton(onClick: () -> Unit) {
-    IconButton(onClick = onClick) { Icon(Icons.Default.Delete, contentDescription = "মুছুন", tint = com.fintracks.app.ui.Rose500) }
+    IconButton(onClick = onClick) { Icon(Icons.Default.Delete, contentDescription = tr("মুছুন", "Delete"), tint = com.fintracks.app.ui.Rose500) }
 }
 
 @Composable

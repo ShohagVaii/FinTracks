@@ -197,7 +197,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
                     Icon(Icons.Default.TrendingUp, contentDescription = null, tint = incomeGreen, modifier = Modifier.size(30.dp))
                 }
             }
-            if (income > 0) Text(tr("সঞ্চয়ের হার", "Savings rate") + ": ${"%.0f".format(savingsRate)}%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+            if (income > 0) Text(tr("সঞ্চয়ের হার", "Savings rate") + ": ${bnDigits("%.0f".format(savingsRate))}%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             StatPill(tr("মোট আয়", "Total income"), taka(income, p), incomeGreen, Modifier.weight(1f))
@@ -311,7 +311,7 @@ fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onDelete: (() -> 
                 Text("${displayDate(dateOf(t, "tx_date"))} · ${t.str("payment_mode")}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text("$sign ${taka(t.num("amount"), state.privacy)}", color = amountColor, fontWeight = FontWeight.Bold)
-            if (onShare != null) IconButton(onClick = onShare) { Icon(Icons.Default.Share, contentDescription = "শেয়ার", tint = Sky400) }
+            if (onShare != null) IconButton(onClick = onShare) { Icon(Icons.Default.Share, contentDescription = tr("শেয়ার", "Share"), tint = Sky400) }
             if (onDelete != null) DeleteButton(onDelete)
         }
     }
@@ -364,7 +364,7 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                             val file = withContext(Dispatchers.IO) { Export.listFile(ctx, fmt, state, filtered, range.label) }
                             Export.share(ctx, file, fmt.mime, "FinTrack - ${range.label}")
                         } catch (e: Exception) {
-                            Toast.makeText(ctx, "এক্সপোর্ট ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
+                            Toast.makeText(ctx, tr("এক্সপোর্ট ব্যর্থ: ${e.message}", "Export failed: ${e.message}"), Toast.LENGTH_LONG).show()
                         } finally { busy = false }
                     }
                 }) { Text("$label", maxLines = 1, softWrap = false, fontSize = 13.sp) }
@@ -377,7 +377,7 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                         val file = withContext(Dispatchers.IO) { Voucher.summaryPdf(ctx, state, filtered, range.label, ref) }
                         Export.share(ctx, file, "application/pdf", "FinTrack সারসংক্ষেপ ভাউচার")
                     } catch (e: Exception) {
-                        Toast.makeText(ctx, "ভাউচার ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(ctx, tr("ভাউচার ব্যর্থ: ${e.message}", "Voucher failed: ${e.message}"), Toast.LENGTH_LONG).show()
                     } finally { busy = false }
                 }
             }) { Text(tr("ভাউচার", "Voucher"), maxLines = 1, softWrap = false, fontSize = 13.sp) }
@@ -397,7 +397,7 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                                 val file = withContext(Dispatchers.IO) { Export.receiptFile(ctx, state, t) }
                                 Export.share(ctx, file, "application/pdf", "FinTrack লেনদেন ভাউচার")
                             } catch (e: Exception) {
-                                Toast.makeText(ctx, "শেয়ার ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
+                                Toast.makeText(ctx, tr("শেয়ার ব্যর্থ: ${e.message}", "Share failed: ${e.message}"), Toast.LENGTH_LONG).show()
                             }
                         }
                     }
@@ -437,7 +437,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         r.date?.let { date = it }
         if (note.isBlank()) r.shop?.let { note = it }
         if (type != "Income") r.category?.let { category = it }
-        captureNote = if (r.amount == null) "রসিদে মোট টাকা পাওয়া যায়নি, হাতে লিখুন" else "রসিদ থেকে পড়া হয়েছে। যাচাই করে সেভ করুন।"
+        captureNote = if (r.amount == null) tr("রসিদে মোট টাকা পাওয়া যায়নি, হাতে লিখুন", "No total found on the receipt, enter it by hand") else tr("রসিদ থেকে পড়া হয়েছে। যাচাই করে সেভ করুন।", "Read from receipt. Check and save.")
     }
     fun readReceipt(uri: Uri) {
         reading = true
@@ -446,7 +446,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                 val text = withContext(Dispatchers.IO) { recognizeReceiptText(ctx, uri) }
                 applyReceipt(CaptureParser.parseReceipt(text))
             } catch (e: Exception) {
-                Toast.makeText(ctx, "রসিদ পড়া যায়নি: ${e.message ?: "অজানা সমস্যা"}", Toast.LENGTH_LONG).show()
+                Toast.makeText(ctx, tr("রসিদ পড়া যায়নি", "Could not read receipt") + ": ${e.message ?: tr("অজানা সমস্যা", "unknown error")}", Toast.LENGTH_LONG).show()
             } finally {
                 reading = false
             }
@@ -457,13 +457,13 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         if (!said.isNullOrBlank()) {
             val v = CaptureParser.parseVoice(said)
             if (v == null) {
-                Toast.makeText(ctx, "পরিমাণ বোঝা যায়নি। আবার বলুন বা লিখুন", Toast.LENGTH_LONG).show()
+                Toast.makeText(ctx, tr("পরিমাণ বোঝা যায়নি। আবার বলুন বা লিখুন", "Couldn't read the amount. Say it again or type it."), Toast.LENGTH_LONG).show()
             } else {
                 amount = fmtNum(v.amount)
                 type = v.type
                 category = v.category ?: if (v.type == "Income") "অন্যান্য" else category
                 note = v.transcript
-                captureNote = "ভয়েস থেকে ভরা হয়েছে। যাচাই করে সেভ করুন।"
+                captureNote = tr("ভয়েস থেকে ভরা হয়েছে। যাচাই করে সেভ করুন।", "Filled from voice. Check and save.")
             }
         }
     }
@@ -478,12 +478,12 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "যেমন: পাঁচশো টাকা বাজার করলাম")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, tr("যেমন: পাঁচশো টাকা বাজার করলাম", "e.g. spent 500 on groceries"))
         }
         try {
             voiceLauncher.launch(intent)
         } catch (e: ActivityNotFoundException) {
-            Toast.makeText(ctx, "এই ফোনে ভয়েস সার্চ চালু নেই", Toast.LENGTH_LONG).show()
+            Toast.makeText(ctx, tr("এই ফোনে ভয়েস সার্চ চালু নেই", "Voice search is not available on this phone"), Toast.LENGTH_LONG).show()
         }
     }
     fun launchCamera() {
@@ -506,8 +506,8 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         if (locked) return
         val amt = parseAmount(amount)
         when {
-            amt == null || amt <= 0 -> error = "সঠিক পরিমাণ লিখুন"
-            !isValidIsoDate(date) -> error = "তারিখ লিখুন (YYYY-MM-DD)"
+            amt == null || amt <= 0 -> error = tr("সঠিক পরিমাণ লিখুন", "Enter a valid amount")
+            !isValidIsoDate(date) -> error = tr("তারিখ বাছাই করুন", "Pick a date")
             else -> onSave(
                 row(
                     "type" to type, "amount" to amt, "currency" to state.currency,
@@ -537,12 +537,12 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (existing == null) "লেনদেন যোগ করুন" else "লেনদেন সম্পাদনা", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = "বন্ধ করুন") }
+                Text(if (existing == null) tr("লেনদেন যোগ করুন", "Add transaction") else tr("লেনদেন সম্পাদনা", "Edit transaction"), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close")) }
             }
             // Segmented toggle: ব্যয় red, আয় green, ট্রান্সফার sky.
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.05f)).padding(4.dp)) {
-                listOf(Triple("Expense", "ব্যয় (Expense)", expenseRed), Triple("Income", "আয় (Income)", incomeGreen), Triple("Transfer", "ট্রান্সফার", Sky500)).forEach { (key, label, c) ->
+                listOf(Triple("Expense", "ব্যয় (Expense)", expenseRed), Triple("Income", tr("আয় (Income)", "Income"), incomeGreen), Triple("Transfer", "ট্রান্সফার", Sky500)).forEach { (key, label, c) ->
                     val on = type == key
                     Box(
                         Modifier
@@ -580,20 +580,20 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                     RoundIcon(Icons.Default.Mic, "ভয়েস") { launchVoice() }
                     RoundIcon(Icons.Default.Image, "ছবি") { galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
                 }
-                RoundIcon(Icons.Default.Calculate, "ক্যালকুলেটর") { showCalc = true }
+                RoundIcon(Icons.Default.Calculate, tr("ক্যালকুলেটর", "Calculator")) { showCalc = true }
             }
-            if (reading) Text("রসিদ পড়া হচ্ছে…", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (reading) Text(tr("রসিদ পড়া হচ্ছে…", "Reading receipt…"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             captureNote?.let { Text(it, fontSize = 12.sp, color = Sky400) }
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (type != "Transfer") {
                     Column(Modifier.weight(1f)) {
-                        Text(if (type == "Income") "আয়ের উৎস" else "ক্যাটাগরি", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (type == "Income") tr("আয়ের উৎস", "Income source") else tr("ক্যাটাগরি", "Category"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         PickerField(category, cats.map { it.name to "${it.icon} ${it.name}" }) { category = it }
                     }
                 }
                 Column(Modifier.weight(1f)) {
-                    TextIn("তারিখ (YYYY-MM-DD)", date, { date = it })
+                    DateField(tr("তারিখ", "Date"), date, { date = it })
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -604,13 +604,13 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                     }
                 }
                 Column(Modifier.weight(1f)) {
-                    Text("পেমেন্ট মোড", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(tr("পেমেন্ট মোড", "Payment mode"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     PickerField(mode, PAYMENT_MODES.map { it to it }) { mode = it }
                 }
             }
             if (type == "Transfer") {
                 Text(
-                    "ট্রান্সফার শুধু ধরন ও ট্যাগ: অ্যাকাউন্ট ব্যালেন্স বদলায় না, আয় বা ব্যয়ের হিসাবেও ধরা হয় না।",
+                    tr("ট্রান্সফার শুধু ধরন ও ট্যাগ: অ্যাকাউন্ট ব্যালেন্স বদলায় না, আয় বা ব্যয়ের হিসাবেও ধরা হয় না।", "Transfer is only a type and tag: it does not change account balances or count as income or expense."),
                     fontSize = 12.sp,
                     color = Sky400
                 )
@@ -633,7 +633,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
             }
             Text("হ্যাশ ট্যাগ", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextIn("ট্যাগ লিখুন (যেমন: জরুরি)", tagInput, { tagInput = it }, modifier = Modifier.weight(1f))
+                TextIn(tr("ট্যাগ লিখুন (যেমন: জরুরি)", "Enter a tag (e.g. urgent)"), tagInput, { tagInput = it }, modifier = Modifier.weight(1f))
                 Box(
                     Modifier
                         .size(52.dp)
@@ -647,14 +647,14 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                             }
                         },
                     contentAlignment = Alignment.Center
-                ) { Icon(Icons.Default.Add, contentDescription = "ট্যাগ যোগ করুন", tint = Color.White) }
+                ) { Icon(Icons.Default.Add, contentDescription = tr("ট্যাগ যোগ করুন", "Add tag"), tint = Color.White) }
             }
             val tagList = tagsText.split(',').map { it.trim() }.filter { it.isNotEmpty() }
             if (tagList.isNotEmpty()) Text(tagList.joinToString("  ") { "#$it" }, fontSize = 12.sp, color = Sky400)
-            TextIn("নোট", note, { note = it })
-            SwitchRow("প্রতি মাসে পুনরাবৃত্ত", recurring) { recurring = it }
+            TextIn(tr("নোট", "Note"), note, { note = it })
+            SwitchRow(tr("প্রতি মাসে পুনরাবৃত্ত", "Repeats monthly"), recurring) { recurring = it }
             error?.let { Text(it, color = expenseRed, fontSize = 12.sp) }
-            if (locked) Text("এটি বাকি পরিশোধ থেকে তৈরি। পরিবর্তন করতে বাকি খাতা থেকে এই পরিশোধ মুছে আবার যোগ করুন।", fontSize = 12.sp, color = Sky400)
+            if (locked) Text(tr("এটি বাকি পরিশোধ থেকে তৈরি। পরিবর্তন করতে বাকি খাতা থেকে এই পরিশোধ মুছে আবার যোগ করুন।", "Created from a credit payment. To change it, delete this payment in the credit ledger and add it again."), fontSize = 12.sp, color = Sky400)
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -663,7 +663,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                     .background(Brush.horizontalGradient(listOf(Sky500, Blue600)))
                     .clickable { if (locked) onDismiss() else trySave() },
                 contentAlignment = Alignment.Center
-            ) { Text(if (locked) "বন্ধ করুন" else "সেভ করুন", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+            ) { Text(if (locked) tr("বন্ধ করুন", "Close") else tr("সেভ করুন", "Save"), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
         }
     }
 }
@@ -691,7 +691,7 @@ enum class HomeSpan(private val bnLabel: String, private val enLabel: String) {
 internal val BN_MONTHS = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
 
 /** ASCII digits to Bengali digits. */
-fun bnDigits(s: String): String = s.map { if (it in '0'..'9') '০' + (it - '0') else it }.joinToString("")
+fun bnDigits(s: String): String = if (AppPrefs.english) s else s.map { if (it in '0'..'9') '০' + (it - '0') else it }.joinToString("")
 
 data class HomePeriod(val from: String, val to: String, val label: String)
 
@@ -805,13 +805,13 @@ fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("SMART SMS PARSER", fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = "বন্ধ করুন") }
+                IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close")) }
             }
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it; result = null; message = null },
                 label = { Text("SMS") },
-                placeholder = { Text("SMS এখানে পেস্ট করুন") },
+                placeholder = { Text(tr("SMS এখানে পেস্ট করুন", "Paste SMS here")) },
                 minLines = 4,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -819,11 +819,11 @@ fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
                 onClick = {
                     val parsed = SmsParser.parse(text)
                     result = parsed
-                    message = if (parsed == null) "এই SMS থেকে লেনদেন বোঝা যায়নি" else null
+                    message = if (parsed == null) tr("এই SMS থেকে লেনদেন বোঝা যায়নি", "Couldn't read a transaction from this SMS") else null
                 },
                 enabled = text.isNotBlank(),
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("স্ক্যান করুন") }
+            ) { Text(tr("স্ক্যান করুন", "Scan")) }
             result?.let { s ->
                 AppCard(borderColor = Sky400.copy(alpha = 0.4f)) {
                     Text("${s.provider} · ${s.type} · ${taka(s.amount, state.privacy)}", fontWeight = FontWeight.Bold)
@@ -842,7 +842,7 @@ fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
                             "source" to "sms"
                         ), null)
                         onDismiss()
-                    }) { Text("লেনদেনে যোগ করুন") }
+                    }) { Text(tr("লেনদেনে যোগ করুন", "Add to transactions")) }
                 }
             }
             message?.let { Text(it, color = expenseRed, fontSize = 12.sp) }

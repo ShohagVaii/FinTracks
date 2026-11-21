@@ -310,7 +310,7 @@ fun MoneyCounterScreen(vm: AppViewModel) {
                             status = if (onServer) "✅ গণনাটি মুছে ফেলা হয়েছে (ডিভাইস ও সার্ভার)" else "💾 এই ফোনে মুছেছে — সার্ভারে সিঙ্ক বাকি"
                         }
                         if (expanded == r.id) expanded = null
-                    }) { Icon(Icons.Default.Delete, contentDescription = "মুছুন", tint = Rose500) }
+                    }) { Icon(Icons.Default.Delete, contentDescription = tr("মুছুন", "Delete"), tint = Rose500) }
                 }
                 if (open) {
                     r.counts.filter { it.value > 0 }.forEach { (d, n) ->

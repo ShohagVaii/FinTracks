@@ -128,7 +128,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                 }
                 restorePlan = Backup.parse(text)
             } catch (e: Exception) {
-                Toast.makeText(ctx, e.message ?: "ফাইল পড়া যায়নি", Toast.LENGTH_LONG).show()
+                Toast.makeText(ctx, e.message ?: tr("ফাইল পড়া যায়নি", "Couldn't read the file"), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -294,7 +294,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                                 val file = withContext(Dispatchers.IO) { Export.listFile(ctx, fmt, state, txs, "সব লেনদেন") }
                                 Export.share(ctx, file, fmt.mime, "FinTrack লেনদেন")
                             } catch (e: Exception) {
-                                Toast.makeText(ctx, "এক্সপোর্ট ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
+                                Toast.makeText(ctx, tr("এক্সপোর্ট ব্যর্থ: ${e.message}", "Export failed: ${e.message}"), Toast.LENGTH_LONG).show()
                             } finally {
                                 exporting = false
                             }
@@ -313,7 +313,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                         val file = withContext(Dispatchers.IO) { Backup.file(ctx, state) }
                         Export.share(ctx, file, "application/json", "FinTrack ব্যাকআপ")
                     } catch (e: Exception) {
-                        Toast.makeText(ctx, "ব্যাকআপ ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(ctx, tr("ব্যাকআপ ব্যর্থ: ${e.message}", "Backup failed: ${e.message}"), Toast.LENGTH_LONG).show()
                     }
                 }
             }) { Text(tr("ব্যাকআপ ফাইল শেয়ার", "Share backup file")) }
@@ -521,7 +521,6 @@ private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () ->
     val error = when {
         name.isBlank() -> tr("নাম লিখুন", "Enter a name")
         u.isNotEmpty() && !USERNAME_RE.matches(u) -> tr("ইউজারনেম ৩–২০ অক্ষর: ইংরেজি ছোট হাতের অক্ষর, সংখ্যা বা _", "Username: 3–20 lowercase letters, digits or _")
-        dob.isNotBlank() && !isValidIsoDate(dob) -> tr("জন্ম তারিখ YYYY-MM-DD ফরম্যাটে দিন", "Date of birth must be YYYY-MM-DD")
         else -> null
     }
 
@@ -540,7 +539,7 @@ private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () ->
                 OutlinedTextField(username, { username = it.take(20) }, label = { Text(tr("ইউজারনেম", "Username")) }, singleLine = true,
                     prefix = { Text("@") }, modifier = Modifier.fillMaxWidth())
                 OutlinedButton(onClick = { pickingDob = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text(tr("জন্ম তারিখ: ", "Birth date: ") + (dob.ifEmpty { tr("বাছাই করুন", "pick") }))
+                    Text(tr("জন্ম তারিখ: ", "Birth date: ") + (if (dob.isEmpty()) tr("বাছাই করুন", "pick") else displayDate(dob)))
                 }
                 OutlinedTextField(phone, { phone = it.take(20) }, label = { Text(tr("ফোন নম্বর", "Phone")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(address, { address = it.take(200) }, label = { Text(tr("ঠিকানা", "Address")) }, modifier = Modifier.fillMaxWidth().height(90.dp))
@@ -628,20 +627,20 @@ fun DeleteAccountDialog(email: String, onDismiss: () -> Unit, onConfirm: (String
     var password by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("অ্যাকাউন্ট মুছবেন?", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
+        title = { Text(tr("অ্যাকাউন্ট মুছবেন?", "Delete account?"), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("এটি স্থায়ী। সব ডেটা মুছে যাবে এবং ফিরিয়ে আনা যাবে না। নিশ্চিত করতে নিচে DELETE লিখুন এবং পাসওয়ার্ড দিন।", fontSize = 13.sp)
-                OutlinedTextField(word, { word = it }, label = { Text("DELETE লিখুন") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(password, { password = it }, label = { Text("পাসওয়ার্ড") }, singleLine = true,
+                Text(tr("এটি স্থায়ী। সব ডেটা মুছে যাবে এবং ফিরিয়ে আনা যাবে না। নিশ্চিত করতে নিচে DELETE লিখুন এবং পাসওয়ার্ড দিন।", "This is permanent. All data will be erased and cannot be restored. To confirm, type DELETE below and enter your password."), fontSize = 13.sp)
+                OutlinedTextField(word, { word = it }, label = { Text(tr("DELETE লিখুন", "Type DELETE")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(password, { password = it }, label = { Text(tr("পাসওয়ার্ড", "Password")) }, singleLine = true,
                     visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
             TextButton(enabled = word == "DELETE" && password.isNotEmpty(), onClick = { onConfirm(password) }) {
-                Text("স্থায়ীভাবে মুছুন", color = MaterialTheme.colorScheme.error)
+                Text(tr("স্থায়ীভাবে মুছুন", "Delete permanently"), color = MaterialTheme.colorScheme.error)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }

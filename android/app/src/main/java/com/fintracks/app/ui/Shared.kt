@@ -203,15 +203,15 @@ private fun NewBillDialog(state: UiState, vm: AppViewModel, onDone: () -> Unit) 
     val tv = t ?: 0.0
     val customSum = people.sumOf { parseAmount(amounts[it] ?: "") ?: 0.0 }
 
-    SharedDialog("নতুন বিল ভাগ", "সেভ", onDismiss = onDone, onConfirm = {
+    SharedDialog(tr("নতুন বিল ভাগ", "New bill split"), tr("সেভ", "Save"), onDismiss = onDone, onConfirm = {
         when {
-            title.isBlank() -> error = "বিলের নাম লিখুন"
-            t == null || t <= 0 -> error = "সঠিক মোট টাকা লিখুন"
-            people.isEmpty() -> error = "অন্তত একজন অংশগ্রহণকারী বাছাই করুন"
-            payer !in people -> error = "কে পরিশোধ করেছেন তা অংশগ্রহণকারীদের মধ্য থেকে বাছাই করুন"
-            mode == "custom" && people.any { parseAmount(amounts[it] ?: "") == null } -> error = "প্রত্যেকের ভাগের পরিমাণ লিখুন"
+            title.isBlank() -> error = tr("বিলের নাম লিখুন", "Enter the bill name")
+            t == null || t <= 0 -> error = tr("সঠিক মোট টাকা লিখুন", "Enter a valid total")
+            people.isEmpty() -> error = tr("অন্তত একজন অংশগ্রহণকারী বাছাই করুন", "Pick at least one participant")
+            payer !in people -> error = tr("কে পরিশোধ করেছেন তা অংশগ্রহণকারীদের মধ্য থেকে বাছাই করুন", "Pick who paid, from the participants")
+            mode == "custom" && people.any { parseAmount(amounts[it] ?: "") == null } -> error = tr("প্রত্যেকের ভাগের পরিমাণ লিখুন", "Enter each person's share")
             mode == "custom" && kotlin.math.abs(customSum - tv) > 0.01 ->
-                error = "ভাগের যোগফল মোট টাকার সমান হতে হবে (এখন ${taka(customSum)})"
+                error = tr("ভাগের যোগফল মোট টাকার সমান হতে হবে (এখন ${taka(customSum)})", "Shares must add up to the total (now ${taka(customSum)})")
             else -> {
                 val shares = if (mode == "custom") {
                     JsonObject(people.associateWith { JsonPrimitive(parseAmount(amounts[it] ?: "") ?: 0.0) })
@@ -235,8 +235,8 @@ private fun NewBillDialog(state: UiState, vm: AppViewModel, onDone: () -> Unit) 
             }
         }
     }) {
-        TextIn("বিলের নাম (যেমন: বাসা ভাড়া, খাবার)", title, { title = it })
-        TextIn("মোট টাকা (৳)", total, { total = it }, number = true)
+        TextIn(tr("বিলের নাম (যেমন: বাসা ভাড়া, খাবার)", "Bill name (e.g. rent, food)"), title, { title = it })
+        TextIn(tr("মোট টাকা (৳)", "Total amount (৳)"), total, { total = it }, number = true)
         Text(tr("অংশগ্রহণকারী", "Participants"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (known.isNotEmpty()) {
             ToggleChips(known, people) { n ->
@@ -245,7 +245,7 @@ private fun NewBillDialog(state: UiState, vm: AppViewModel, onDone: () -> Unit) 
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextIn("নতুন নাম", newName, { newName = it }, modifier = Modifier.weight(1f))
+            TextIn(tr("নতুন নাম", "New name"), newName, { newName = it }, modifier = Modifier.weight(1f))
             OutlinedButton(onClick = {
                 val n = newName.trim()
                 if (n.isNotEmpty()) {
@@ -263,7 +263,7 @@ private fun NewBillDialog(state: UiState, vm: AppViewModel, onDone: () -> Unit) 
         ChoiceChips(listOf("equal" to tr("সমান ভাগ", "Equal split"), "custom" to tr("কাস্টম পরিমাণ", "Custom amounts")), mode) { mode = it }
         if (mode == "custom") {
             people.forEach { n ->
-                TextIn("$n-এর ভাগ (৳)", amounts[n] ?: "", { v -> amounts = amounts + (n to v) }, number = true)
+                TextIn(tr("$n-এর ভাগ (৳)", "$n's share (৳)"), amounts[n] ?: "", { v -> amounts = amounts + (n to v) }, number = true)
             }
             if (t != null) Text(tr("বাকি", "Left") + ": ${taka(tv - customSum)}", fontSize = 12.sp)
         } else if (t != null && people.isNotEmpty()) {
@@ -289,8 +289,8 @@ private fun ShoppingSection(state: UiState, vm: AppViewModel) {
 
     AppCard {
         Text(tr("নতুন জিনিসের তালিকা", "New shopping list"), fontWeight = FontWeight.Bold)
-        TextIn("আইটেমের নাম", name, { name = it })
-        TextIn("আনুমানিক বাজেট (৳)", budget, { budget = it }, number = true)
+        TextIn(tr("আইটেমের নাম", "Item name"), name, { name = it })
+        TextIn(tr("আনুমানিক বাজেট (৳)", "Estimated budget (৳)"), budget, { budget = it }, number = true)
         Button(
             onClick = {
                 vm.save("shopping_items", row("name" to name.trim(), "estimated_price" to (parseAmount(budget) ?: 0.0)), null)
@@ -353,16 +353,16 @@ private fun BoughtDialog(item: JsonObject, vm: AppViewModel, onDone: () -> Unit)
         mutableStateOf(fmtNum(if (done) item.num("actual_price") else item.num("estimated_price")))
     }
     var error by remember { mutableStateOf<String?>(null) }
-    SharedDialog("আসল দাম: ${item.str("name")}", "সেভ", onDismiss = onDone, onConfirm = {
+    SharedDialog("আসল দাম: ${item.str("name")}", tr("সেভ", "Save"), onDismiss = onDone, onConfirm = {
         val v = parseAmount(price)
         if (v == null || v < 0) {
-            error = "সঠিক দাম লিখুন"
+            error = tr("সঠিক দাম লিখুন", "Enter a valid price")
         } else {
             vm.save("shopping_items", row("is_done" to true, "actual_price" to v), item.id())
             onDone()
         }
     }) {
-        TextIn("কত টাকায় কেনা হলো (৳)", price, { price = it }, number = true)
+        TextIn(tr("কত টাকায় কেনা হলো (৳)", "Bought for how much (৳)"), price, { price = it }, number = true)
         error?.let { Text(it, color = Rose500, fontSize = 12.sp) }
     }
 }
@@ -441,14 +441,14 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(m.str("name"), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Row {
-                    IconButton(onClick = { editingMember = m }) { Icon(Icons.Default.Edit, contentDescription = "এডিট") }
+                    IconButton(onClick = { editingMember = m }) { Icon(Icons.Default.Edit, contentDescription = tr("এডিট", "Edit")) }
                     DeleteButton { vm.remove("mess_members", m.id()) }
                 }
             }
             KeyValue(tr("জমা মোট (বাজার + ক্যাশ)", "Total deposits (bazaar + cash)"), taka(paid + cash, p))
             KeyValue(tr("  · বাজার এন্ট্রি", "  · bazaar entries"), taka(paid, p))
             KeyValue(tr("  · ক্যাশ জমা", "  · cash deposits"), taka(cash, p))
-            KeyValue("মিল", fmtNum(mealN))
+            KeyValue(tr("মিল", "Meals"), fmtNum(mealN))
             KeyValue(tr("তার খরচ (মিল × রেট)", "Their cost (meals × rate)"), taka(mealN * rate, p))
             when {
                 bal > 0.005 -> KeyValue(tr("পাবেন", "Gets back"), taka(bal, p), Emerald500)
@@ -523,45 +523,45 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
         var note by remember { mutableStateOf("") }
         var date by remember { mutableStateOf(todayIso()) }
         var error by remember { mutableStateOf<String?>(null) }
-        SharedDialog("জমা এন্ট্রি (ক্যাশ ডিপোজিট)", "সেভ", onDismiss = { addingDeposit = false }, onConfirm = {
+        SharedDialog(tr("জমা এন্ট্রি (ক্যাশ ডিপোজিট)", "Deposit entry (cash)"), tr("সেভ", "Save"), onDismiss = { addingDeposit = false }, onConfirm = {
             val a = parseAmount(amount)
             when {
-                a == null || a <= 0 -> error = "সঠিক টাকার পরিমাণ লিখুন"
-                !isValidIsoDate(date) -> error = "তারিখ লিখুন (YYYY-MM-DD)"
+                a == null || a <= 0 -> error = tr("সঠিক টাকার পরিমাণ লিখুন", "Enter a valid amount")
+                !isValidIsoDate(date) -> error = tr("তারিখ বাছাই করুন", "Pick a date")
                 else -> {
                     vm.save("mess_deposits", row("member_id" to member, "amount" to a, "deposit_date" to date.trim(), "note" to note.trim()), null)
                     addingDeposit = false
                 }
             }
         }) {
-            Text("কে জমা দিয়েছেন", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("কে জমা দিয়েছেন", "Who deposited"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             ChoiceChips(members.map { it.id() to it.str("name") }, member) { member = it }
-            TextIn("টাকা (৳)", amount, { amount = it }, number = true)
-            TextIn("তারিখ (YYYY-MM-DD)", date, { date = it })
-            TextIn("নোট (ঐচ্ছিক)", note, { note = it })
+            TextIn(tr("টাকা (৳)", "Amount (৳)"), amount, { amount = it }, number = true)
+            DateField(tr("তারিখ", "Date"), date, { date = it })
+            TextIn(tr("নোট (ঐচ্ছিক)", "Note (optional)"), note, { note = it })
             error?.let { Text(it, color = Rose500, fontSize = 12.sp) }
         }
     }
     if (addingMember) {
         var name by remember { mutableStateOf("") }
-        SharedDialog("নতুন সদস্য", "সেভ", onDismiss = { addingMember = false }, onConfirm = {
+        SharedDialog(tr("নতুন সদস্য", "New member"), tr("সেভ", "Save"), onDismiss = { addingMember = false }, onConfirm = {
             if (name.isNotBlank()) {
                 vm.save("mess_members", row("name" to name.trim()), null)
                 addingMember = false
             }
         }) {
-            TextIn("নাম", name, { name = it })
+            TextIn(tr("নাম", "Name"), name, { name = it })
         }
     }
     editingMember?.let { m ->
         var name by remember(m.id()) { mutableStateOf(m.str("name")) }
-        SharedDialog("সদস্যের নাম বদলান", "সেভ", onDismiss = { editingMember = null }, onConfirm = {
+        SharedDialog(tr("সদস্যের নাম বদলান", "Rename member"), tr("সেভ", "Save"), onDismiss = { editingMember = null }, onConfirm = {
             if (name.isNotBlank()) {
                 vm.save("mess_members", row("name" to name.trim()), m.id())
                 editingMember = null
             }
         }) {
-            TextIn("নাম", name, { name = it })
+            TextIn(tr("নাম", "Name"), name, { name = it })
         }
     }
     if (addingBazaar && members.isNotEmpty()) {
@@ -570,22 +570,22 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
         var item by remember { mutableStateOf("") }
         var date by remember { mutableStateOf(todayIso()) }
         var error by remember { mutableStateOf<String?>(null) }
-        SharedDialog(tr("বাজার এন্ট্রি", "Bazaar entry"), "সেভ", onDismiss = { addingBazaar = false }, onConfirm = {
+        SharedDialog(tr("বাজার এন্ট্রি", "Bazaar entry"), tr("সেভ", "Save"), onDismiss = { addingBazaar = false }, onConfirm = {
             val a = parseAmount(amount)
             when {
-                a == null || a <= 0 -> error = "সঠিক টাকার পরিমাণ লিখুন"
-                !isValidIsoDate(date) -> error = "তারিখ লিখুন (YYYY-MM-DD)"
+                a == null || a <= 0 -> error = tr("সঠিক টাকার পরিমাণ লিখুন", "Enter a valid amount")
+                !isValidIsoDate(date) -> error = tr("তারিখ বাছাই করুন", "Pick a date")
                 else -> {
                     vm.save("mess_bazaars", row("member_id" to member, "amount" to a, "item" to item.trim(), "bazaar_date" to date.trim()), null)
                     addingBazaar = false
                 }
             }
         }) {
-            Text("কে বাজার করেছে", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("কে বাজার করেছে", "Who shopped"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             ChoiceChips(members.map { it.id() to it.str("name") }, member) { member = it }
-            TextIn("টাকা (৳)", amount, { amount = it }, number = true)
-            TextIn("কী কেনা হলো", item, { item = it })
-            TextIn("তারিখ (YYYY-MM-DD)", date, { date = it })
+            TextIn(tr("টাকা (৳)", "Amount (৳)"), amount, { amount = it }, number = true)
+            TextIn(tr("কী কেনা হলো", "What was bought"), item, { item = it })
+            DateField(tr("তারিখ", "Date"), date, { date = it })
             error?.let { Text(it, color = Rose500, fontSize = 12.sp) }
         }
     }
@@ -596,23 +596,23 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
         var error by remember { mutableStateOf<String?>(null) }
         SharedDialog(tr("মিল এন্ট্রি", "Meal entry"), "মিল যোগ করুন", onDismiss = { addingMeal = false }, onConfirm = {
             when {
-                count <= 0 -> error = "মিলের সংখ্যা ০-এর বেশি হতে হবে"
-                !isValidIsoDate(date) -> error = "তারিখ লিখুন (YYYY-MM-DD)"
+                count <= 0 -> error = tr("মিলের সংখ্যা ০-এর বেশি হতে হবে", "Meal count must be more than 0")
+                !isValidIsoDate(date) -> error = tr("তারিখ বাছাই করুন", "Pick a date")
                 else -> {
                     vm.save("mess_meals", row("member_id" to member, "meal_count" to count, "meal_date" to date.trim()), null)
                     addingMeal = false
                 }
             }
         }) {
-            Text("কে খেয়েছেন", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("কে খেয়েছেন", "Who ate"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             ChoiceChips(members.map { it.id() to it.str("name") }, member) { member = it }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { count = (count - 0.5).coerceAtLeast(0.0) }) { Text("−", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
                 Text(fmtNum(count), fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 18.dp))
                 IconButton(onClick = { count += 0.5 }) { Text("+", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
             }
-            Text("ধাপ ০.৫", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextIn("তারিখ (YYYY-MM-DD)", date, { date = it })
+            Text(tr("ধাপ ০.৫", "Step 0.5"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            DateField(tr("তারিখ", "Date"), date, { date = it })
             error?.let { Text(it, color = Rose500, fontSize = 12.sp) }
         }
     }
@@ -623,9 +623,9 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
 @Composable
 private fun MonthNav(ym: YearMonth, onChange: (YearMonth) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        IconButton(onClick = { onChange(ym.minusMonths(1)) }) { Icon(Icons.Default.ChevronLeft, contentDescription = "আগের মাস") }
+        IconButton(onClick = { onChange(ym.minusMonths(1)) }) { Icon(Icons.Default.ChevronLeft, contentDescription = tr("আগের মাস", "Previous month")) }
         Text("${BN_MONTHS[ym.monthValue - 1]} ${bnDigits(ym.year.toString())}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        IconButton(onClick = { onChange(ym.plusMonths(1)) }) { Icon(Icons.Default.ChevronRight, contentDescription = "পরের মাস") }
+        IconButton(onClick = { onChange(ym.plusMonths(1)) }) { Icon(Icons.Default.ChevronRight, contentDescription = tr("পরের মাস", "Next month")) }
     }
 }
 
@@ -669,6 +669,6 @@ private fun SharedDialog(
             )
         },
         confirmButton = { TextButton(onClick = onConfirm) { Text(confirmLabel) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }

@@ -68,7 +68,7 @@ object Assistant {
             .groupBy { it.str("category") }.maxByOrNull { e -> e.value.sumOf { it.num("amount") } }
 
         return when {
-            has(q, "বাকি", "credit", "দোকান") -> {
+            has(q, tr("বাকি", "Due"), "credit", "দোকান") -> {
                 val due = state.rows("credit_shops").sumOf { shopBalance(it.id(), state) }
                 "মোট বাকি আছে ${taka(due, p)}। দোকানভিত্তিক হিসাব বাকি মেনুতে দেখতে পারবেন।"
             }
@@ -95,7 +95,7 @@ object Assistant {
                 if (income <= 0) "এই মাসে আয় নেই, তাই সঞ্চয়ের হার হিসাব করা যাচ্ছে না। আয় যোগ করুন।"
                 else "এই মাসে সঞ্চয়ের হার ${String.format("%.0f", (income - expense) / income * 100)}%। ২০% বা তার বেশি হলে ভালো।"
             }
-            has(q, "আয়", "income", "বেতন") -> "এই মাসে মোট আয় ${taka(income, p)}।"
+            has(q, tr("আয়", "Income"), "income", "বেতন") -> "এই মাসে মোট আয় ${taka(income, p)}।"
             has(q, "খরচ", "expense", "spend") -> {
                 val extra = if (topCat != null) " সবচেয়ে বেশি খরচ '${topCat.key}' খাতে (${taka(topCat.value.sumOf { it.num("amount") }, p)})।" else ""
                 "এই মাসে মোট খরচ ${taka(expense, p)}।$extra"
@@ -192,7 +192,7 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
                 Text("Ask FinTrack AI", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Text("PREMIUM ADVISOR", color = Color(0xFFC7D2FE), fontSize = 10.sp, letterSpacing = 2.sp)
             }
-            IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = "বন্ধ করুন", tint = Color.White) }
+            IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close"), tint = Color.White) }
         }
         ChoiceChips(
             listOf("এই মাসে কত খরচ?" to "এই মাসে কত খরচ?", "বাজেট কেমন?" to "বাজেট কেমন?", "পরামর্শ দিন" to "পরামর্শ দিন", "বাকি কত?" to "বাকি কত?"),
@@ -232,7 +232,7 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
                     .background(Brush.linearGradient(listOf(Color(0xFF7C3AED), Color(0xFF4F46E5))))
                     .clickable(enabled = input.isNotBlank() && !thinking) { send(input) },
                 contentAlignment = Alignment.Center
-            ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "পাঠান", tint = Color.White) }
+            ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = tr("পাঠান", "Send"), tint = Color.White) }
         }
     }
 }

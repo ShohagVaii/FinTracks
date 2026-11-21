@@ -223,7 +223,7 @@ private fun Header(
             Text("FinTrack", color = MaterialTheme.colorScheme.primary, fontSize = 26.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
             Text("PREMIUM FINANCE", color = Slate400, fontSize = 9.sp, letterSpacing = 3.sp)
         }
-        HeaderIcon(Icons.Default.Calculate, "ক্যালকুলেটর", onCalc)
+        HeaderIcon(Icons.Default.Calculate, tr("ক্যালকুলেটর", "Calculator"), onCalc)
         HeaderIcon(Icons.Default.WbSunny, if (dark) "লাইট থিম" else "ডার্ক থিম", onToggleTheme, tint = Amber400)
         HeaderIcon(if (privacy) Icons.Default.VisibilityOff else Icons.Default.Visibility, "প্রাইভেসি", onTogglePrivacy)
         HeaderIcon(Icons.Default.Settings, tr("সেটিংস", "Settings"), onSettings)
@@ -252,7 +252,7 @@ private fun OverlayHeader(title: String, onBack: () -> Unit) {
         Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ফিরে যান") }
+        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("ফিরে যান", "Back")) }
         Text(title, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 18.sp)
     }
 }

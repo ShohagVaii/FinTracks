@@ -52,10 +52,12 @@ private val BakiAmber = Color(0xFFF59E0B)
 private val BakiSky = Color(0xFF38BDF8)
 private const val EPS = 0.005
 
-enum class BakiStatus(val label: String, val color: Color) {
-    ONGOING("চলমান", BakiSky),
-    PARTIAL("আংশিক পরিশোধ", BakiAmber),
-    SETTLED("শোধ", BakiGreen)
+enum class BakiStatus(private val bnLabel: String, private val enLabel: String, val color: Color) {
+    ONGOING("চলমান", "Ongoing", BakiSky),
+    PARTIAL("আংশিক পরিশোধ", "Partly paid", BakiAmber),
+    SETTLED("শোধ", "Settled", BakiGreen);
+
+    val label: String get() = tr(bnLabel, enLabel)
 }
 
 /** One line of a purchase, as typed in the form. */
@@ -153,11 +155,11 @@ fun BakiScreen(state: UiState, vm: AppViewModel) {
         AppCard {
             Text(tr("মোট বাকি দেনা", "Total credit due"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
             Text(taka(totalDue, p), fontSize = 26.sp, fontWeight = FontWeight.Black, color = BakiRed)
-            if (overdue > 0) Text("$overdue টি কেনার শেষ তারিখ পার হয়ে গেছে", fontSize = 12.sp, color = BakiRed)
-            Text("ধার/লোন থেকে আলাদা হিসাব। দোকান ও ব্যক্তির বাকি এখানে।", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (overdue > 0) Text(tr("$overdue টি কেনার শেষ তারিখ পার হয়ে গেছে", "$overdue purchases past due date"), fontSize = 12.sp, color = BakiRed)
+            Text(tr("ধার/লোন থেকে আলাদা হিসাব। দোকান ও ব্যক্তির বাকি এখানে।", "Separate from loans. Shop and personal credit is here."), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        AddButton("নতুন দোকান") { addingShop = true }
-        if (shops.isEmpty()) EmptyHint("কোনো দোকান নেই। দোকান যোগ করে কেনা ও বাকি তুলুন।")
+        AddButton(tr("নতুন দোকান", "New shop")) { addingShop = true }
+        if (shops.isEmpty()) EmptyHint(tr("কোনো দোকান নেই। দোকান যোগ করে কেনা ও বাকি তুলুন।", "No shops yet. Add a shop to record purchases and credit."))
         shops.forEach { s ->
             val open = settle(s.id(), state).values.count { it.status != BakiStatus.SETTLED }
             AppCard(onClick = { selected = s.id() }) {
@@ -166,7 +168,7 @@ fun BakiScreen(state: UiState, vm: AppViewModel) {
                         Text(s.str("name"), fontWeight = FontWeight.Bold)
                         val sub = listOfNotNull(
                             nonEmpty(s.str("phone")),
-                            if (open > 0) "$open টি কেনা খোলা আছে" else "সব কেনা শোধ"
+                            if (open > 0) tr("$open টি কেনা খোলা আছে", "$open purchases open") else tr("সব কেনা শোধ", "All purchases settled")
                         ).joinToString(" · ")
                         Text(sub, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -186,13 +188,13 @@ private fun ShopDialog(existing: JsonObject?, vm: AppViewModel, onDismiss: () ->
     var name by remember { mutableStateOf(existing?.str("name").orEmpty()) }
     var phone by remember { mutableStateOf(existing?.str("phone").orEmpty()) }
     var note by remember { mutableStateOf(existing?.str("note").orEmpty()) }
-    FormDialog(if (existing == null) "নতুন দোকান" else "দোকান সম্পাদনা", confirmEnabled = name.isNotBlank(), onDismiss = onDismiss, onConfirm = {
+    FormDialog(if (existing == null) tr("নতুন দোকান", "New shop") else tr("দোকান সম্পাদনা", "Edit shop"), confirmEnabled = name.isNotBlank(), onDismiss = onDismiss, onConfirm = {
         vm.save("credit_shops", row("name" to name.trim(), "phone" to phone.trim(), "note" to note.trim()), existing?.id())
         onDismiss()
     }) {
-        TextIn("দোকান / ব্যক্তির নাম", name, { name = it })
-        TextIn("ফোন (ঐচ্ছিক)", phone, { phone = it })
-        TextIn("নোট (ঐচ্ছিক)", note, { note = it })
+        TextIn(tr("দোকান / ব্যক্তির নাম", "Shop / person name"), name, { name = it })
+        TextIn(tr("ফোন (ঐচ্ছিক)", "Phone (optional)"), phone, { phone = it })
+        TextIn(tr("নোট (ঐচ্ছিক)", "Note (optional)"), note, { note = it })
     }
 }
 
@@ -216,25 +218,25 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
     val balance = bought - paid
 
     Page {
-        OutlinedButton(onClick = onBack) { Text("← সব দোকান") }
+        OutlinedButton(onClick = onBack) { Text(tr("← সব দোকান", "← All shops")) }
         AppCard {
             Text(shop.str("name"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
             if (shop.str("phone").isNotBlank()) Text(shop.str("phone"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            KeyValue("বাকি আছে", taka(balance, p), if (balance > EPS) BakiRed else BakiGreen)
-            KeyValue("মোট কেনা", taka(bought, p))
-            KeyValue("মোট পরিশোধ", taka(paid, p))
+            KeyValue(tr("বাকি আছে", "Balance due"), taka(balance, p), if (balance > EPS) BakiRed else BakiGreen)
+            KeyValue(tr("মোট কেনা", "Total bought"), taka(bought, p))
+            KeyValue(tr("মোট পরিশোধ", "Total paid"), taka(paid, p))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { addingPurchase = true }) { Text("নতুন কেনা") }
-                OutlinedButton(onClick = { addingPayment = true }, enabled = balance > EPS) { Text("পরিশোধ") }
+                Button(onClick = { addingPurchase = true }) { Text(tr("নতুন কেনা", "New purchase")) }
+                OutlinedButton(onClick = { addingPayment = true }, enabled = balance > EPS) { Text(tr("পরিশোধ", "Pay")) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = { editingShop = true }) { Text("দোকান সম্পাদনা") }
+                TextButton(onClick = { editingShop = true }) { Text(tr("দোকান সম্পাদনা", "Edit shop")) }
                 DeleteButton { confirmDelete = true }
             }
         }
 
-        SectionTitle("কেনার তালিকা")
-        if (purchases.isEmpty()) EmptyHint("এখনো কোনো কেনা নেই")
+        SectionTitle(tr("কেনার তালিকা", "Purchases"))
+        if (purchases.isEmpty()) EmptyHint(tr("এখনো কোনো কেনা নেই", "No purchases yet"))
         purchases.forEach { e ->
             val st = settled[e.id()]
             val status = st?.status ?: BakiStatus.ONGOING
@@ -242,7 +244,7 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
             AppCard {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(e.str("item_name"), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    StatusChip(if (overdue) "মেয়াদোত্তীর্ণ" else status.label, if (overdue) BakiRed else status.color)
+                    StatusChip(if (overdue) tr("মেয়াদোত্তীর্ণ", "Overdue") else status.label, if (overdue) BakiRed else status.color)
                 }
                 val lines = purchaseLines(e)
                 lines.forEach { l ->
@@ -252,10 +254,10 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
                     )
                 }
                 val adj = e.num("adjustment")
-                if (adj != 0.0) Text("সমন্বয় (± ডেলিভারি/ছাড়): ${if (adj > 0) "+" else ""}${taka(adj, p)}", fontSize = 12.sp)
-                KeyValue("মোট", taka(e.num("total"), p))
-                KeyValue("পরিশোধ", taka(st?.paid ?: 0.0, p), BakiGreen)
-                KeyValue("বাকি", taka(st?.remaining ?: e.num("total"), p), if ((st?.remaining ?: 0.0) > EPS) BakiRed else BakiGreen)
+                if (adj != 0.0) Text(tr("সমন্বয়", "Adjustment") + ": ${if (adj > 0) "+" else ""}${taka(adj, p)}", fontSize = 12.sp)
+                KeyValue(tr("মোট", "Total"), taka(e.num("total"), p))
+                KeyValue(tr("পরিশোধ", "Pay"), taka(st?.paid ?: 0.0, p), BakiGreen)
+                KeyValue(tr("বাকি", "Due"), taka(st?.remaining ?: e.num("total"), p), if ((st?.remaining ?: 0.0) > EPS) BakiRed else BakiGreen)
                 Text(
                     tr("কেনা", "Bought") + ": ${displayDate(dateOf(e, "purchase_date"))}" + (e.strOrNull("due_date")?.take(10)?.let { " · " + tr("শেষ তারিখ", "Due") + ": ${displayDate(it)}" } ?: ""),
                     fontSize = 11.sp,
@@ -263,14 +265,14 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
                 )
                 if (e.str("note").isNotBlank()) Text(e.str("note"), fontSize = 11.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = { editingPurchase = e }) { Text("সম্পাদনা") }
+                    TextButton(onClick = { editingPurchase = e }) { Text(tr("সম্পাদনা", "Edit")) }
                     DeleteButton { vm.remove("credit_entries", e.id()) }
                 }
             }
         }
 
-        SectionTitle("পরিশোধের ইতিহাস")
-        if (payments.isEmpty()) EmptyHint("এখনো কোনো পরিশোধ নেই")
+        SectionTitle(tr("পরিশোধের ইতিহাস", "Payment history"))
+        if (payments.isEmpty()) EmptyHint(tr("এখনো কোনো পরিশোধ নেই", "No payments yet"))
         payments.sortedByDescending { it.str("paid_on") }.forEach { pay ->
             AppCard {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -292,12 +294,12 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("দোকানটি মুছবেন?", fontWeight = FontWeight.Bold) },
-            text = { Text("এই দোকানের সব কেনা ও পরিশোধের হিসাব মুছে যাবে। এটি ফেরানো যাবে না।") },
+            title = { Text(tr("দোকানটি মুছবেন?", "Delete this shop?"), fontWeight = FontWeight.Bold) },
+            text = { Text(tr("এই দোকানের সব কেনা ও পরিশোধের হিসাব মুছে যাবে। এটি ফেরানো যাবে না।", "All purchases and payments of this shop will be deleted. This cannot be undone.")) },
             confirmButton = {
-                TextButton(onClick = { confirmDelete = false; vm.remove("credit_shops", shop.id()); onBack() }) { Text("মুছুন") }
+                TextButton(onClick = { confirmDelete = false; vm.remove("credit_shops", shop.id()); onBack() }) { Text(tr("মুছুন", "Delete")) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("বাতিল") } }
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(tr("বাতিল", "Cancel")) } }
         )
     }
 }
@@ -330,7 +332,7 @@ private fun PurchaseDialog(shopId: String, existing: JsonObject?, vm: AppViewMod
     val total = named.sumOf { lineTotal(it) } + adj
     val valid = linesValid && adjValid && total >= 0 && isValidIsoDate(date) && (due.isBlank() || isValidIsoDate(due))
 
-    FormDialog(if (existing == null) "নতুন কেনা" else "কেনা সম্পাদনা", confirmEnabled = valid, onDismiss = onDismiss, onConfirm = {
+    FormDialog(if (existing == null) tr("নতুন কেনা", "New purchase") else tr("কেনা সম্পাদনা", "Edit purchase"), confirmEnabled = valid, onDismiss = onDismiss, onConfirm = {
         val itemsJson = buildJsonArray {
             named.forEach { l ->
                 add(buildJsonObject {
@@ -360,22 +362,22 @@ private fun PurchaseDialog(shopId: String, existing: JsonObject?, vm: AppViewMod
     }) {
         lines.forEachIndexed { i, l ->
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                TextIn("আইটেমের নাম (যেমন: মালদা)", l.name, { lines[i] = l.copy(name = it) })
+                TextIn(tr("আইটেমের নাম (যেমন: মালদা)", "Item name (e.g. Malda mango)"), l.name, { lines[i] = l.copy(name = it) })
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextIn("পরিমাণ", l.qty, { lines[i] = l.copy(qty = it) }, number = true, modifier = Modifier.weight(1f))
-                    TextIn("একক দাম (৳)", l.price, { lines[i] = l.copy(price = it) }, number = true, modifier = Modifier.weight(1f))
+                    TextIn(tr("পরিমাণ", "Amount"), l.qty, { lines[i] = l.copy(qty = it) }, number = true, modifier = Modifier.weight(1f))
+                    TextIn(tr("একক দাম (৳)", "Unit price (৳)"), l.price, { lines[i] = l.copy(price = it) }, number = true, modifier = Modifier.weight(1f))
                     if (lines.size > 1) DeleteButton { lines.removeAt(i) }
                 }
                 if (l.name.isNotBlank()) Text("= ${taka(lineTotal(l), false)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        AddButton("আইটেম যোগ") { lines.add(ItemDraft()) }
-        TextIn("সমন্বয় (+ ডেলিভারি, − ছাড়; না থাকলে খালি)", adjust, { adjust = it })
-        Text("মোট: ${taka(total, false)}", fontWeight = FontWeight.Bold)
-        if (total < 0) Text("মোট ঋণাত্মক হতে পারে না", fontSize = 12.sp, color = BakiRed)
-        TextIn("কেনার তারিখ (YYYY-MM-DD)", date, { date = it })
-        TextIn("শেষ তারিখ (ঐচ্ছিক, YYYY-MM-DD)", due, { due = it })
-        TextIn("নোট (ঐচ্ছিক)", note, { note = it })
+        AddButton(tr("আইটেম যোগ", "Add item")) { lines.add(ItemDraft()) }
+        TextIn(tr("সমন্বয় (+ ডেলিভারি, − ছাড়; না থাকলে খালি)", "Adjustment (+ delivery, − discount; empty if none)"), adjust, { adjust = it })
+        Text(tr("মোট: ${taka(total, false)}", "Total: ${taka(total, false)}"), fontWeight = FontWeight.Bold)
+        if (total < 0) Text(tr("মোট ঋণাত্মক হতে পারে না", "Total cannot be negative"), fontSize = 12.sp, color = BakiRed)
+        DateField(tr("কেনার তারিখ", "Purchase date"), date, { date = it })
+        DateField(tr("শেষ তারিখ (ঐচ্ছিক)", "Due date (optional)"), due, { due = it }, optional = true)
+        TextIn(tr("নোট (ঐচ্ছিক)", "Note (optional)"), note, { note = it })
     }
 }
 
@@ -390,16 +392,16 @@ private fun PaymentDialog(shopId: String, shopName: String, balance: Double, vm:
     val tooMuch = a != null && a > balance + EPS
     val valid = a != null && a > 0 && !tooMuch && isValidIsoDate(date) && balance > EPS
 
-    FormDialog("পরিশোধ / কিস্তি", confirmEnabled = valid, onDismiss = onDismiss, onConfirm = {
+    FormDialog(tr("পরিশোধ / কিস্তি", "Payment / instalment"), confirmEnabled = valid, onDismiss = onDismiss, onConfirm = {
         if (a != null) {
             vm.recordDebtPayment(shopName, a, date.trim(), note.trim(), shopId)
             onDismiss()
         }
     }) {
-        Text("বর্তমান বাকি: ${taka(balance, false)}", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-        TextIn("পরিমাণ (৳)", amount, { amount = it }, number = true)
-        if (tooMuch) Text("বাকির বেশি টাকা দেওয়া যাবে না", fontSize = 12.sp, color = BakiRed)
-        TextIn("তারিখ (YYYY-MM-DD)", date, { date = it })
-        TextIn("নোট (ঐচ্ছিক)", note, { note = it })
+        Text(tr("বর্তমান বাকি: ${taka(balance, false)}", "Current due: ${taka(balance, false)}"), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        TextIn(tr("পরিমাণ (৳)", "Amount (৳)"), amount, { amount = it }, number = true)
+        if (tooMuch) Text(tr("বাকির বেশি টাকা দেওয়া যাবে না", "Payment cannot exceed the balance due"), fontSize = 12.sp, color = BakiRed)
+        DateField(tr("তারিখ", "Date"), date, { date = it })
+        TextIn(tr("নোট (ঐচ্ছিক)", "Note (optional)"), note, { note = it })
     }
 }

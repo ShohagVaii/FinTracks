@@ -260,9 +260,9 @@ fun PinSetupDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
                     first != second -> error = "দুটি PIN মিলছে না"
                     else -> onSave(first)
                 }
-            }) { Text("সেভ") }
+            }) { Text(tr("সেভ", "Save")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }
 
@@ -288,6 +288,6 @@ fun PinVerifyDialog(title: String, onDismiss: () -> Unit, onVerified: () -> Unit
                 if (AppLock.checkPin(ctx, pin)) onVerified() else error = "ভুল PIN"
             }) { Text("নিশ্চিত") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }

@@ -178,8 +178,8 @@ fun FormDialog(
                 content = content
             )
         },
-        confirmButton = { TextButton(onClick = onConfirm, enabled = confirmEnabled) { Text("সেভ") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+        confirmButton = { TextButton(onClick = onConfirm, enabled = confirmEnabled) { Text(tr("সেভ", "Save")) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }
 
@@ -231,7 +231,7 @@ fun BottomBar(selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
                 .clickable(onClick = onAdd),
             contentAlignment = Alignment.Center
         ) {
-            M3Icon(Icons.Default.Add, contentDescription = "যোগ করুন", tint = Color.White, modifier = Modifier.size(32.dp))
+            M3Icon(Icons.Default.Add, contentDescription = tr("যোগ করুন", "Add"), tint = Color.White, modifier = Modifier.size(32.dp))
         }
     }
 }

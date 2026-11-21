@@ -7,7 +7,8 @@ import java.util.Locale
 fun taka(value: Double, privacy: Boolean = false): String {
     if (privacy) return AppPrefs.symbol + " ••••"
     val whole = value % 1.0 == 0.0
-    return AppPrefs.symbol + " " + String.format(Locale.US, if (whole) "%,.0f" else "%,.2f", value)
+    val body = String.format(Locale.US, if (whole) "%,.0f" else "%,.2f", value)
+    return AppPrefs.symbol + " " + (if (AppPrefs.english) body else bnDigits(body))
 }
 
 /** 2 instead of 2.0 for whole numbers. */

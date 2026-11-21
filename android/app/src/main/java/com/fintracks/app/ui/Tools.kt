@@ -83,7 +83,10 @@ object Web {
     const val NISAB_SILVER_GRAMS = 612.36
 }
 
-fun fmtMoney(v: Double): String = AppPrefs.symbol + " " + String.format(Locale.US, "%,.0f", v)
+fun fmtMoney(v: Double): String {
+    val body = String.format(Locale.US, "%,.0f", v)
+    return AppPrefs.symbol + " " + (if (AppPrefs.english) body else bnDigits(body))
+}
 
 /** One tile in the Tools grid. */
 private data class ToolTile(val overlay: Overlay, val label: String, val icon: ImageVector, val color: Color)
@@ -181,30 +184,30 @@ fun ZakatScreen(state: UiState) {
     val silverBasis = (silverPerGram.toDoubleOrNull() ?: 0.0) > 0
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AppCard {
-            Text("যাকাত ক্যালকুলেটর", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Text("ক্যাশ: ${fmtMoney(cash)}", color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold)
-            Text("ইনভেস্টমেন্ট/সম্পদ: ${fmtMoney(assets)}", fontSize = 13.sp)
-            TextIn("স্বর্ণ (৳)", gold, { gold = it }, number = true)
-            TextIn("রূপা (৳)", silver, { silver = it }, number = true)
+            Text(tr("যাকাত ক্যালকুলেটর", "Zakat calculator"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text(tr("ক্যাশ: ${fmtMoney(cash)}", "Cash: ${fmtMoney(cash)}"), color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold)
+            Text(tr("ইনভেস্টমেন্ট/সম্পদ: ${fmtMoney(assets)}", "Investments/assets: ${fmtMoney(assets)}"), fontSize = 13.sp)
+            TextIn(tr("স্বর্ণ (৳)", "Gold (৳)"), gold, { gold = it }, number = true)
+            TextIn(tr("রূপা (৳)", "Silver (৳)"), silver, { silver = it }, number = true)
         }
         AppCard {
-            Text("নিসাবের হিসাব", fontWeight = FontWeight.Bold)
-            TextIn("রূপার দর (প্রতি গ্রাম, ৳)", silverPerGram, { silverPerGram = it }, number = true)
-            TextIn("স্বর্ণের দর (প্রতি গ্রাম, ৳)", goldPerGram, { goldPerGram = it }, number = true)
+            Text(tr("নিসাবের হিসাব", "Nisab calculation"), fontWeight = FontWeight.Bold)
+            TextIn(tr("রূপার দর (প্রতি গ্রাম, ৳)", "Silver price per gram (৳)"), silverPerGram, { silverPerGram = it }, number = true)
+            TextIn(tr("স্বর্ণের দর (প্রতি গ্রাম, ৳)", "Gold price per gram (৳)"), goldPerGram, { goldPerGram = it }, number = true)
             if (nisab == null) {
-                Text("নিসাব জানতে রূপার দর (প্রতি গ্রাম) লিখুন।", fontSize = 12.sp, color = Rose500)
+                Text(tr("নিসাব জানতে রূপার দর (প্রতি গ্রাম) লিখুন।", "Enter the silver price per gram to find the nisab."), fontSize = 12.sp, color = Rose500)
             } else {
                 val basis = if (silverBasis) "রূপার ভিত্তিতে ${Web.NISAB_SILVER_GRAMS} গ্রাম" else "স্বর্ণের ভিত্তিতে ${Web.NISAB_GOLD_GRAMS} গ্রাম"
-                Text("নিসাব: ${fmtMoney(nisab)} ($basis)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr("নিসাব: ${fmtMoney(nisab)} ($basis)", "Nisab: ${fmtMoney(nisab)} ($basis)"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         AppCard {
-            Text("প্রদেয় যাকাত (২.৫%)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("প্রদেয় যাকাত (২.৫%)", "Zakat due (2.5%)"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(if (zakat == null) "—" else fmtMoney(zakat), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Color(0xFFFBBF24))
             val status = when {
-                nisab == null -> "নিসাব না জানা পর্যন্ত যাকাত হিসাব করা যাবে না।"
-                wealth >= nisab -> "সম্পদ নিসাবের সমান বা বেশি, তাই যাকাত দেওয়ার পর্যায়ে।"
-                else -> "সম্পদ নিসাবের নিচে, তাই যাকাত নেই।"
+                nisab == null -> tr("নিসাব না জানা পর্যন্ত যাকাত হিসাব করা যাবে না।", "Zakat cannot be worked out until the nisab is known.")
+                wealth >= nisab -> tr("সম্পদ নিসাবের সমান বা বেশি, তাই যাকাত দেওয়ার পর্যায়ে।", "Assets meet or exceed the nisab, so zakat is due.")
+                else -> tr("সম্পদ নিসাবের নিচে, তাই যাকাত নেই।", "Assets are below the nisab, so no zakat is due.")
             }
             Text(status, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -248,19 +251,19 @@ fun TaxScreen(state: UiState) {
     val tax = bdTax(inc, women)
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AppCard {
-            Text("ট্যাক্স ক্যালকুলেটর (বার্ষিক)", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            ChoiceChips(listOf("general" to "সাধারণ", "women" to "মহিলা বা ৬৫+"), if (women) "women" else "general") { women = it == "women" }
-            TextIn("বার্ষিক আয় (৳)", income, { income = it }, number = true)
-            KeyValue("করযোগ্য সীমা", fmtMoney(if (inc > threshold) inc - threshold else 0.0))
-            KeyValue("করমুক্ত সীমা", fmtMoney(threshold))
+            Text(tr("ট্যাক্স ক্যালকুলেটর (বার্ষিক)", "Tax calculator (yearly)"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            ChoiceChips(listOf("general" to tr("সাধারণ", "General"), "women" to tr("মহিলা বা ৬৫+", "Women or 65+")), if (women) "women" else "general") { women = it == "women" }
+            TextIn(tr("বার্ষিক আয় (৳)", "Annual income (৳)"), income, { income = it }, number = true)
+            KeyValue(tr("করযোগ্য সীমা", "Taxable amount"), fmtMoney(if (inc > threshold) inc - threshold else 0.0))
+            KeyValue(tr("করমুক্ত সীমা", "Tax-free limit"), fmtMoney(threshold))
         }
         AppCard {
-            Text("মোট ট্যাক্স", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("মোট ট্যাক্স", "Total tax"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(fmtMoney(tax), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Rose500)
-            Text("কার্যকর হার: ${if (inc > 0) String.format(Locale.US, "%.2f", tax / inc * 100) else "0.00"}%", fontSize = 12.sp)
+            Text(tr("কার্যকর হার", "Effective rate") + ": ${bnDigits(if (inc > 0) String.format(Locale.US, "%.2f", tax / inc * 100) else "0.00")}%", fontSize = 12.sp)
         }
         Text(
-            "স্ল্যাব (করমুক্ত সীমার উপরে): ১০% প্রথম ৩ লাখ, ১৫% পরের ৪ লাখ, ২০% পরের ৫ লাখ, ২৫% পরের ২০ লাখ, বাকিটা ৩০%। ন্যূনতম ট্যাক্স ৫,০০০ টাকা (সীমার উপরে হলে)। অর্থ আইন ২০২৬, অ্যাসেসমেন্ট বছর ২০২৬-২৭।",
+            tr("স্ল্যাব (করমুক্ত সীমার উপরে): ১০% প্রথম ৩ লাখ, ১৫% পরের ৪ লাখ, ২০% পরের ৫ লাখ, ২৫% পরের ২০ লাখ, বাকিটা ৩০%। ন্যূনতম ট্যাক্স ৫,০০০ টাকা (সীমার উপরে হলে)। অর্থ আইন ২০২৬, অ্যাসেসমেন্ট বছর ২০২৬-২৭।", "Slabs above the tax-free limit: 10% on the first 3 lakh, 15% on the next 4 lakh, 20% on the next 5 lakh, 25% on the next 20 lakh, 30% on the rest. Minimum tax ৳5,000 when above the limit. Finance Act 2026, assessment year 2026-27."),
             fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -298,31 +301,31 @@ fun CurrencyScreen() {
     val result = s?.let { fxConvert(v, from, to, it.rates) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AppCard {
-            Text("কারেন্সি কনভার্টার", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            TextIn("পরিমাণ", value, { value = it }, number = true)
-            Text("থেকে", fontSize = 12.sp)
+            Text(tr("কারেন্সি কনভার্টার", "Currency converter"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            TextIn(tr("পরিমাণ", "Amount"), value, { value = it }, number = true)
+            Text(tr("থেকে", "From"), fontSize = 12.sp)
             ChoiceChips(FxStore.CURRENCIES.map { it to it }, from) { from = it }
-            Text("তে", fontSize = 12.sp)
+            Text(tr("তে", "To"), fontSize = 12.sp)
             ChoiceChips(FxStore.CURRENCIES.map { it to it }, to) { to = it }
         }
         AppCard {
-            Text("ফলাফল", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("ফলাফল", "Result"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (result != null) {
-                Text(String.format(Locale.US, "%,.2f", result) + " $to", fontSize = 26.sp, fontWeight = FontWeight.Black, color = Color(0xFF34D399))
+                Text(bnDigits(String.format(Locale.US, "%,.2f", result)) + " $to", fontSize = 26.sp, fontWeight = FontWeight.Black, color = Color(0xFF34D399))
             } else {
-                Text("রেট পাওয়া যায়নি। ইন্টারনেট দিয়ে একবার রেট আনুন।", fontSize = 13.sp, color = Rose500)
+                Text(tr("রেট পাওয়া যায়নি। ইন্টারনেট দিয়ে একবার রেট আনুন।", "No rate yet. Fetch rates once with internet."), fontSize = 13.sp, color = Rose500)
             }
             if (s != null) {
                 val at = fxUpdatedLocal(s.updatedUtc)
-                val stamp = at?.let { displayDate(it.toLocalDate().toString()) + " " + String.format(Locale.US, "%02d:%02d", it.hour, it.minute) } ?: s.updatedUtc
+                val stamp = at?.let { displayDate(it.toLocalDate().toString()) + " " + bnDigits(String.format(Locale.US, "%02d:%02d", it.hour, it.minute)) } ?: s.updatedUtc
                 val stale = System.currentTimeMillis() - s.fetchedAt > FxStore.MAX_AGE_MS
-                Text("রেটের সময়: $stamp (ডিভাইসের সময়)" + if (stale) " · পুরনো ক্যাশ" else "", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (failed) Text("নতুন রেট আনা যায়নি, তাই ক্যাশ করা রেট দেখানো হচ্ছে।", fontSize = 11.sp, color = Rose500)
+                Text(tr("রেটের সময়: $stamp (ডিভাইসের সময়)", "Rate time: $stamp (device time)") + if (stale) tr(" · পুরনো ক্যাশ", " · cached") else "", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (failed) Text(tr("নতুন রেট আনা যায়নি, তাই ক্যাশ করা রেট দেখানো হচ্ছে।", "Couldn't fetch new rates, so the saved rate is shown."), fontSize = 11.sp, color = Rose500)
             }
             OutlinedButton(onClick = { refresh() }, enabled = !loading) {
-                Text(if (loading) "রেট আনা হচ্ছে…" else "রেট নতুন করে আনুন")
+                Text(if (loading) tr("রেট আনা হচ্ছে…", "Fetching rates…") else tr("রেট নতুন করে আনুন", "Refresh rates"))
             }
-            Text("রেট সরবরাহ: ExchangeRate-API (open access)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("রেট সরবরাহ: ExchangeRate-API (open access)", "Rates: ExchangeRate-API (open access)"), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -348,8 +351,8 @@ fun LoanScreen(state: UiState, vm: AppViewModel) {
     val p = state.privacy
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        AddButton("নতুন লোন") { editing = true }
-        if (loans.isEmpty()) EmptyHint("কোনো লোন নেই")
+        AddButton(tr("নতুন লোন", "New loan")) { editing = true }
+        if (loans.isEmpty()) EmptyHint(tr("কোনো লোন নেই", "No loans"))
         loans.forEach { l ->
             val term = l.num("term_months").toInt()
             val paid = l.num("paid").toInt()
@@ -360,14 +363,14 @@ fun LoanScreen(state: UiState, vm: AppViewModel) {
                     Text(l.str("name"), fontWeight = FontWeight.Bold)
                     DeleteButton { vm.remove("loans", l.id()) }
                 }
-                KeyValue("মূল টাকা", taka(l.num("principal"), p))
-                KeyValue("মাসিক EMI", taka(emi, p))
-                KeyValue("পরিশোধ", "$paid / $term মাস")
+                KeyValue(tr("মূল টাকা", "Principal"), taka(l.num("principal"), p))
+                KeyValue(tr("মাসিক EMI", "Monthly EMI"), taka(emi, p))
+                KeyValue(tr("পরিশোধ", "Pay"), bnDigits("$paid / $term") + " " + tr("মাস", "months"))
                 ProgressBar(if (term > 0) paid.toFloat() / term else 0f, Emerald500)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (!done) Button(onClick = {
                         vm.save("loans", row("paid" to (paid + 1).toDouble()), l.id())
-                    }) { Text("১ মাস পরিশোধ") }
+                    }) { Text(tr("১ মাস পরিশোধ", "Pay 1 month")) }
                     else Text("✅ সম্পন্ন", color = Emerald500)
                 }
             }
@@ -376,7 +379,7 @@ fun LoanScreen(state: UiState, vm: AppViewModel) {
 
     if (editing) {
         FormDialog(
-            title = "নতুন লোন",
+            title = tr("নতুন লোন", "New loan"),
             onDismiss = { editing = false },
             onConfirm = {
                 val p0 = parseAmount(amount)
@@ -391,10 +394,10 @@ fun LoanScreen(state: UiState, vm: AppViewModel) {
                 }
             }
         ) {
-            TextIn("লোনের নাম", title, { title = it })
-            TextIn("মূল টাকা (৳)", amount, { amount = it }, number = true)
-            TextIn("সুদের হার % (বার্ষিক)", rate, { rate = it }, number = true)
-            TextIn("মেয়াদ (মাস)", months, { months = it }, number = true)
+            TextIn(tr("লোনের নাম", "Loan name"), title, { title = it })
+            TextIn(tr("মূল টাকা (৳)", "Principal (৳)"), amount, { amount = it }, number = true)
+            TextIn(tr("সুদের হার % (বার্ষিক)", "Interest rate % (yearly)"), rate, { rate = it }, number = true)
+            TextIn(tr("মেয়াদ (মাস)", "Term (months)"), months, { months = it }, number = true)
             val m = months.toIntOrNull() ?: 0
             val p0 = parseAmount(amount) ?: 0.0
             if (p0 > 0 && m > 0) Text("EMI: ${fmtMoney(emiFor(p0, rate.toDoubleOrNull() ?: 0.0, m))}", fontWeight = FontWeight.Bold)
@@ -459,7 +462,7 @@ fun ReportsScreen(state: UiState) {
                                 val file = withContext(Dispatchers.IO) { Export.listFile(ctx, fmt, state, txs, range.label) }
                                 Export.share(ctx, file, fmt.mime, tr("FinTrack রিপোর্ট", "FinTrack report") + " - ${range.label}")
                             } catch (e: Exception) {
-                                Toast.makeText(ctx, "এক্সপোর্ট ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
+                                Toast.makeText(ctx, tr("এক্সপোর্ট ব্যর্থ: ${e.message}", "Export failed: ${e.message}"), Toast.LENGTH_LONG).show()
                             } finally { busy = false }
                         }
                     }) { Text(label) }

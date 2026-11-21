@@ -117,7 +117,7 @@ fun BudgetsScreen(state: UiState, vm: AppViewModel) {
                 showing = false; editing = null
             }
         }) {
-            Text("ক্যাটাগরি", fontSize = 12.sp)
+            Text(tr("ক্যাটাগরি", "Category"), fontSize = 12.sp)
             ChoiceChips(ALL_CATS.map { it.name to "${it.icon} ${it.name}" }.distinctBy { it.first }, category) { category = it }
             TextIn("মাসিক সীমা (৳)", limit, { limit = it }, number = true)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -181,7 +181,7 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
         }) {
             TextIn("লক্ষ্যের নাম", name, { name = it })
             TextIn("লক্ষ্য (৳)", target, { target = it }, number = true)
-            TextIn("শেষ তারিখ (YYYY-MM-DD, ঐচ্ছিক)", deadline, { deadline = it })
+            DateField(tr("শেষ তারিখ (ঐচ্ছিক)", "Due date (optional)"), deadline, { deadline = it }, optional = true)
         }
     }
     topUp?.let { g ->
@@ -207,7 +207,7 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
         }) {
             Text("বর্তমান জমা: ${taka(saved, false)} / ${taka(target, false)}", fontSize = 12.sp)
             ChoiceChips(listOf("deposit" to "জমা", "withdraw" to "তোলা"), mode) { mode = it }
-            TextIn("পরিমাণ (৳)", amount, { amount = it }, number = true)
+            TextIn(tr("পরিমাণ (৳)", "Amount (৳)"), amount, { amount = it }, number = true)
             if (error != null) Text(error, fontSize = 12.sp, color = red)
         }
     }
@@ -225,7 +225,7 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
                     vm.dismissCelebration()
                 }) { Text("শেয়ার কার্ড") }
             },
-            dismissButton = { TextButton(onClick = { vm.dismissCelebration() }) { Text("বন্ধ") } }
+            dismissButton = { TextButton(onClick = { vm.dismissCelebration() }) { Text(tr("বন্ধ", "Off")) } }
         )
     }
 }

@@ -55,18 +55,18 @@ fun DebtsScreen(state: UiState, vm: AppViewModel) {
     val owed = debts.filter { !it.bool("settled") && it.str("direction") == "owed" }.sumOf { it.num("amount") }
     Page {
         AppCard {
-            KeyValue("আমি ধারি", taka(owe, p), red)
-            KeyValue("আমার পাওনা", taka(owed, p), green)
+            KeyValue(tr("আমি ধারি", "I owe"), taka(owe, p), red)
+            KeyValue(tr("আমার পাওনা", "Owed to me"), taka(owed, p), green)
         }
         DebtPlanner(debts, p)
-        AddButton("নতুন ধার / পাওনা") { adding = true }
-        if (debts.isEmpty()) EmptyHint("কোনো ধার বা পাওনা নেই")
+        AddButton(tr("নতুন ধার / পাওনা", "New debt / due")) { adding = true }
+        if (debts.isEmpty()) EmptyHint(tr("কোনো ধার বা পাওনা নেই", "No debts or dues"))
         debts.forEach { d ->
             AppCard {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text(d.str("person"), fontWeight = FontWeight.Bold)
-                        Text(if (d.str("direction") == "owe") "আমি ধারি" else "আমার পাওনা", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (d.str("direction") == "owe") tr("আমি ধারি", "I owe") else tr("আমার পাওনা", "Owed to me"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Text(taka(d.num("amount"), p), fontWeight = FontWeight.Bold, color = if (d.bool("settled")) MaterialTheme.colorScheme.onSurfaceVariant else if (d.str("direction") == "owe") red else green)
                 }
@@ -74,7 +74,7 @@ fun DebtsScreen(state: UiState, vm: AppViewModel) {
                 if (d.str("note").isNotBlank()) Text(d.str("note"), fontSize = 11.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { vm.save("debts", row("settled" to !d.bool("settled")), d.id()) }) {
-                        Text(if (d.bool("settled")) "আবার খুলুন" else "নিষ্পত্তি")
+                        Text(if (d.bool("settled")) tr("আবার খুলুন", "Reopen") else tr("নিষ্পত্তি", "Settle"))
                     }
                     DeleteButton { vm.remove("debts", d.id()) }
                 }
@@ -88,25 +88,25 @@ fun DebtsScreen(state: UiState, vm: AppViewModel) {
         var direction by remember { mutableStateOf("owed") }
         var due by remember { mutableStateOf("") }
         var note by remember { mutableStateOf("") }
-        FormDialog("ধার / পাওনা", onDismiss = { adding = false }, onConfirm = {
+        FormDialog(tr("ধার / পাওনা", "Debt / due"), onDismiss = { adding = false }, onConfirm = {
             val a = parseAmount(amount)
             if (person.isNotBlank() && a != null && a > 0 && (due.isBlank() || isValidIsoDate(due))) {
                 vm.save("debts", row("person" to person, "amount" to a, "direction" to direction, "due_date" to nonEmpty(due), "note" to note), null)
                 adding = false
             }
         }) {
-            ChoiceChips(listOf("owed" to "পাওনা (কেউ আমার কাছে)", "owe" to "ধার (আমি কারো কাছে)"), direction) { direction = it }
-            TextIn("ব্যক্তির নাম", person, { person = it })
-            TextIn("পরিমাণ (৳)", amount, { amount = it }, number = true)
-            TextIn("শেষ তারিখ (YYYY-MM-DD, ঐচ্ছিক)", due, { due = it })
-            TextIn("নোট", note, { note = it })
+            ChoiceChips(listOf("owed" to tr("পাওনা (কেউ আমার কাছে)", "Due (someone owes me)"), "owe" to tr("ধার (আমি কারো কাছে)", "Debt (I owe someone)")), direction) { direction = it }
+            TextIn(tr("ব্যক্তির নাম", "Person's name"), person, { person = it })
+            TextIn(tr("পরিমাণ (৳)", "Amount (৳)"), amount, { amount = it }, number = true)
+            DateField(tr("শেষ তারিখ (ঐচ্ছিক)", "Due date (optional)"), due, { due = it }, optional = true)
+            TextIn(tr("নোট", "Note"), note, { note = it })
         }
     }
 }
 
 // ======================= বাজেট, লক্ষ্য, ইনভেস্টমেন্ট, সাবস্ক্রিপশন, অ্যাকাউন্ট =======================
 
-val INVESTMENT_KINDS = listOf("Stock" to "শেয়ার", "SavingsCertificate" to "সঞ্চয়পত্র", "Crypto" to "ক্রিপ্টো", "Gold" to "সোনা", "RealEstate" to "জমি/বাড়ি", "Other" to "অন্যান্য")
+fun investmentKinds() = listOf("Stock" to tr("শেয়ার", "Shares"), "SavingsCertificate" to "সঞ্চয়পত্র", "Crypto" to "ক্রিপ্টো", "Gold" to "সোনা", "RealEstate" to "জমি/বাড়ি", "Other" to "অন্যান্য")
 
 @Composable
 fun InvestmentsScreen(state: UiState, vm: AppViewModel) {
@@ -117,26 +117,26 @@ fun InvestmentsScreen(state: UiState, vm: AppViewModel) {
     val p = state.privacy
     Page {
         AppCard {
-            KeyValue("মোট বিনিয়োগ", taka(invested, p))
-            KeyValue("বর্তমান মূল্য", taka(value, p))
-            KeyValue("লাভ/ক্ষতি", taka(value - invested, p), if (value >= invested) green else red)
+            KeyValue(tr("মোট বিনিয়োগ", "Total invested"), taka(invested, p))
+            KeyValue(tr("বর্তমান মূল্য", "Current value"), taka(value, p))
+            KeyValue(tr("লাভ/ক্ষতি", "Gain/loss"), taka(value - invested, p), if (value >= invested) green else red)
         }
-        AddButton("নতুন সম্পদ") { adding = true }
-        if (inv.isEmpty()) EmptyHint("কোনো সম্পদ নেই")
+        AddButton(tr("নতুন সম্পদ", "New asset")) { adding = true }
+        if (inv.isEmpty()) EmptyHint(tr("কোনো সম্পদ নেই", "No assets"))
         inv.forEach { i ->
             AppCard {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text(i.str("name"), fontWeight = FontWeight.Bold)
-                        Text(INVESTMENT_KINDS.firstOrNull { it.first == i.str("kind") }?.second ?: i.str("kind"), fontSize = 11.sp)
+                        Text(investmentKinds().firstOrNull { it.first == i.str("kind") }?.second ?: i.str("kind"), fontSize = 11.sp)
                     }
                     DeleteButton { vm.remove("investments", i.id()) }
                 }
-                KeyValue("বিনিয়োগ / বর্তমান", "${taka(i.num("invested"), p)} / ${taka(i.num("current_value"), p)}")
+                KeyValue(tr("বিনিয়োগ / বর্তমান", "Invested / current"), "${taka(i.num("invested"), p)} / ${taka(i.num("current_value"), p)}")
                 OutlinedButton(onClick = {
                     val now = i.num("current_value")
                     vm.save("investments", row("current_value" to now), i.id())
-                }) { Text("মূল্য হালনাগাদ") }
+                }) { Text(tr("মূল্য হালনাগাদ", "Update value")) }
             }
         }
     }
@@ -146,18 +146,18 @@ fun InvestmentsScreen(state: UiState, vm: AppViewModel) {
         var invested by remember { mutableStateOf("") }
         var current by remember { mutableStateOf("") }
         var bought by remember { mutableStateOf(todayIso()) }
-        FormDialog("নতুন সম্পদ", onDismiss = { adding = false }, onConfirm = {
+        FormDialog(tr("নতুন সম্পদ", "New asset"), onDismiss = { adding = false }, onConfirm = {
             val iv = parseAmount(invested); val cv = parseAmount(current) ?: iv
             if (name.isNotBlank() && iv != null && iv >= 0 && cv != null && isValidIsoDate(bought)) {
                 vm.save("investments", row("name" to name, "kind" to kind, "invested" to iv, "current_value" to cv, "bought_on" to bought), null)
                 adding = false
             }
         }) {
-            ChoiceChips(INVESTMENT_KINDS, kind) { kind = it }
-            TextIn("নাম", name, { name = it })
-            TextIn("বিনিয়োগের পরিমাণ (৳)", invested, { invested = it }, number = true)
-            TextIn("বর্তমান মূল্য (৳)", current, { current = it }, number = true)
-            TextIn("কেনার তারিখ", bought, { bought = it })
+            ChoiceChips(investmentKinds(), kind) { kind = it }
+            TextIn(tr("নাম", "Name"), name, { name = it })
+            TextIn(tr("বিনিয়োগের পরিমাণ (৳)", "Invested amount (৳)"), invested, { invested = it }, number = true)
+            TextIn(tr("বর্তমান মূল্য (৳)", "Current value (৳)"), current, { current = it }, number = true)
+            DateField(tr("কেনার তারিখ", "Purchase date"), bought, { bought = it })
         }
     }
 }
@@ -170,9 +170,9 @@ fun SubscriptionsScreen(state: UiState, vm: AppViewModel) {
         when (it.str("frequency")) { "Daily" -> it.num("amount") * 30; "Weekly" -> it.num("amount") * 4.3; "Yearly" -> it.num("amount") / 12; else -> it.num("amount") }
     }
     Page {
-        AppCard { KeyValue("মাসিক আনুমানিক খরচ", taka(monthly, state.privacy), red) }
-        AddButton("নতুন সাবস্ক্রিপশন") { adding = true }
-        if (subs.isEmpty()) EmptyHint("কোনো সাবস্ক্রিপশন নেই")
+        AppCard { KeyValue(tr("মাসিক আনুমানিক খরচ", "Estimated monthly cost"), taka(monthly, state.privacy), red) }
+        AddButton(tr("নতুন সাবস্ক্রিপশন", "New subscription")) { adding = true }
+        if (subs.isEmpty()) EmptyHint(tr("কোনো সাবস্ক্রিপশন নেই", "No subscriptions"))
         subs.forEach { s ->
             AppCard {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -184,7 +184,7 @@ fun SubscriptionsScreen(state: UiState, vm: AppViewModel) {
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { vm.save("subscriptions", row("is_active" to !s.bool("is_active")), s.id()) }) {
-                        Text(if (s.bool("is_active")) "বন্ধ করুন" else "চালু করুন")
+                        Text(if (s.bool("is_active")) tr("বন্ধ করুন", "Close") else tr("চালু করুন", "Activate"))
                     }
                     DeleteButton { vm.remove("subscriptions", s.id()) }
                 }
@@ -196,17 +196,17 @@ fun SubscriptionsScreen(state: UiState, vm: AppViewModel) {
         var amount by remember { mutableStateOf("") }
         var freq by remember { mutableStateOf("Monthly") }
         var renewal by remember { mutableStateOf(todayIso()) }
-        FormDialog("নতুন সাবস্ক্রিপশন", onDismiss = { adding = false }, onConfirm = {
+        FormDialog(tr("নতুন সাবস্ক্রিপশন", "New subscription"), onDismiss = { adding = false }, onConfirm = {
             val a = parseAmount(amount)
             if (name.isNotBlank() && a != null && a >= 0 && isValidIsoDate(renewal)) {
                 vm.save("subscriptions", row("name" to name, "amount" to a, "frequency" to freq, "renewal_date" to renewal, "currency" to state.currency), null)
                 adding = false
             }
         }) {
-            TextIn("সার্ভিসের নাম", name, { name = it })
-            TextIn("পরিমাণ (৳)", amount, { amount = it }, number = true)
-            ChoiceChips(listOf("Daily" to "দৈনিক", "Weekly" to "সাপ্তাহিক", "Monthly" to "মাসিক", "Yearly" to "বার্ষিক"), freq) { freq = it }
-            TextIn("পরবর্তী নবায়ন (YYYY-MM-DD)", renewal, { renewal = it })
+            TextIn(tr("সার্ভিসের নাম", "Service name"), name, { name = it })
+            TextIn(tr("পরিমাণ (৳)", "Amount (৳)"), amount, { amount = it }, number = true)
+            ChoiceChips(listOf("Daily" to tr("দৈনিক", "Daily"), "Weekly" to tr("সাপ্তাহিক", "Weekly"), "Monthly" to tr("মাসিক", "Monthly"), "Yearly" to tr("বার্ষিক", "Yearly")), freq) { freq = it }
+            DateField(tr("পরবর্তী নবায়ন", "Next renewal"), renewal, { renewal = it })
         }
     }
 }
@@ -218,10 +218,10 @@ fun AccountsScreen(state: UiState, vm: AppViewModel) {
     val accounts = state.rows("accounts")
     Page {
         AppCard {
-            Text("ট্রান্সফার করতে + বাটনে গিয়ে 'ট্রান্সফার' বাছাই করুন।", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("ট্রান্সফার করতে + বাটনে গিয়ে 'ট্রান্সফার' বাছাই করুন।", "To transfer, tap + and choose 'Transfer'."), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        AddButton("নতুন অ্যাকাউন্ট") { adding = true }
-        if (accounts.isEmpty()) EmptyHint("কোনো অ্যাকাউন্ট নেই (ক্যাশ, bKash, Nagad, ব্যাংক)")
+        AddButton(tr("নতুন অ্যাকাউন্ট", "New account")) { adding = true }
+        if (accounts.isEmpty()) EmptyHint(tr("কোনো অ্যাকাউন্ট নেই (ক্যাশ, bKash, Nagad, ব্যাংক)", "No accounts (cash, bKash, Nagad, bank)"))
         accounts.forEach { a ->
             AppCard {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -239,16 +239,16 @@ fun AccountsScreen(state: UiState, vm: AppViewModel) {
         var name by remember { mutableStateOf("") }
         var kind by remember { mutableStateOf("Cash") }
         var opening by remember { mutableStateOf("0") }
-        FormDialog("নতুন অ্যাকাউন্ট", onDismiss = { adding = false }, onConfirm = {
+        FormDialog(tr("নতুন অ্যাকাউন্ট", "New account"), onDismiss = { adding = false }, onConfirm = {
             val o = parseAmount(opening) ?: 0.0
             if (name.isNotBlank()) {
                 vm.save("accounts", row("name" to name, "kind" to kind, "opening_balance" to o), null)
                 adding = false
             }
         }) {
-            TextIn("নাম", name, { name = it })
+            TextIn(tr("নাম", "Name"), name, { name = it })
             ChoiceChips(listOf("Cash", "Bkash", "Nagad", "Rocket", "Bank", "Card").map { it to it }, kind) { kind = it }
-            TextIn("শুরুর ব্যালেন্স (৳)", opening, { opening = it }, number = true)
+            TextIn(tr("শুরুর ব্যালেন্স (৳)", "Opening balance (৳)"), opening, { opening = it }, number = true)
         }
     }
 }
@@ -260,18 +260,18 @@ fun DebtPlanner(debts: List<JsonObject>, privacy: Boolean) {
     val owes = debts.filter { !it.bool("settled") && it.str("direction") == "owe" }.sortedBy { it.num("amount") }
     val m = parseAmount(monthly) ?: 0.0
     AppCard {
-        Text("ধার পরিশোধের পরিকল্পনা (ছোট ধার আগে)", fontWeight = FontWeight.Bold)
-        TextIn("প্রতি মাসে কত দিতে পারবেন (৳)", monthly, { monthly = it }, number = true)
+        Text(tr("ধার পরিশোধের পরিকল্পনা (ছোট ধার আগে)", "Repayment plan (smallest debts first)"), fontWeight = FontWeight.Bold)
+        TextIn(tr("প্রতি মাসে কত দিতে পারবেন (৳)", "How much per month (৳)"), monthly, { monthly = it }, number = true)
         when {
-            owes.isEmpty() -> Text("কোনো ধার নেই", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            m <= 0 -> Text("মাসিক পরিমাণ লিখুন", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            owes.isEmpty() -> Text(tr("কোনো ধার নেই", "No loans"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            m <= 0 -> Text(tr("মাসিক পরিমাণ লিখুন", "Enter a monthly amount"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             else -> {
                 var cumulative = 0.0
                 owes.forEach { d ->
                     cumulative += d.num("amount")
                     Text("${d.str("person")}: ${taka(d.num("amount"), privacy)} → ${ceil(cumulative / m).toInt()} মাসে শেষ", fontSize = 13.sp)
                 }
-                Text("সব ধার শেষ হবে ${ceil(cumulative / m).toInt()} মাসে (সুদ ছাড়া হিসাব)", fontWeight = FontWeight.Bold)
+                Text(tr("সব ধার শেষ হবে ${ceil(cumulative / m).toInt()} মাসে (সুদ ছাড়া হিসাব)", "All debts clear in ${ceil(cumulative / m).toInt()} months (no interest)"), fontWeight = FontWeight.Bold)
             }
         }
     }

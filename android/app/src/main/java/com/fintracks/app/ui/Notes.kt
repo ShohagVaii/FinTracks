@@ -272,7 +272,7 @@ private fun NoteEditor(initial: JsonObject?, vm: AppViewModel, onClose: () -> Un
 
     Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ফিরে যান") }
+            IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("ফিরে যান", "Back")) }
             Spacer(Modifier.weight(1f))
             IconButton(onClick = {
                 val text = listOf(title, body).filter { it.isNotBlank() }.joinToString("\n\n")
@@ -280,7 +280,7 @@ private fun NoteEditor(initial: JsonObject?, vm: AppViewModel, onClose: () -> Un
                     val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, text) }
                     ctx.startActivity(Intent.createChooser(send, "নোট শেয়ার করুন").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
-            }) { Icon(Icons.Default.Share, contentDescription = "শেয়ার") }
+            }) { Icon(Icons.Default.Share, contentDescription = tr("শেয়ার", "Share")) }
             if (id != null) {
                 DeleteButton {
                     handled = true

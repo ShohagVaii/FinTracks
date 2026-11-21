@@ -53,8 +53,8 @@ fun PeriodPicker(period: Period, from: String, to: String, onPeriod: (Period) ->
         ChoiceChips(Period.entries.map { it.name to it.label }, period.name) { onPeriod(Period.valueOf(it)) }
         if (period == Period.CUSTOM) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextIn("শুরু (YYYY-MM-DD)", from, onFrom, modifier = Modifier.weight(1f))
-                TextIn("শেষ (YYYY-MM-DD)", to, onTo, modifier = Modifier.weight(1f))
+                DateField(tr("শুরু", "From"), from, onFrom, modifier = Modifier.weight(1f))
+                DateField(tr("শেষ", "To"), to, onTo, modifier = Modifier.weight(1f))
             }
         }
     }

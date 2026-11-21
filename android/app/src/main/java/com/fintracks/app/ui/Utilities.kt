@@ -65,13 +65,13 @@ import kotlin.math.min
 private fun bnDate(d: LocalDate): String = displayDate(d.toString())
 
 private fun bnWeekday(d: java.time.DayOfWeek): String = when (d) {
-    java.time.DayOfWeek.SATURDAY -> "শনিবার"
-    java.time.DayOfWeek.SUNDAY -> "রবিবার"
-    java.time.DayOfWeek.MONDAY -> "সোমবার"
-    java.time.DayOfWeek.TUESDAY -> "মঙ্গলবার"
-    java.time.DayOfWeek.WEDNESDAY -> "বুধবার"
-    java.time.DayOfWeek.THURSDAY -> "বৃহস্পতিবার"
-    java.time.DayOfWeek.FRIDAY -> "শুক্রবার"
+    java.time.DayOfWeek.SATURDAY -> tr("শনিবার", "Saturday")
+    java.time.DayOfWeek.SUNDAY -> tr("রবিবার", "Sunday")
+    java.time.DayOfWeek.MONDAY -> tr("সোমবার", "Monday")
+    java.time.DayOfWeek.TUESDAY -> tr("মঙ্গলবার", "Tuesday")
+    java.time.DayOfWeek.WEDNESDAY -> tr("বুধবার", "Wednesday")
+    java.time.DayOfWeek.THURSDAY -> tr("বৃহস্পতিবার", "Thursday")
+    java.time.DayOfWeek.FRIDAY -> tr("শুক্রবার", "Friday")
 }
 
 /** The birthday in [year]; Feb 29 falls back to Feb 28 in non-leap years. */
@@ -110,9 +110,9 @@ internal fun DatePickerSheet(initial: LocalDate, title: String, onDismiss: () ->
             TextButton(onClick = {
                 state.selectedDateMillis?.let { onPick(localFromUtcMillis(it)) }
                 onDismiss()
-            }) { Text("ঠিক আছে") }
+            }) { Text(tr("ঠিক আছে", "OK")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("বাতিল") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     ) {
         Column(Modifier.padding(horizontal = 16.dp)) {
             Text(title, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
@@ -137,27 +137,27 @@ fun AgeCalcScreen() {
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AppCard {
-            Text("জন্ম তারিখ", fontWeight = FontWeight.Bold)
+            Text(tr("জন্ম তারিখ", "Birth date"), fontWeight = FontWeight.Bold)
             OutlinedButton(onClick = { pickingBirth = true }, modifier = Modifier.fillMaxWidth()) {
                 Text(b?.let { bnDate(it) } ?: "তারিখ বাছাই করুন")
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("অন্য তারিখ পর্যন্ত হিসাব", modifier = Modifier.weight(1f), fontSize = 13.sp)
+                Text(tr("অন্য তারিখ পর্যন্ত হিসাব", "Calculate up to another date"), modifier = Modifier.weight(1f), fontSize = 13.sp)
                 androidx.compose.material3.Switch(checked = useCustomRef, onCheckedChange = { useCustomRef = it })
             }
             if (useCustomRef) {
                 OutlinedButton(onClick = { pickingRef = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text("রেফারেন্স: ${bnDate(ref)}")
+                    Text(tr("রেফারেন্স: ${bnDate(ref)}", "Reference: ${bnDate(ref)}"))
                 }
             } else {
-                Text("রেফারেন্স: আজ (${bnDate(today)})", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr("রেফারেন্স: আজ (${bnDate(today)})", "Reference: today (${bnDate(today)})"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
         if (b == null) {
-            EmptyHint("জন্ম তারিখ বাছাই করলে বয়স দেখাবে")
+            EmptyHint(tr("জন্ম তারিখ বাছাই করলে বয়স দেখাবে", "Pick a birth date to see the age"))
         } else if (result == null) {
-            Text("জন্ম তারিখ রেফারেন্স তারিখের পরে হতে পারে না।", color = Rose500, fontSize = 13.sp)
+            Text(tr("জন্ম তারিখ রেফারেন্স তারিখের পরে হতে পারে না।", "Birth date cannot be after the reference date."), color = Rose500, fontSize = 13.sp)
         } else {
                 Column(
                     Modifier
@@ -167,33 +167,51 @@ fun AgeCalcScreen() {
                         .padding(22.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("আপনার বয়স", fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f), letterSpacing = 2.sp)
+                    Text(tr("আপনার বয়স", "Your age"), fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f), letterSpacing = 2.sp)
                     Text(
-                        bnDigits("${result.period.years} বছর"),
+                        bnDigits(tr("${result.period.years} বছর", "${result.period.years} years")),
                         fontSize = 34.sp, fontWeight = FontWeight.Black, color = Color.White
                     )
                     Text(
-                        bnDigits("${result.period.months} মাস ${result.period.days} দিন"),
+                        bnDigits(tr("${result.period.months} মাস ${result.period.days} দিন", "${result.period.months} months ${result.period.days} days")),
                         fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White
                     )
                 }
                 AppCard {
-                    KeyValue("মোট দিন", bnDigits(String.format(Locale.US, "%,d", result.totalDays)))
-                    KeyValue("পরবর্তী জন্মদিন", bnDate(result.nextBirthday))
+                    KeyValue(tr("মোট দিন", "Total days"), bnDigits(String.format(Locale.US, "%,d", result.totalDays)))
+                    KeyValue(tr("পরবর্তী জন্মদিন", "Next birthday"), bnDate(result.nextBirthday))
                     KeyValue(
-                        "জন্মদিন বাকি",
-                        if (result.daysToBirthday == 0L) "আজ! জন্মদিন মুবারক" else bnDigits("${result.daysToBirthday} দিন"),
+                        tr("জন্মদিন বাকি", "Days to birthday"),
+                        if (result.daysToBirthday == 0L) tr("আজ! জন্মদিন মুবারক", "Today! Happy birthday") else bnDigits(tr("${result.daysToBirthday} দিন", "${result.daysToBirthday} days")),
                         Color(0xFFE879F9)
                     )
-                    KeyValue("জন্মের বার", bnWeekday(result.weekday))
+                    KeyValue(tr("জন্মের বার", "Day of birth"), bnWeekday(result.weekday))
                 }
             }
     }
 
     if (pickingBirth) {
-        DatePickerSheet(birth ?: LocalDate.of(2000, 1, 1), "জন্ম তারিখ", onDismiss = { pickingBirth = false }) { birth = it }
+        DatePickerSheet(birth ?: LocalDate.of(2000, 1, 1), tr("জন্ম তারিখ", "Birth date"), onDismiss = { pickingBirth = false }) { birth = it }
     }
     if (pickingRef) {
-        DatePickerSheet(ref, "রেফারেন্স তারিখ", onDismiss = { pickingRef = false }) { ref = it }
+        DatePickerSheet(ref, tr("রেফারেন্স তারিখ", "Reference date"), onDismiss = { pickingRef = false }) { ref = it }
     }
+}
+
+/** Date field: shows the date in the chosen format and opens the calendar. Nothing is typed. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DateField(label: String, iso: String, onChange: (String) -> Unit, optional: Boolean = false, modifier: Modifier = Modifier.fillMaxWidth()) {
+    var open by remember { mutableStateOf(false) }
+    val parsed = runCatching { LocalDate.parse(iso.trim().take(10)) }.getOrNull()
+    Column(modifier) {
+        Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { open = true }, modifier = Modifier.weight(1f)) {
+                Text(parsed?.let { displayDate(it.toString()) } ?: tr("তারিখ বাছাই করুন", "Pick a date"))
+            }
+            if (optional && parsed != null) TextButton(onClick = { onChange("") }) { Text(tr("মুছুন", "Clear")) }
+        }
+    }
+    if (open) DatePickerSheet(parsed ?: LocalDate.now(), label, onDismiss = { open = false }) { onChange(it.toString()) }
 }
