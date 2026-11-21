@@ -1,12 +1,14 @@
 package com.fintracks.app.data
 
 import android.content.Context
+import com.fintracks.app.BuildConfig
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.JsonElement
@@ -102,6 +104,32 @@ class Repository(context: Context) {
             val body = JsonArray(chunk.map { JsonObject(it + ("user_id" to JsonPrimitive(uid))) })
             authed("POST", "/rest/v1/$table?on_conflict=$onConflict", body, "resolution=merge-duplicates,return=minimal")
         }
+    }
+
+    /**
+     * The login email. It lives in Supabase Auth, not in profiles, so it is read from the session;
+     * when the session has none, it is fetched from the Auth user endpoint.
+     */
+    suspend fun accountEmail(): String {
+        session?.user?.email?.takeIf { it.isNotBlank() }?.let { return it }
+        val text = authed("GET", "/auth/v1/user", null)
+        return json.parseToJsonElement(text).jsonObject["email"]?.jsonPrimitive?.content.orEmpty()
+    }
+
+    /** Uploads a profile photo to the avatars bucket (own folder only) and returns its public URL. */
+    suspend fun uploadAvatar(bytes: ByteArray): String {
+        val uid = uid()
+        val path = "/storage/v1/object/avatars/$uid/avatar.jpg"
+        val current = session ?: throw SupabaseException(401, "লগইন করা নেই")
+        try {
+            api.upload(path, bytes, "image/jpeg", current.accessToken)
+        } catch (e: SupabaseException) {
+            if (e.code != 401) throw e
+            val fresh = api.refresh(current.refreshToken)
+            session = fresh
+            api.upload(path, bytes, "image/jpeg", fresh.accessToken)
+        }
+        return BuildConfig.SUPABASE_URL.trimEnd('/') + "/storage/v1/object/public/avatars/$uid/avatar.jpg?v=${System.currentTimeMillis()}"
     }
 
     suspend fun updateProfile(fields: JsonObject) {

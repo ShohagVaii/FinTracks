@@ -308,7 +308,7 @@ fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onDelete: (() -> 
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(t.strOrNull("note")?.takeIf { it.isNotBlank() } ?: t.str("category"), fontWeight = FontWeight.Bold, maxLines = 1)
-                Text("${dateOf(t, "tx_date")} · ${t.str("payment_mode")}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${displayDate(dateOf(t, "tx_date"))} · ${t.str("payment_mode")}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text("$sign ${taka(t.num("amount"), state.privacy)}", color = amountColor, fontWeight = FontWeight.Bold)
             if (onShare != null) IconButton(onClick = onShare) { Icon(Icons.Default.Share, contentDescription = "শেয়ার", tint = Sky400) }
@@ -492,7 +492,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         cameraUri = uri
         cameraLauncher.launch(uri)
     }
-    val cats = if (type == "Income") INCOME_CATS else EXPENSE_CATS
+    val cats = categoriesFor(type)
     val accounts = state.rows("accounts")
 
     if (showCalc) {

@@ -42,6 +42,22 @@ class SupabaseApi {
         .build()
     private val jsonMedia = "application/json; charset=utf-8".toMediaType()
 
+    /** Raw-bytes upload to Supabase Storage (used for profile photos). Upserts, so a new photo replaces the old one. */
+    suspend fun upload(path: String, bytes: ByteArray, mime: String, token: String): String = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(BuildConfig.SUPABASE_URL.trimEnd('/') + path)
+            .header("apikey", BuildConfig.SUPABASE_KEY)
+            .header("Authorization", "Bearer $token")
+            .header("x-upsert", "true")
+            .post(bytes.toRequestBody(mime.toMediaType()))
+            .build()
+        http.newCall(request).execute().use { resp ->
+            val text = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) throw SupabaseException(resp.code, parseError(text, resp.code))
+            text
+        }
+    }
+
     suspend fun call(
         method: String,
         path: String,

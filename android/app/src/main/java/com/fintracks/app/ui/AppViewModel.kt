@@ -44,7 +44,9 @@ val TABLES: List<Pair<String, String>> = listOf(
     "mess_members" to "select=*",
     "mess_bazaars" to "select=*&order=bazaar_date.desc",
     "mess_meals" to "select=*&order=meal_date.desc",
-    "mess_deposits" to "select=*&order=deposit_date.desc"
+    "mess_deposits" to "select=*&order=deposit_date.desc",
+    "categories" to "select=*&order=name.asc",
+    "cash_counts" to "select=*&order=counted_at.desc"
 )
 
 /** The last deleted row, kept for a few seconds so the user can undo. */
@@ -59,7 +61,8 @@ val UNDO_LABELS = mapOf(
     "transactions" to "লেনদেন", "accounts" to "অ্যাকাউন্ট", "budgets" to "বাজেট", "goals" to "লক্ষ্য",
     "debts" to "ধার", "loans" to "লোন", "subscriptions" to "সাবস্ক্রিপশন", "investments" to "বিনিয়োগ",
     "credit_entries" to "কেনা", "credit_payments" to "পরিশোধ", "shopping_items" to "শপিং আইটেম",
-    "bill_splits" to "বিল ভাগ", "mess_bazaars" to "বাজার", "mess_meals" to "মিল", "mess_deposits" to "জমা"
+    "bill_splits" to "বিল ভাগ", "mess_bazaars" to "বাজার", "mess_meals" to "মিল", "mess_deposits" to "জমা",
+    "categories" to "ক্যাটাগরি", "cash_counts" to "গণনা"
 )
 
 data class UiState(
@@ -86,6 +89,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = Repository(app)
     /** Notepad: server copy plus offline cache and pending queue (see Notes.kt). */
     val notes = NotesStore(app, repo, viewModelScope)
+    /** Cash counter history: device first, then the cash_counts table (see Counter.kt). */
+    val cashCounts = CashCountStore(app, repo, viewModelScope)
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
@@ -99,6 +104,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun loadAll() {
         val profile = repo.list("profiles", "select=*&id=eq.${repo.uid()}").firstOrNull()
         val tables = Sync.run(getApplication<Application>(), repo, profile?.bool("is_privacy_mode") == true)
+        Sync.markOk(getApplication<Application>())
         _state.update {
             it.copy(
                 signedIn = true,
@@ -113,6 +119,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** After a write: refetch the 16 tables only. Full sync (recurring, reminders, widget) runs on login and daily. */
     private suspend fun refreshTables() {
         val tables = Sync.fetchTables(repo)
+        Sync.markOk(getApplication<Application>())
         _state.update { it.copy(tables = tables) }
         syncRegistry(state.value.profile, tables["transactions"].orEmpty())
     }
@@ -184,6 +191,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     text.contains("Invalid login", ignoreCase = true) -> "ইমেইল বা পাসওয়ার্ড ভুল"
                     text.contains("already registered", ignoreCase = true) -> "এই ইমেইল দিয়ে আগে অ্যাকাউন্ট খোলা হয়েছে"
                     text.contains("Email not confirmed", ignoreCase = true) -> "ইমেইলে পাঠানো লিংকে ক্লিক করে অ্যাকাউন্ট কনফার্ম করুন"
+                    text.contains("profiles_username", ignoreCase = true) -> "এই ইউজারনেম আগে থেকে অন্য কেউ নিয়েছে"
+                    text.contains("duplicate key", ignoreCase = true) -> "এই নামে আগে থেকেই একটি আছে"
+                    text.contains("profiles_username_check", ignoreCase = true) || text.contains("username", ignoreCase = true) && text.contains("check", ignoreCase = true) -> "ইউজারনেম ৩–২০ অক্ষর হতে হবে: শুধু ইংরেজি ছোট হাতের অক্ষর, সংখ্যা ও _"
                     else -> text
                 }
                 _state.update { it.copy(message = friendly) }
@@ -223,7 +233,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Re-checks the password, deletes the account on the server, then clears every local store. */
     fun deleteAccount(password: String) = act {
-        val email = state.value.profile?.str("email").orEmpty()
+        val email = repo.accountEmail()
         if (email.isBlank()) throw IllegalStateException("ইমেইল পাওয়া যায়নি, আবার লগইন করুন")
         repo.signIn(email, password)
         repo.deleteAccount()
@@ -231,10 +241,44 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = UiState(checking = false, notice = "আপনার অ্যাকাউন্ট ও সব ডেটা স্থায়ীভাবে মুছে ফেলা হয়েছে।")
     }
 
+    /** Login email from Auth (profiles has no email column). Used by Settings and account deletion. */
+    suspend fun accountEmail(): String = repo.accountEmail()
+
+    /** Refreshes every table now. Settings uses this for the manual sync button. */
+    fun syncNow() = act { refreshTables(); Sync.markOk(getApplication<Application>()) }
+
+    /** Uploads a profile photo and saves its URL on the profile. */
+    fun saveAvatar(bytes: ByteArray) = act {
+        val url = repo.uploadAvatar(bytes)
+        repo.updateProfile(row("avatar_url" to url))
+        _state.update { it.copy(profile = JsonObject(state.value.profile.orEmpty() + row("avatar_url" to url))) }
+        _state.update { it.copy(notice = "প্রোফাইল ছবি সেভ হয়েছে") }
+    }
+
+    /**
+     * Removes every local store on this phone: preferences, caches, pending offline changes, PIN and lock,
+     * local SMS suggestions, and the sign-in on this device. Server data is NOT touched.
+     */
+    fun resetLocal() {
+        val app = getApplication<Application>()
+        notes.reset()
+        cashCounts.reset()
+        repo.session = null
+        AppLock.disable(app)
+        DailyReminder.cancel(app)
+        PendingSmsStore.save(app, emptyList())
+        // The "fintracks" file (session) is already cleared above; everything else goes.
+        java.io.File(app.applicationInfo.dataDir, "shared_prefs").listFiles()?.forEach { f ->
+            val name = f.name.removeSuffix(".xml")
+            if (name != "fintracks") app.deleteSharedPreferences(name)
+        }
+        _state.value = UiState(checking = false, notice = "এই ফোনের সব লোকাল ডেটা মুছে ফেলা হয়েছে। সার্ভারের ডেটা অক্ষত আছে।")
+    }
+
     private fun clearLocalData() {
         val app = getApplication<Application>()
         AppLock.disable(app)
-        listOf("fintrack_lock", "fintrack_recurring", "fintrack_reminders", "fintrack_notes", "fintrack_counter").forEach {
+        listOf("fintrack_lock", "fintrack_recurring", "fintrack_reminders", "fintrack_notes", "fintrack_counter", "fintrack_sync", "fintrack_daily").forEach {
             app.getSharedPreferences(it, Context.MODE_PRIVATE).edit().clear().commit()
         }
         PendingSmsStore.save(app, emptyList())

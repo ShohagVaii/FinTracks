@@ -80,6 +80,12 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
 
     private fun key(): String = "notes-" + (runCatching { repo.uid() }.getOrDefault("anon"))
 
+    /** Clears the in-memory copy (used by the app reset). */
+    fun reset() = synchronized(this) {
+        cache = emptyList(); pending = emptyList(); loadedKey = null
+        _notes.value = emptyList(); _pendingCount.value = 0
+    }
+
     /** Loads the cache for the signed-in user (once per user). */
     private fun ensureLoaded() {
         val k = key()

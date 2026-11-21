@@ -82,6 +82,8 @@ fun FinTracksApp(vm: AppViewModel = viewModel()) {
         }
     }
 
+    // Display settings (currency symbol, language, date style, accent, custom categories) apply before any screen draws.
+    AppPrefs.apply(state)
     FinTracksTheme(dark = state.dark, accent = state.accent) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             when {
@@ -218,13 +220,13 @@ private fun Header(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text("FinTrack", color = Sky400, fontSize = 26.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+            Text("FinTrack", color = MaterialTheme.colorScheme.primary, fontSize = 26.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
             Text("PREMIUM FINANCE", color = Slate400, fontSize = 9.sp, letterSpacing = 3.sp)
         }
         HeaderIcon(Icons.Default.Calculate, "ক্যালকুলেটর", onCalc)
         HeaderIcon(Icons.Default.WbSunny, if (dark) "লাইট থিম" else "ডার্ক থিম", onToggleTheme, tint = Amber400)
         HeaderIcon(if (privacy) Icons.Default.VisibilityOff else Icons.Default.Visibility, "প্রাইভেসি", onTogglePrivacy)
-        HeaderIcon(Icons.Default.Settings, "সেটিংস", onSettings)
+        HeaderIcon(Icons.Default.Settings, tr("সেটিংস", "Settings"), onSettings)
     }
 }
 
@@ -272,7 +274,7 @@ private fun OverlayContent(overlay: Overlay, state: UiState, vm: AppViewModel, o
         Overlay.ACCOUNTS -> AccountsScreen(state, vm)
         Overlay.REPORTS -> ReportsScreen(state)
         Overlay.SETTINGS -> SettingsScreen(state, vm)
-        Overlay.COUNTER -> MoneyCounterScreen()
+        Overlay.COUNTER -> MoneyCounterScreen(vm)
         Overlay.AGE -> AgeCalcScreen()
         Overlay.NOTES -> NotesScreen(vm)
     }

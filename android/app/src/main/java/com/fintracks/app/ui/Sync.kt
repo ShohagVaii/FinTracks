@@ -22,6 +22,18 @@ import java.util.concurrent.TimeUnit
 
 /** Shared sync steps: fetch every table, create monthly recurring copies, reminders, widget refresh. */
 object Sync {
+    private const val PREFS = "fintrack_sync"
+
+    /** Remembers when the last successful table fetch finished (shown in Settings). */
+    fun markOk(ctx: Context) {
+        ctx.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putLong("last_ok", System.currentTimeMillis()).apply()
+    }
+
+    /** Epoch millis of the last successful sync, or 0 when there has never been one on this phone. */
+    fun lastOk(ctx: Context): Long =
+        ctx.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong("last_ok", 0L)
+
     suspend fun fetchTables(repo: Repository): Map<String, List<JsonObject>> = coroutineScope {
         TABLES.map { (t, q) -> async { t to repo.list(t, q) } }.awaitAll().toMap()
     }

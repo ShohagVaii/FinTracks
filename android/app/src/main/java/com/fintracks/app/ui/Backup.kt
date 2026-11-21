@@ -87,7 +87,7 @@ object Backup {
 
 /** Parent tables first, so foreign keys always find their rows. Must list every table in TABLES. */
 val RESTORE_ORDER: List<String> = listOf(
-    "accounts", "credit_shops", "mess_members", "transactions", "budgets", "goals", "debts", "loans",
+    "categories", "accounts", "credit_shops", "mess_members", "transactions", "budgets", "goals", "debts", "loans",
     "subscriptions", "investments", "credit_entries", "credit_payments", "bill_splits", "shopping_items",
-    "mess_bazaars", "mess_meals", "mess_deposits"
+    "mess_bazaars", "mess_meals", "mess_deposits", "cash_counts"
 )

@@ -38,9 +38,10 @@ val Slate500 = Color(0xFF64748B)
 val Slate400 = Color(0xFF94A3B8)
 val Slate200 = Color(0xFFE2E8F0)
 val Slate50 = Color(0xFFF8FAFC)
-val Sky400 = Color(0xFF38BDF8)
-val Sky500 = Color(0xFF0EA5E9)
-val Blue600 = Color(0xFF2563EB)
+// These three follow the accent colour chosen in Settings. Sky is the default.
+val Sky400: Color get() = AppPrefs.accent.darkPrimary
+val Sky500: Color get() = AppPrefs.accent.lightPrimary
+val Blue600: Color get() = AppPrefs.accent.gradientEnd
 
 val Emerald500 = Color(0xFF10B981)
 val Rose500 = Color(0xFFF43F5E)

@@ -82,7 +82,7 @@ object Web {
     const val NISAB_SILVER_GRAMS = 612.36
 }
 
-fun fmtMoney(v: Double): String = "৳ " + String.format(Locale.US, "%,.0f", v)
+fun fmtMoney(v: Double): String = AppPrefs.symbol + " " + String.format(Locale.US, "%,.0f", v)
 
 /** One tile in the Tools grid. */
 private data class ToolTile(val overlay: Overlay, val label: String, val icon: ImageVector, val color: Color)
@@ -415,7 +415,7 @@ internal fun ToolsFooter() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("FinTrack AI", color = Sky400, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text("FinTrack AI", color = MaterialTheme.colorScheme.primary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Text(
             "আপনার ব্যক্তিগত অর্থ ও লেনদেনের সবচেয়ে বুদ্ধিমান সমাধান।\nপ্রযুক্তির মাধ্যমে জীবন হোক আরও সহজ।",
             color = Slate400,
@@ -429,6 +429,7 @@ internal fun ToolsFooter() {
             SocialButton(FacebookGlyph, "Facebook") { uri.openUri(FACEBOOK_URL) }
             SocialButton(TelegramGlyph, "Telegram") { uri.openUri(TELEGRAM_URL) }
         }
+        Text("v${com.fintracks.app.BuildConfig.VERSION_NAME}-${com.fintracks.app.BuildConfig.VERSION_CODE}", color = Slate500, fontSize = 11.sp)
         Spacer(Modifier.height(8.dp))
         Text("CRAFTED WITH ❤ BY SHOHAG VAII", color = Slate500, fontSize = 10.sp, letterSpacing = 2.sp)
         Text("© FINTRACK PREMIUM FINANCE", color = Slate600, fontSize = 9.sp, letterSpacing = 1.sp)

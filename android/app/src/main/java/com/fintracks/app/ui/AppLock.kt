@@ -59,6 +59,10 @@ object AppLock {
     fun hasPin(ctx: Context): Boolean = prefs(ctx).getString("pin_hash", null) != null
     fun timeoutSeconds(ctx: Context): Int = prefs(ctx).getInt("timeout", 0)
 
+    /** Fingerprint / face unlock on the lock screen. On by default; the PIN always works too. */
+    fun biometricOn(ctx: Context): Boolean = prefs(ctx).getBoolean("bio", true)
+    fun setBiometric(ctx: Context, on: Boolean) = prefs(ctx).edit().putBoolean("bio", on).apply()
+
     fun setTimeout(ctx: Context, seconds: Int) {
         prefs(ctx).edit().putInt("timeout", seconds).apply()
     }
@@ -135,7 +139,7 @@ fun LockScreen(onSignOut: () -> Unit) {
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val auth = AppLock.biometricAuthenticators()
-    val bioAvailable = BiometricManager.from(ctx).canAuthenticate(auth) == BiometricManager.BIOMETRIC_SUCCESS
+    val bioAvailable = AppLock.biometricOn(ctx) && BiometricManager.from(ctx).canAuthenticate(auth) == BiometricManager.BIOMETRIC_SUCCESS
 
     fun prompt() {
         val callback = object : BiometricPrompt.AuthenticationCallback() {

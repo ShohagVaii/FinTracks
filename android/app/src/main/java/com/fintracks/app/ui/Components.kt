@@ -187,10 +187,10 @@ fun FormDialog(
 @Composable
 fun BottomBar(selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
     val items = listOf(
-        "dashboard" to ("হোম" to Icons.Outlined.Home),
-        "transactions" to ("লেনদেন" to Icons.AutoMirrored.Outlined.List),
-        "shared" to ("শেয়ারড" to Icons.Outlined.Group),
-        "tools" to ("টুলস" to Icons.Outlined.Work)
+        "dashboard" to (tr("হোম", "Home") to Icons.Outlined.Home),
+        "transactions" to (tr("লেনদেন", "Transactions") to Icons.AutoMirrored.Outlined.List),
+        "shared" to (tr("শেয়ারড", "Shared") to Icons.Outlined.Group),
+        "tools" to (tr("টুলস", "Tools") to Icons.Outlined.Work)
     )
     val barShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     Box(Modifier.fillMaxWidth().height(100.dp)) {

@@ -5,9 +5,9 @@ import java.util.Locale
 
 /** Money in taka. Privacy mode masks the amount, like the web app. */
 fun taka(value: Double, privacy: Boolean = false): String {
-    if (privacy) return "৳ ••••"
+    if (privacy) return AppPrefs.symbol + " ••••"
     val whole = value % 1.0 == 0.0
-    return "৳ " + String.format(Locale.US, if (whole) "%,.0f" else "%,.2f", value)
+    return AppPrefs.symbol + " " + String.format(Locale.US, if (whole) "%,.0f" else "%,.2f", value)
 }
 
 /** 2 instead of 2.0 for whole numbers. */
@@ -21,7 +21,8 @@ data class Cat(val name: String, val icon: String)
 val EXPENSE_CATS = listOf(Cat("খাদ্য", "🍔"), Cat("যাতায়াত", "🚗"), Cat("শপিং", "🛍️"), Cat("বিল", "📜"), Cat("অন্যান্য", "📦"))
 val INCOME_CATS = listOf(Cat("বেতন", "💰"), Cat("অন্যান্য", "📦"))
 val ALL_CATS = (EXPENSE_CATS + INCOME_CATS).distinctBy { it.name }
-fun catIcon(name: String): String = ALL_CATS.firstOrNull { it.name == name }?.icon ?: "📦"
+fun catIcon(name: String): String =
+    (ALL_CATS + AppPrefs.customCats.map { Cat(it.name, it.icon) }).firstOrNull { it.name == name }?.icon ?: "📦"
 
 val PAYMENT_MODES = listOf("Cash", "Card", "Bkash", "Nagad", "Rocket", "Bank")
 val MOODS = listOf("😊", "😐", "😞", "😡")
