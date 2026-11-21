@@ -182,8 +182,8 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
             Text(tr("ভাষা", "Language"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             ChoiceChips(listOf("bn" to "বাংলা", "en" to "English"), langStyle) { vm.saveProfile(row("language" to it)) }
             Text(
-                tr("ভাষা বদলালে সেটিংস ও প্রধান মেনু ইংরেজিতে দেখাবে। বাকি অ্যাপ এখনো বাংলায়।",
-                    "Language changes Settings and the main menu. The rest of the app is still in Bangla."),
+                tr("ভাষা বদলালে সেটিংস, প্রধান মেনু, হোম, লেনদেন, শেয়ার ও টুলস স্ক্রিন ইংরেজিতে দেখাবে। বাকি স্ক্রিন এখনো বাংলায়।",
+                    "Language changes Settings, the main menu, Home, Transactions, Shared and Tools. Other screens are still in Bangla."),
                 fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 

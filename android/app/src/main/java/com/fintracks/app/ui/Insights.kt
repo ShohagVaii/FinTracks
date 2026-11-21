@@ -176,7 +176,7 @@ fun HeatmapCard(txs: List<JsonObject>, privacy: Boolean, ym: YearMonth, onPrev: 
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("এক্সপেন্স হিটম্যাপ", fontWeight = FontWeight.Bold)
                 Text(
-                    "${BN_MONTHS[ym.monthValue - 1]} ${bnDigits(ym.year.toString())}",
+                    monthYearLabel(ym.year, ym.monthValue),
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -249,7 +249,7 @@ fun ExpenseTrendCard(txs: List<JsonObject>, privacy: Boolean) {
             val ym = YearMonth.from(today).minusMonths(k.toLong())
             TrendBucket(
                 short = bnDigits(ym.monthValue.toString()),
-                full = "${BN_MONTHS[ym.monthValue - 1]} ${bnDigits(ym.year.toString())}",
+                full = monthYearLabel(ym.year, ym.monthValue),
                 total = byMonth[ym.toString()] ?: 0.0
             )
         }

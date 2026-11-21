@@ -50,7 +50,7 @@ object Export {
     private fun rows(state: UiState, txs: List<JsonObject>): List<List<Any>> =
         txs.sortedBy { dateOf(it, "tx_date") }.map { t ->
             listOf(
-                dateOf(t, "tx_date"), typeBn(t.str("type")), t.str("category"), t.num("amount"),
+                displayDate(dateOf(t, "tx_date")), typeBn(t.str("type")), t.str("category"), t.num("amount"),
                 t.str("payment_mode"), accountName(state, t), t.str("note")
             )
         }
@@ -188,7 +188,8 @@ object Export {
         }
 
         c.drawText("FinTrack লেনদেনের প্রতিবেদন", 40f, y, h1); y += 20f
-        c.drawText(bn("${title} · তৈরি: ${todayIso()} · মোট ${txs.size} টি লেনদেন"), 40f, y, small); y += 28f
+        // The title already carries the formatted period; the creation date follows the date setting.
+        c.drawText("$title · তৈরি: ${displayDate(todayIso())} · মোট ${bn(txs.size.toString())} টি লেনদেন", 40f, y, small); y += 28f
 
         // Summary boxes
         val boxes = listOf(
@@ -227,7 +228,7 @@ object Export {
                 c.drawRect(RectF(40f, y - 13f, 555f, y + 5f), stripe)
             }
             val amountColor = when (t.str("type")) { "Income" -> "#059669"; "Expense" -> "#E11D48"; else -> "#0284C7" }
-            c.drawText(bn(dateOf(t, "tx_date")), colX[0] + 4f, y, body)
+            c.drawText(displayDate(dateOf(t, "tx_date")), colX[0] + 4f, y, body)
             c.drawText(typeBn(t.str("type")), colX[1], y, body)
             c.drawText(t.str("category").take(14), colX[2], y, body)
             c.drawText(t.str("payment_mode"), colX[3], y, body)

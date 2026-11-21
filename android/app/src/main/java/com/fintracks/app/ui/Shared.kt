@@ -53,7 +53,7 @@ fun SharedScreen(state: UiState, vm: AppViewModel) {
     var section by remember { mutableStateOf("bill") }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            ChoiceChips(listOf("bill" to "বিল স্প্লিটার", "mess" to "মেস ম্যানেজার", "shop" to "শপিং লিস্ট"), section) { section = it }
+            ChoiceChips(listOf("bill" to tr("বিল স্প্লিটার", "Bill splitter"), "mess" to tr("মেস ম্যানেজার", "Mess manager"), "shop" to tr("শপিং লিস্ট", "Shopping list")), section) { section = it }
         }
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -130,7 +130,7 @@ private fun BillSplitSection(state: UiState, vm: AppViewModel) {
     unsettled.forEach { b -> billNet(b).forEach { (k, v) -> overall[k] = (overall[k] ?: 0.0) + v } }
     val overallPayouts = settle(overall)
 
-    AddButton("নতুন বিল") { adding = true }
+    AddButton(tr("নতুন বিল", "New bill")) { adding = true }
     if (unsettled.isNotEmpty()) {
         AppCard {
             Text("অমীমাংসিত বিল: সব মিলিয়ে", fontWeight = FontWeight.Bold)
@@ -288,7 +288,7 @@ private fun ShoppingSection(state: UiState, vm: AppViewModel) {
     val diff = budgetTotal - spent
 
     AppCard {
-        Text("নতুন জিনিসের তালিকা", fontWeight = FontWeight.Bold)
+        Text(tr("নতুন জিনিসের তালিকা", "New shopping list"), fontWeight = FontWeight.Bold)
         TextIn("আইটেমের নাম", name, { name = it })
         TextIn("আনুমানিক বাজেট (৳)", budget, { budget = it }, number = true)
         Button(
@@ -302,7 +302,7 @@ private fun ShoppingSection(state: UiState, vm: AppViewModel) {
         ) { Text("যোগ করুন") }
     }
     AppCard {
-        Text("বাজেট বনাম খরচ", fontWeight = FontWeight.Bold)
+        Text(tr("বাজেট বনাম খরচ", "Budget vs spending"), fontWeight = FontWeight.Bold)
         KeyValue("মোট বাজেট", taka(budgetTotal, p))
         KeyValue("মোট খরচ (কেনা আইটেম)", taka(spent, p))
         KeyValue(
@@ -430,7 +430,7 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
         modifier = Modifier.fillMaxWidth().height(52.dp)
     ) { Text("মিল এন্ট্রি", fontWeight = FontWeight.Bold) }
 
-    SectionTitle("সদস্য ও হিসাব")
+    SectionTitle(tr("সদস্য ও হিসাব", "Members & accounts"))
     if (members.isEmpty()) EmptyHint("কোনো সদস্য নেই। উপরে '+ সদস্য' দিয়ে যোগ করুন।")
     members.forEach { m ->
         val paid = bazaars.filter { it.str("member_id") == m.id() }.sumOf { it.num("amount") }
@@ -458,7 +458,7 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
         }
     }
 
-    SectionTitle("হিসাব নিষ্পত্তি (সেটল-আপ)")
+    SectionTitle(tr("হিসাব নিষ্পত্তি (সেটল-আপ)", "Settle up"))
     AppCard {
         when {
             members.isEmpty() -> Text("সদস্য যোগ করলে এখানে কে কাকে কত দেবে তা দেখাবে।", fontSize = 13.sp)
@@ -469,7 +469,7 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
         }
     }
 
-    SectionTitle("জমার হিসাব")
+    SectionTitle(tr("জমার হিসাব", "Deposits"))
     if (deposits.isEmpty()) EmptyHint("এই মাসে কোনো জমা এন্ট্রি নেই")
     deposits.sortedByDescending { dateOf(it, "deposit_date") }.forEach { d ->
         AppCard {
@@ -488,7 +488,7 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
         }
     }
 
-    SectionTitle("বাজারের হিসাব")
+    SectionTitle(tr("বাজারের হিসাব", "Bazaar"))
     if (bazaars.isEmpty()) EmptyHint("এই মাসে কোনো বাজার এন্ট্রি নেই")
     bazaars.sortedByDescending { dateOf(it, "bazaar_date") }.forEach { b ->
         AppCard {
@@ -503,7 +503,7 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
         }
     }
 
-    SectionTitle("মিলের হিসাব")
+    SectionTitle(tr("মিলের হিসাব", "Meals"))
     if (meals.isEmpty()) EmptyHint("এই মাসে কোনো মিল নেই")
     meals.sortedByDescending { dateOf(it, "meal_date") }.forEach { m ->
         AppCard {

@@ -182,12 +182,15 @@ object Voucher {
 
     // ---------------- Dates and money ----------------
 
-    fun bnDate(iso: String): String = runCatching { LocalDate.parse(iso) }.map { d ->
-        "${Export.bn(d.dayOfMonth.toString())} ${MONTHS[d.monthValue - 1]} ${Export.bn(d.year.toString())}"
-    }.getOrDefault(iso)
+    /** Same date setting as the app screens and exports (see displayDate). */
+    fun bnDate(iso: String): String = displayDate(iso)
 
     private fun shortDate(iso: String): String = runCatching { LocalDate.parse(iso) }.map { d ->
-        "${Export.bn(d.dayOfMonth.toString())} ${MONTHS[d.monthValue - 1].take(3)}"
+        if (AppPrefs.dateBn) {
+            "${Export.bn(d.dayOfMonth.toString())} ${MONTHS[d.monthValue - 1].take(3)}"
+        } else {
+            "${d.dayOfMonth} ${d.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH)}"
+        }
     }.getOrDefault(iso)
 
     /** Issue time, e.g. "২১ নভেম্বর ২০২৬ · ৩:১০ AM" (Bengali digits, 12-hour clock, device time zone). */

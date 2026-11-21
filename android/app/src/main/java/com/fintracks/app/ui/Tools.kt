@@ -87,6 +87,27 @@ fun fmtMoney(v: Double): String = AppPrefs.symbol + " " + String.format(Locale.U
 /** One tile in the Tools grid. */
 private data class ToolTile(val overlay: Overlay, val label: String, val icon: ImageVector, val color: Color)
 
+/** English tile names, keyed by the Bengali label. Unknown labels fall back to themselves. */
+private fun toolEnglishName(bn: String): String = when (bn) {
+    "AI সহকারী" -> "AI assistant"
+    "রিপোর্ট" -> "Reports"
+    "লোন" -> "Loan"
+    "যাকাত" -> "Zakat"
+    "ধার ও পাওনা" -> "Debts & dues"
+    "সম্পদ" -> "Assets"
+    "ট্যাক্স" -> "Tax"
+    "কনভার্টার" -> "Converter"
+    "সাবস্ক্রিপশন" -> "Subscriptions"
+    "বাকি খাতা" -> "Credit ledger"
+    "বাজেট" -> "Budget"
+    "লক্ষ্য" -> "Goals"
+    "অ্যাকাউন্ট" -> "Accounts"
+    "টাকা গণক" -> "Money counter"
+    "বয়স ক্যালকুলেটর" -> "Age calculator"
+    "নোটপ্যাড" -> "Notepad"
+    else -> bn
+}
+
 @Composable
 fun ToolsScreen(onOpen: (Overlay) -> Unit) {
     // Each tool has its own colour, like the web app's tool grid.
@@ -133,7 +154,7 @@ fun ToolsScreen(onOpen: (Overlay) -> Unit) {
                             Icon(tile.icon, contentDescription = tile.label, tint = tile.color, modifier = Modifier.size(24.dp))
                         }
                         Spacer(Modifier.height(8.dp))
-                        Text(tile.label, fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text(tr(tile.label, toolEnglishName(tile.label)), fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
                 repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }

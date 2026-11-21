@@ -175,7 +175,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             NavSquare(Icons.Default.ChevronLeft, enabled = true) { offset -= 1 }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(period.label, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("টাইমলাইন ভিউ", fontSize = 11.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr("টাইমলাইন ভিউ", "Timeline view"), fontSize = 11.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             NavSquare(Icons.Default.ChevronRight, enabled = offset < 0) { offset += 1 }
         }
@@ -190,18 +190,18 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
-                    Text("নিট লাভ (PROFIT)", fontSize = 12.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(tr("নিট লাভ (PROFIT)", "Net profit (PROFIT)"), fontSize = 12.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(taka(net, p), fontSize = 36.sp, fontWeight = FontWeight.Black, color = if (net >= 0) incomeGreen else expenseRed)
                 }
                 Box(Modifier.size(64.dp).clip(CircleShape).background(incomeGreen.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.TrendingUp, contentDescription = null, tint = incomeGreen, modifier = Modifier.size(30.dp))
                 }
             }
-            if (income > 0) Text("সঞ্চয়ের হার: ${"%.0f".format(savingsRate)}%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+            if (income > 0) Text(tr("সঞ্চয়ের হার", "Savings rate") + ": ${"%.0f".format(savingsRate)}%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatPill("মোট আয়", taka(income, p), incomeGreen, Modifier.weight(1f))
-            StatPill("মোট ব্যয়", taka(expense, p), expenseRed, Modifier.weight(1f))
+            StatPill(tr("মোট আয়", "Total income"), taka(income, p), incomeGreen, Modifier.weight(1f))
+            StatPill(tr("মোট ব্যয়", "Total expense"), taka(expense, p), expenseRed, Modifier.weight(1f))
         }
         // Wallet card — all-time balance.
         Row(
@@ -215,7 +215,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
-                Text("অবশিষ্ট ব্যালেন্স (ALL TIME)", fontSize = 11.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr("অবশিষ্ট ব্যালেন্স (ALL TIME)", "Balance (all time)"), fontSize = 11.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(taka(total, p), fontSize = 26.sp, fontWeight = FontWeight.Bold)
             }
             Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Sky400.copy(alpha = 0.6f), modifier = Modifier.size(32.dp))
@@ -228,21 +228,21 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
         SmsParserCard(state, vm)
 
         if (state.pendingSms.isNotEmpty()) {
-            SectionTitle("SMS থেকে নতুন লেনদেন")
+            SectionTitle(tr("SMS থেকে নতুন লেনদেন", "New transactions from SMS"))
             state.pendingSms.take(3).forEach { s ->
                 AppCard(borderColor = Sky400.copy(alpha = 0.4f)) {
                     Text("${s.provider} · ${s.type} · ${taka(s.amount, p)}", fontWeight = FontWeight.Bold)
                     Text(s.raw, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { vm.acceptSms(s) }) { Text("যোগ করুন") }
-                        OutlinedButton(onClick = { vm.dismissSms(s) }) { Text("বাতিল") }
+                        Button(onClick = { vm.acceptSms(s) }) { Text(tr("যোগ করুন", "Add")) }
+                        OutlinedButton(onClick = { vm.dismissSms(s) }) { Text(tr("বাতিল", "Cancel")) }
                     }
                 }
             }
         }
 
         if (accounts.isNotEmpty()) {
-            SectionTitle("অ্যাকাউন্ট")
+            SectionTitle(tr("অ্যাকাউন্ট", "Accounts"))
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 accounts.forEach { acc ->
                     AppCard(onClick = { openOverlay(Overlay.ACCOUNTS) }) {
@@ -254,10 +254,10 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             }
         }
 
-        SectionTitle("এই মাসের বাজেট")
+        SectionTitle(tr("এই মাসের বাজেট", "This month's budget"))
         val budgets = state.rows("budgets")
         if (budgets.isEmpty()) {
-            AppCard(onClick = { openOverlay(Overlay.BUDGETS) }) { Text("বাজেট সেট করতে ট্যাপ করুন", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            AppCard(onClick = { openOverlay(Overlay.BUDGETS) }) { Text(tr("বাজেট সেট করতে ট্যাপ করুন", "Tap to set a budget"), color = MaterialTheme.colorScheme.onSurfaceVariant) }
         } else {
             AppCard {
                 budgets.forEach { b ->
@@ -275,7 +275,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             }
         }
 
-        SectionTitle("খরচের ট্রেন্ড (এই মাস)")
+        SectionTitle(tr("খরচের ট্রেন্ড (এই মাস)", "Expense trend (this month)"))
         AppCard {
             val days = (1..31).map { d ->
                 val key = month + "-" + d.toString().padStart(2, '0')
@@ -284,8 +284,8 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             LineChart(days.take(maxOf(1, lastIndexWithData(days) + 1)), expenseRed)
         }
 
-        SectionTitle("সাম্প্রতিক লেনদেন")
-        if (txs.isEmpty()) EmptyHint("এখনো কোনো লেনদেন নেই। নিচের + বাটন দিয়ে যোগ করুন।")
+        SectionTitle(tr("সাম্প্রতিক লেনদেন", "Recent transactions"))
+        if (txs.isEmpty()) EmptyHint(tr("এখনো কোনো লেনদেন নেই। নিচের + বাটন দিয়ে যোগ করুন।", "No transactions yet. Add one with the + button below."))
         txs.take(5).forEach { t -> TxItem(t, state, onClick = { openReceipt(t) }, onDelete = null, onLongClick = { onTxLongPress(t) }) }
         Spacer(Modifier.height(90.dp))
     }
@@ -344,16 +344,16 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
     val expense = inRange.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        ChoiceChips(listOf("history" to "লেনদেনের ইতিহাস", "auto" to "অটো-লেনদেন"), segment) { segment = it }
-        OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text("খুঁজুন (নোট / ক্যাটাগরি / #ট্যাগ)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        ChoiceChips(listOf("history" to tr("লেনদেনের ইতিহাস", "History"), "auto" to tr("অটো-লেনদেন", "Auto-created")), segment) { segment = it }
+        OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text(tr("খুঁজুন (নোট / ক্যাটাগরি / #ট্যাগ)", "Search (note / category / #tag)")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
         PeriodPicker(period, customFrom, customTo, onPeriod = { period = it }, onFrom = { customFrom = it }, onTo = { customTo = it })
-        ChoiceChips(listOf("all" to "সব", "income" to "আয়", "expense" to "ব্যয়", "transfer" to "ট্রান্সফার"), filter) { filter = it }
-        ChoiceChips(listOf("" to "সব মাধ্যম") + PAYMENT_MODES.map { it to it }, modeFilter) { modeFilter = it }
+        ChoiceChips(listOf("all" to tr("সব", "All"), "income" to tr("আয়", "Income"), "expense" to tr("ব্যয়", "Expense"), "transfer" to tr("ট্রান্সফার", "Transfer")), filter) { filter = it }
+        ChoiceChips(listOf("" to tr("সব মাধ্যম", "All modes")) + PAYMENT_MODES.map { it to it }, modeFilter) { modeFilter = it }
         Text(range.label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatPill("আয়", taka(income, state.privacy), incomeGreen, Modifier.weight(1f))
-            StatPill("ব্যয়", taka(expense, state.privacy), expenseRed, Modifier.weight(1f))
-            StatPill("নিট", taka(income - expense, state.privacy), Sky400, Modifier.weight(1f))
+            StatPill(tr("আয়", "Income"), taka(income, state.privacy), incomeGreen, Modifier.weight(1f))
+            StatPill(tr("ব্যয়", "Expense"), taka(expense, state.privacy), expenseRed, Modifier.weight(1f))
+            StatPill(tr("নিট", "Net"), taka(income - expense, state.privacy), Sky400, Modifier.weight(1f))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf(Export.Format.XLSX to "Excel", Export.Format.PDF to "PDF", Export.Format.CSV to "CSV").forEach { (fmt, label) ->
@@ -380,9 +380,9 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                         Toast.makeText(ctx, "ভাউচার ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
                     } finally { busy = false }
                 }
-            }) { Text("ভাউচার", maxLines = 1, softWrap = false, fontSize = 13.sp) }
+            }) { Text(tr("ভাউচার", "Voucher"), maxLines = 1, softWrap = false, fontSize = 13.sp) }
         }
-        if (filtered.isEmpty()) EmptyHint("এই সময়সীমায় কোনো লেনদেন পাওয়া যায়নি")
+        if (filtered.isEmpty()) EmptyHint(tr("এই সময়সীমায় কোনো লেনদেন পাওয়া যায়নি", "No transactions found in this period"))
         // weight() keeps the list inside the remaining height; the bottom padding keeps the last row above the nav bar and the + button.
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f), contentPadding = PaddingValues(bottom = 120.dp)) {
             items(filtered, key = { it.id() }) { t ->
@@ -682,7 +682,11 @@ internal fun StatPill(label: String, value: String, color: Color, modifier: Modi
     }
 }
 
-enum class HomeSpan(val label: String) { DAY("দৈনিক"), MONTH("মাসিক"), YEAR("বাৎসরিক") }
+enum class HomeSpan(private val bnLabel: String, private val enLabel: String) {
+    DAY("দৈনিক", "Daily"), MONTH("মাসিক", "Monthly"), YEAR("বাৎসরিক", "Yearly");
+
+    val label: String get() = tr(bnLabel, enLabel)
+}
 
 internal val BN_MONTHS = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
 
@@ -697,16 +701,16 @@ fun homePeriod(span: HomeSpan, offset: Int): HomePeriod {
     return when (span) {
         HomeSpan.DAY -> {
             val d = today.plusDays(offset.toLong())
-            HomePeriod(d.toString(), d.toString(), "${bnDigits(d.dayOfMonth.toString())} ${BN_MONTHS[d.monthValue - 1]} ${bnDigits(d.year.toString())}")
+            HomePeriod(d.toString(), d.toString(), displayDate(d.toString()))
         }
         HomeSpan.MONTH -> {
             val f = today.withDayOfMonth(1).plusMonths(offset.toLong())
             val l = f.withDayOfMonth(f.lengthOfMonth())
-            HomePeriod(f.toString(), l.toString(), "${BN_MONTHS[f.monthValue - 1]} ${bnDigits(f.year.toString())}")
+            HomePeriod(f.toString(), l.toString(), monthYearLabel(f.year, f.monthValue))
         }
         HomeSpan.YEAR -> {
             val y = today.year + offset
-            HomePeriod("$y-01-01", "$y-12-31", bnDigits(y.toString()))
+            HomePeriod("$y-01-01", "$y-12-31", yearLabel(y))
         }
     }
 }

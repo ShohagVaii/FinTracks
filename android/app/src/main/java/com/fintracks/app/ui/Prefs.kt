@@ -13,7 +13,8 @@ import java.util.Locale
 object AppPrefs {
     @Volatile var symbol: String = "৳"
     @Volatile var english: Boolean = false
-    @Volatile var dateBn: Boolean = true
+    /** Default matches the profile default date_format 'DD-MM-YYYY' (English). */
+    @Volatile var dateBn: Boolean = false
     @Volatile var accent: AccentColor = AccentColor.SKY
     @Volatile var customCats: List<CustomCat> = emptyList()
 
@@ -56,6 +57,17 @@ fun displayDate(iso: String): String {
     return if (AppPrefs.dateBn) {
         bnDigits("${d.dayOfMonth} ${BN_MONTHS[d.monthValue - 1]} ${d.year}")
     } else {
-        "${d.dayOfMonth} ${d.month.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)} ${d.year}"
+        String.format(Locale.ENGLISH, "%02d-%02d-%04d", d.dayOfMonth, d.monthValue, d.year)
     }
 }
+
+/** Month and year for period labels, in the chosen date style. */
+fun monthYearLabel(year: Int, month: Int): String =
+    if (AppPrefs.dateBn) {
+        "${BN_MONTHS[month - 1]} ${bnDigits(year.toString())}"
+    } else {
+        "${java.time.Month.of(month).getDisplayName(TextStyle.FULL, Locale.ENGLISH)} $year"
+    }
+
+/** Year alone, in the chosen date style. */
+fun yearLabel(year: Int): String = if (AppPrefs.dateBn) bnDigits(year.toString()) else year.toString()

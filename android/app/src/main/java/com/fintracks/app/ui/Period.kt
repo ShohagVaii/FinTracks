@@ -13,8 +13,11 @@ import kotlinx.serialization.json.JsonObject
 import java.time.LocalDate
 
 /** Date periods shared by the transaction list, reports, and exports. */
-enum class Period(val label: String) {
-    TODAY("আজ"), WEEK("সপ্তাহ"), MONTH("মাস"), YEAR("বছর"), CUSTOM("কাস্টম"), ALL("সব")
+enum class Period(private val bnLabel: String, private val enLabel: String) {
+    TODAY("আজ", "Today"), WEEK("সপ্তাহ", "Week"), MONTH("মাস", "Month"), YEAR("বছর", "Year"), CUSTOM("কাস্টম", "Custom"), ALL("সব", "All");
+
+    /** Read on every use, so a language change applies without a restart. */
+    val label: String get() = tr(bnLabel, enLabel)
 }
 
 /** A resolved date range (inclusive). Null bounds mean open-ended. */
@@ -28,16 +31,18 @@ data class DateRange(val from: LocalDate?, val to: LocalDate?, val label: String
 fun rangeFor(period: Period, customFrom: String, customTo: String): DateRange {
     val today = LocalDate.now()
     return when (period) {
-        Period.TODAY -> DateRange(today, today, "আজ (${today})")
-        Period.WEEK -> DateRange(today.minusDays(6), today, "গত ৭ দিন")
-        Period.MONTH -> DateRange(today.withDayOfMonth(1), today, "এই মাস (${today.monthValue}/${today.year})")
-        Period.YEAR -> DateRange(today.withDayOfYear(1), today, "এই বছর (${today.year})")
+        Period.TODAY -> DateRange(today, today, tr("আজ", "Today") + " (${displayDate(today.toString())})")
+        Period.WEEK -> DateRange(today.minusDays(6), today, tr("গত ৭ দিন", "Last 7 days"))
+        Period.MONTH -> DateRange(today.withDayOfMonth(1), today, tr("এই মাস", "This month") + " (${monthYearLabel(today.year, today.monthValue)})")
+        Period.YEAR -> DateRange(today.withDayOfYear(1), today, tr("এই বছর", "This year") + " (${yearLabel(today.year)})")
         Period.CUSTOM -> {
             val f = runCatching { LocalDate.parse(customFrom.trim()) }.getOrNull()
             val t = runCatching { LocalDate.parse(customTo.trim()) }.getOrNull()
-            DateRange(f, t, "কাস্টম: ${customFrom.ifBlank { "শুরু" }} থেকে ${customTo.ifBlank { "আজ" }}")
+            val fromTxt = if (customFrom.isBlank()) tr("শুরু", "start") else displayDate(customFrom)
+            val toTxt = if (customTo.isBlank()) tr("আজ", "today") else displayDate(customTo)
+            DateRange(f, t, tr("কাস্টম", "Custom") + ": $fromTxt " + tr("থেকে", "to") + " $toTxt")
         }
-        Period.ALL -> DateRange(null, null, "সব সময়")
+        Period.ALL -> DateRange(null, null, tr("সব সময়", "All time"))
     }
 }
 
