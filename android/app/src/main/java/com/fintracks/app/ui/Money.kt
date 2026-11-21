@@ -1,6 +1,7 @@
 package com.fintracks.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,19 +47,35 @@ fun Page(content: @Composable () -> Unit) {
 
 // ======================= ধার ও পাওনা =======================
 
+/** Amount already paid back on one debt (sum of its payment rows). */
+fun debtPaid(debt: JsonObject, payments: List<JsonObject>): Double =
+    payments.filter { it.str("debt_id") == debt.id() }.sumOf { it.num("amount") }
+
+/** Still owed on one debt: amount minus payments, never below zero. */
+fun debtRemaining(debt: JsonObject, payments: List<JsonObject>): Double =
+    (debt.num("amount") - debtPaid(debt, payments)).coerceAtLeast(0.0)
+
+/** Total still owed in one direction ("owe" = I owe, "owed" = owed to me), counting only unpaid parts. */
+fun debtsRemaining(state: UiState, direction: String): Double {
+    val payments = state.rows("debt_payments")
+    return state.rows("debts").filter { it.str("direction") == direction }.sumOf { debtRemaining(it, payments) }
+}
+
 @Composable
 fun DebtsScreen(state: UiState, vm: AppViewModel) {
     var adding by remember { mutableStateOf(false) }
+    var paying by remember { mutableStateOf<JsonObject?>(null) }
     val debts = state.rows("debts")
+    val payments = state.rows("debt_payments")
     val p = state.privacy
-    val owe = debts.filter { !it.bool("settled") && it.str("direction") == "owe" }.sumOf { it.num("amount") }
-    val owed = debts.filter { !it.bool("settled") && it.str("direction") == "owed" }.sumOf { it.num("amount") }
+    val owe = debtsRemaining(state, "owe")
+    val owed = debtsRemaining(state, "owed")
     Page {
         AppCard {
             KeyValue(tr("আমি ধারি", "I owe"), taka(owe, p), red)
             KeyValue(tr("আমার পাওনা", "Owed to me"), taka(owed, p), green)
         }
-        DebtPlanner(debts, p)
+        DebtPlanner(debts, payments, p)
         AddButton(tr("নতুন ধার / পাওনা", "New debt / due")) { adding = true }
         if (debts.isEmpty()) EmptyHint(tr("কোনো ধার বা পাওনা নেই", "No debts or dues"))
         debts.forEach { d ->
@@ -68,14 +85,21 @@ fun DebtsScreen(state: UiState, vm: AppViewModel) {
                         Text(d.str("person"), fontWeight = FontWeight.Bold)
                         Text(if (d.str("direction") == "owe") tr("আমি ধারি", "I owe") else tr("আমার পাওনা", "Owed to me"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Text(taka(d.num("amount"), p), fontWeight = FontWeight.Bold, color = if (d.bool("settled")) MaterialTheme.colorScheme.onSurfaceVariant else if (d.str("direction") == "owe") red else green)
+                    val left = debtRemaining(d, payments)
+                    Text(taka(left, p), fontWeight = FontWeight.Bold, color = if (left <= 0.005) MaterialTheme.colorScheme.onSurfaceVariant else if (d.str("direction") == "owe") red else green)
                 }
                 d.strOrNull("due_date")?.let { Text(tr("শেষ তারিখ", "Due") + ": ${displayDate(it)}", fontSize = 11.sp) }
                 if (d.str("note").isNotBlank()) Text(d.str("note"), fontSize = 11.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { vm.save("debts", row("settled" to !d.bool("settled")), d.id()) }) {
-                        Text(if (d.bool("settled")) tr("আবার খুলুন", "Reopen") else tr("নিষ্পত্তি", "Settle"))
+                Text(tr("মোট: ", "Total: ") + taka(d.num("amount"), p) + tr(" · পরিশোধ: ", " · Paid: ") + taka(debtPaid(d, payments), p) + tr(" · বাকি: ", " · Left: ") + taka(left, p), fontSize = 11.sp)
+                payments.filter { it.str("debt_id") == d.id() }.sortedByDescending { it.str("paid_on") }.forEach { pay ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(displayDate(pay.str("paid_on")) + (if (pay.str("note").isNotBlank()) " · ${pay.str("note")}" else ""), fontSize = 11.sp, modifier = Modifier.weight(1f))
+                        Text(taka(pay.num("amount"), p), fontSize = 11.sp)
+                        DeleteButton { vm.remove("debt_payments", pay.id()) }
                     }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(enabled = left > 0.005, onClick = { paying = d }) { Text(tr("পরিশোধ", "Pay")) }
                     DeleteButton { vm.remove("debts", d.id()) }
                 }
             }
@@ -102,6 +126,7 @@ fun DebtsScreen(state: UiState, vm: AppViewModel) {
             TextIn(tr("নোট", "Note"), note, { note = it })
         }
     }
+    paying?.let { d -> DebtPaymentDialog(d, debtRemaining(d, payments), vm) { paying = null } }
 }
 
 // ======================= বাজেট, লক্ষ্য, ইনভেস্টমেন্ট, সাবস্ক্রিপশন, অ্যাকাউন্ট =======================
@@ -277,9 +302,9 @@ fun AccountsScreen(state: UiState, vm: AppViewModel) {
 
 /** Debt payoff plan (snowball: smallest debt first). Interest-free estimate: months = cumulative debt / monthly payment. */
 @Composable
-fun DebtPlanner(debts: List<JsonObject>, privacy: Boolean) {
+fun DebtPlanner(debts: List<JsonObject>, payments: List<JsonObject>, privacy: Boolean) {
     var monthly by remember { mutableStateOf("") }
-    val owes = debts.filter { !it.bool("settled") && it.str("direction") == "owe" }.sortedBy { it.num("amount") }
+    val owes = debts.filter { it.str("direction") == "owe" && debtRemaining(it, payments) > 0.005 }.sortedBy { debtRemaining(it, payments) }
     val m = parseAmount(monthly) ?: 0.0
     AppCard {
         Text(tr("ধার পরিশোধের পরিকল্পনা (ছোট ধার আগে)", "Repayment plan (smallest debts first)"), fontWeight = FontWeight.Bold)
@@ -290,11 +315,35 @@ fun DebtPlanner(debts: List<JsonObject>, privacy: Boolean) {
             else -> {
                 var cumulative = 0.0
                 owes.forEach { d ->
-                    cumulative += d.num("amount")
-                    Text("${d.str("person")}: ${taka(d.num("amount"), privacy)} → ${ceil(cumulative / m).toInt()} মাসে শেষ", fontSize = 13.sp)
+                    val left = debtRemaining(d, payments)
+                    cumulative += left
+                    Text("${d.str("person")}: ${taka(left, privacy)} → ${ceil(cumulative / m).toInt()} মাসে শেষ", fontSize = 13.sp)
                 }
                 Text(tr("সব ধার শেষ হবে ${ceil(cumulative / m).toInt()} মাসে (সুদ ছাড়া হিসাব)", "All debts clear in ${ceil(cumulative / m).toInt()} months (no interest)"), fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
+
+/** Records a partial (or full) repayment of one ধার/পাওনা. No transaction is created. */
+@Composable
+private fun DebtPaymentDialog(debt: JsonObject, balance: Double, vm: AppViewModel, onDismiss: () -> Unit) {
+    var amount by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf(todayIso()) }
+    var note by remember { mutableStateOf("") }
+    val a = parseAmount(amount)
+    val tooMuch = a != null && a > balance + 0.005
+    val valid = a != null && a > 0 && !tooMuch && isValidIsoDate(date) && balance > 0.005
+    FormDialog(tr("পরিশোধ", "Pay"), confirmEnabled = valid, onDismiss = onDismiss, onConfirm = {
+        if (a != null) {
+            vm.recordPersonalDebtPayment(debt.id(), a, date.trim(), note.trim())
+            onDismiss()
+        }
+    }) {
+        Text(tr("বর্তমান বাকি: ", "Balance: ") + taka(balance, false), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        TextIn(tr("পরিমাণ (৳)", "Amount (৳)"), amount, { amount = it }, number = true)
+        if (tooMuch) Text(tr("বাকির বেশি টাকা দেওয়া যাবে না", "Payment cannot exceed the balance"), fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+        DateField(tr("তারিখ", "Date"), date, { date = it })
+        TextIn(tr("নোট (ঐচ্ছিক)", "Note (optional)"), note, { note = it })
     }
 }

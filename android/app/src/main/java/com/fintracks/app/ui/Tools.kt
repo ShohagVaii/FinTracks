@@ -155,7 +155,7 @@ fun ToolsScreen(onOpen: (Overlay) -> Unit) {
                             Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(tile.color.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(tile.icon, contentDescription = tile.label, tint = tile.color, modifier = Modifier.size(24.dp))
+                            Icon(tile.icon, contentDescription = tr(tile.label, toolEnglishName(tile.label)), tint = tile.color, modifier = Modifier.size(24.dp))
                         }
                         Spacer(Modifier.height(8.dp))
                         Text(tr(tile.label, toolEnglishName(tile.label)), fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurface)

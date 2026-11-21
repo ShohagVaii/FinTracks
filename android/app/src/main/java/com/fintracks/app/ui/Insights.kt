@@ -101,7 +101,7 @@ object Insights {
             txs.sumOf { if (it.str("type") == "Income") it.num("amount") else if (it.str("type") == "Expense") -it.num("amount") else 0.0 }
         } else accounts.sumOf { accountBalance(it, txs) }
         val investments = state.rows("investments").sumOf { it.num("current_value") }
-        val owe = state.rows("debts").filter { !it.bool("settled") && it.str("direction") == "owe" }.sumOf { it.num("amount") }
+        val owe = debtsRemaining(state, "owe")
         val loans = state.rows("loans").sumOf { (it.num("principal") - it.num("paid")).coerceAtLeast(0.0) }
         return cash + investments - owe - loans
     }

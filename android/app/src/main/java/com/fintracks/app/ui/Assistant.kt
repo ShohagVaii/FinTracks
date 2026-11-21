@@ -73,8 +73,8 @@ object Assistant {
                 tr("মোট বাকি আছে ${taka(due, p)}। দোকানভিত্তিক হিসাব বাকি মেনুতে দেখতে পারবেন।", "Total due is ${taka(due, p)}. You can see the shop-wise breakdown in the Due menu.")
             }
             has(q, "ধার", "পাওনা", "debt", "loan", "লোন") -> {
-                val owe = state.rows("debts").filter { !it.bool("settled") && it.str("direction") == "owe" }.sumOf { it.num("amount") }
-                val owed = state.rows("debts").filter { !it.bool("settled") && it.str("direction") == "owed" }.sumOf { it.num("amount") }
+                val owe = debtsRemaining(state, "owe")
+                val owed = debtsRemaining(state, "owed")
                 tr("আপনি ধারি ${taka(owe, p)}, আপনার পাওনা ${taka(owed, p)}।", "You owe ${taka(owe, p)}, and you are owed ${taka(owed, p)}.")
             }
             has(q, "যাকাত", "zakat") -> {
@@ -134,9 +134,8 @@ fun aiContext(state: UiState): String {
     val expense = txs.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
     val cats = txs.filter { it.str("type") == "Expense" }.groupBy { it.str("category") }
         .map { (k, v) -> k to v.sumOf { it.num("amount") } }.sortedByDescending { it.second }.take(5)
-    val debts = state.rows("debts").filter { !it.bool("settled") }
-    val owe = debts.filter { it.str("direction") == "owe" }.sumOf { it.num("amount") }
-    val owed = debts.filter { it.str("direction") == "owed" }.sumOf { it.num("amount") }
+    val owe = debtsRemaining(state, "owe")
+    val owed = debtsRemaining(state, "owed")
     return buildString {
         append("মুদ্রা: ${state.currency}. মাস: $month. মোট আয়: ${m(income)}. মোট ব্যয়: ${m(expense)}.\n")
         append("শীর্ষ ব্যয়ের ক্যাটাগরি: ")
@@ -195,7 +194,13 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
             IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close"), tint = Color.White) }
         }
         ChoiceChips(
-            listOf("এই মাসে কত খরচ?" to "এই মাসে কত খরচ?", "বাজেট কেমন?" to "বাজেট কেমন?", "পরামর্শ দিন" to "পরামর্শ দিন", "বাকি কত?" to "বাকি কত?"),
+            // Label follows the language switch; the question sent matches the language so the answer engine reads it.
+            listOf(
+                tr("এই মাসে কত খরচ?", "How much did I spend this month?") to tr("এই মাসে কত খরচ?", "How much did I spend this month?"),
+                tr("বাজেট কেমন?", "How is my budget?") to tr("বাজেট কেমন?", "How is my budget?"),
+                tr("পরামর্শ দিন", "Give me advice") to tr("পরামর্শ দিন", "Give me advice"),
+                tr("বাকি কত?", "What is due?") to tr("বাকি কত?", "What is due?")
+            ),
             ""
         ) { send(it) }
         LazyColumn(

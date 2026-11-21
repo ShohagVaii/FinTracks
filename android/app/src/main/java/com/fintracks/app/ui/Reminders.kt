@@ -37,8 +37,9 @@ object Reminders {
             val next = nextRenewal(it, today)?.toString().orEmpty()
             items += "sub-${it.id()}" to "${it.str("name")} নবায়ন: $next · ${fmtMoney(it.num("amount"))}"
         }
-        tables["debts"].orEmpty().filter { !it.bool("settled") && it.str("direction") == "owe" && inWindow(it.strOrNull("due_date")) }.forEach {
-            items += "debt-${it.id()}" to "ধার পরিশোধ: ${it.str("person")} · ${fmtMoney(it.num("amount"))}"
+        val debtPays = tables["debt_payments"].orEmpty()
+        tables["debts"].orEmpty().filter { it.str("direction") == "owe" && debtRemaining(it, debtPays) > 0.005 && inWindow(it.strOrNull("due_date")) }.forEach {
+            items += "debt-${it.id()}" to "ধার পরিশোধ: ${it.str("person")} · ${fmtMoney(debtRemaining(it, debtPays))}"
         }
         tables["credit_entries"].orEmpty().filter { inWindow(it.strOrNull("due_date")) }.forEach {
             items += "credit-${it.id()}" to "বাকি শেষ তারিখ: ${it.str("item_name")} · ${it.str("due_date").take(10)}"

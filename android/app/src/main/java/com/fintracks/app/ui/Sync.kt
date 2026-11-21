@@ -24,6 +24,9 @@ import java.util.concurrent.TimeUnit
 object Sync {
     private const val PREFS = "fintrack_sync"
 
+    /** Tables that may be missing on the server until their migration is applied. */
+    private val OPTIONAL_TABLES = setOf("debt_payments")
+
     /** Remembers when the last successful table fetch finished (shown in Settings). */
     fun markOk(ctx: Context) {
         ctx.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -35,7 +38,9 @@ object Sync {
         ctx.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong("last_ok", 0L)
 
     suspend fun fetchTables(repo: Repository): Map<String, List<JsonObject>> = coroutineScope {
-        TABLES.map { (t, q) -> async { t to repo.list(t, q) } }.awaitAll().toMap()
+        TABLES.map { (t, q) ->
+            async { t to (if (t in OPTIONAL_TABLES) runCatching { repo.list(t, q) }.getOrNull() else repo.list(t, q)) }
+        }.awaitAll().mapNotNull { (t, rows) -> rows?.let { t to it } }.toMap()
     }
 
     /**

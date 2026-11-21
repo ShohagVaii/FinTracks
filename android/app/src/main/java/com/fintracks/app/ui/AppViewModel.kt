@@ -33,6 +33,7 @@ val TABLES: List<Pair<String, String>> = listOf(
     "budgets" to "select=*",
     "goals" to "select=*",
     "debts" to "select=*&order=settled.asc",
+    "debt_payments" to "select=*&order=paid_on.desc",
     "loans" to "select=*",
     "subscriptions" to "select=*",
     "investments" to "select=*",
@@ -59,14 +60,14 @@ data class GoalCelebration(val goalName: String, val percent: Int, val saved: Do
 
 private val UNDO_BN = mapOf(
     "transactions" to "লেনদেন", "accounts" to "অ্যাকাউন্ট", "budgets" to "বাজেট", "goals" to "লক্ষ্য",
-    "debts" to "ধার", "loans" to "লোন", "subscriptions" to "সাবস্ক্রিপশন", "investments" to "বিনিয়োগ",
+    "debts" to "ধার", "debt_payments" to "ধার পরিশোধ", "loans" to "লোন", "subscriptions" to "সাবস্ক্রিপশন", "investments" to "বিনিয়োগ",
     "credit_entries" to "কেনা", "credit_payments" to "পরিশোধ", "shopping_items" to "শপিং আইটেম",
     "bill_splits" to "বিল ভাগ", "mess_bazaars" to "বাজার", "mess_meals" to "মিল", "mess_deposits" to "জমা",
     "categories" to "ক্যাটাগরি", "cash_counts" to "গণনা"
 )
 private val UNDO_EN = mapOf(
     "transactions" to "transaction", "accounts" to "account", "budgets" to "budget", "goals" to "goal",
-    "debts" to "debt", "loans" to "loan", "subscriptions" to "subscription", "investments" to "investment",
+    "debts" to "debt", "debt_payments" to "debt payment", "loans" to "loan", "subscriptions" to "subscription", "investments" to "investment",
     "credit_entries" to "purchase", "credit_payments" to "payment", "shopping_items" to "shopping item",
     "bill_splits" to "bill split", "mess_bazaars" to "bazaar", "mess_meals" to "meal", "mess_deposits" to "deposit",
     "categories" to "category", "cash_counts" to "count"
@@ -126,7 +127,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** After a write: refetch the 16 tables only. Full sync (recurring, reminders, widget) runs on login and daily. */
     private suspend fun refreshTables() {
-        val tables = Sync.fetchTables(repo)
+        val fetched = Sync.fetchTables(repo)
+        // debt_payments is optional until its migration is applied; keep the last known rows if it could not be read.
+        val tables = if ("debt_payments" in fetched) fetched else fetched + ("debt_payments" to state.value.rows("debt_payments"))
         Sync.markOk(getApplication<Application>())
         _state.update { it.copy(tables = tables) }
         syncRegistry(state.value.profile, tables["transactions"].orEmpty())
@@ -327,6 +330,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     null
                 )
             )
+        )
+    }
+
+    /** Records a partial or full repayment of a personal debt (ধার/পাওনা). Creates no transaction. */
+    fun recordPersonalDebtPayment(debtId: String, amount: Double, date: String, note: String) {
+        save(
+            "debt_payments",
+            row("id" to java.util.UUID.randomUUID().toString(), "debt_id" to debtId, "amount" to amount, "paid_on" to date, "note" to note),
+            null
         )
     }
 
