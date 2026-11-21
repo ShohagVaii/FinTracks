@@ -79,13 +79,13 @@ fun DebtsScreen(state: UiState, vm: AppViewModel) {
         AddButton(tr("নতুন ধার / পাওনা", "New debt / due")) { adding = true }
         if (debts.isEmpty()) EmptyHint(tr("কোনো ধার বা পাওনা নেই", "No debts or dues"))
         debts.forEach { d ->
+            val left = debtRemaining(d, payments)
             AppCard {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text(d.str("person"), fontWeight = FontWeight.Bold)
                         Text(if (d.str("direction") == "owe") tr("আমি ধারি", "I owe") else tr("আমার পাওনা", "Owed to me"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    val left = debtRemaining(d, payments)
                     Text(taka(left, p), fontWeight = FontWeight.Bold, color = if (left <= 0.005) MaterialTheme.colorScheme.onSurfaceVariant else if (d.str("direction") == "owe") red else green)
                 }
                 d.strOrNull("due_date")?.let { Text(tr("শেষ তারিখ", "Due") + ": ${displayDate(it)}", fontSize = 11.sp) }
