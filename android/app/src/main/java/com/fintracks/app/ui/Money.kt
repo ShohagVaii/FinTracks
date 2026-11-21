@@ -162,13 +162,35 @@ fun InvestmentsScreen(state: UiState, vm: AppViewModel) {
     }
 }
 
+/** Monthly equivalent of one subscription amount (daily = 365/12 days, weekly = 52/12 weeks). */
+fun subscriptionMonthly(s: JsonObject): Double = when (s.str("frequency")) {
+    "Daily" -> s.num("amount") * 365.0 / 12.0
+    "Weekly" -> s.num("amount") * 52.0 / 12.0
+    "Yearly" -> s.num("amount") / 12.0
+    else -> s.num("amount")
+}
+
+/** The first renewal on or after [today], stepping forward from the stored renewal date. Null if no valid date. */
+fun nextRenewal(s: JsonObject, today: java.time.LocalDate): java.time.LocalDate? {
+    val base = runCatching { java.time.LocalDate.parse(s.str("renewal_date").take(10)) }.getOrNull() ?: return null
+    val step: (Long) -> java.time.LocalDate = when (s.str("frequency")) {
+        "Daily" -> { n -> base.plusDays(n) }
+        "Weekly" -> { n -> base.plusWeeks(n) }
+        "Yearly" -> { n -> base.plusYears(n) }
+        else -> { n -> base.plusMonths(n) }
+    }
+    var n = 0L
+    var d = base
+    while (d.isBefore(today) && n < 100_000L) { n++; d = step(n) }
+    return d
+}
+
 @Composable
 fun SubscriptionsScreen(state: UiState, vm: AppViewModel) {
     var adding by remember { mutableStateOf(false) }
     val subs = state.rows("subscriptions")
-    val monthly = subs.filter { it.bool("is_active") }.sumOf {
-        when (it.str("frequency")) { "Daily" -> it.num("amount") * 30; "Weekly" -> it.num("amount") * 4.3; "Yearly" -> it.num("amount") / 12; else -> it.num("amount") }
-    }
+    val monthly = subs.filter { it.bool("is_active") }.sumOf { subscriptionMonthly(it) }
+    val today = java.time.LocalDate.now()
     Page {
         AppCard { KeyValue(tr("মাসিক আনুমানিক খরচ", "Estimated monthly cost"), taka(monthly, state.privacy), red) }
         AddButton(tr("নতুন সাবস্ক্রিপশন", "New subscription")) { adding = true }
@@ -178,7 +200,7 @@ fun SubscriptionsScreen(state: UiState, vm: AppViewModel) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text(s.str("name"), fontWeight = FontWeight.Bold)
-                        Text("${s.str("frequency")} · ${displayDate(s.str("renewal_date")).ifEmpty { "-" }}", fontSize = 11.sp)
+                        Text("${s.str("frequency")} · ${nextRenewal(s, today)?.let { displayDate(it.toString()) } ?: "-"}", fontSize = 11.sp)
                     }
                     Text(taka(s.num("amount"), state.privacy), fontWeight = FontWeight.Bold)
                 }

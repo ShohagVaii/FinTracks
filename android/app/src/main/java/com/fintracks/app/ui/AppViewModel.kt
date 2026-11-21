@@ -51,19 +51,27 @@ val TABLES: List<Pair<String, String>> = listOf(
 
 /** The last deleted row, kept for a few seconds so the user can undo. */
 data class UndoEntry(val table: String, val row: JsonObject, val token: Long) {
-    val label: String get() = UNDO_LABELS[table] ?: "আইটেম"
+    val label: String get() = undoLabel(table)
 }
 
 /** Shown once when a goal crosses 25 / 50 / 75 / 100 %. */
 data class GoalCelebration(val goalName: String, val percent: Int, val saved: Double, val target: Double)
 
-val UNDO_LABELS = mapOf(
+private val UNDO_BN = mapOf(
     "transactions" to "লেনদেন", "accounts" to "অ্যাকাউন্ট", "budgets" to "বাজেট", "goals" to "লক্ষ্য",
     "debts" to "ধার", "loans" to "লোন", "subscriptions" to "সাবস্ক্রিপশন", "investments" to "বিনিয়োগ",
-    "credit_entries" to "কেনা", "credit_payments" to tr("পরিশোধ", "Pay"), "shopping_items" to "শপিং আইটেম",
-    "bill_splits" to "বিল ভাগ", "mess_bazaars" to "বাজার", "mess_meals" to tr("মিল", "Meals"), "mess_deposits" to "জমা",
-    "categories" to tr("ক্যাটাগরি", "Category"), "cash_counts" to "গণনা"
+    "credit_entries" to "কেনা", "credit_payments" to "পরিশোধ", "shopping_items" to "শপিং আইটেম",
+    "bill_splits" to "বিল ভাগ", "mess_bazaars" to "বাজার", "mess_meals" to "মিল", "mess_deposits" to "জমা",
+    "categories" to "ক্যাটাগরি", "cash_counts" to "গণনা"
 )
+private val UNDO_EN = mapOf(
+    "transactions" to "transaction", "accounts" to "account", "budgets" to "budget", "goals" to "goal",
+    "debts" to "debt", "loans" to "loan", "subscriptions" to "subscription", "investments" to "investment",
+    "credit_entries" to "purchase", "credit_payments" to "payment", "shopping_items" to "shopping item",
+    "bill_splits" to "bill split", "mess_bazaars" to "bazaar", "mess_meals" to "meal", "mess_deposits" to "deposit",
+    "categories" to "category", "cash_counts" to "count"
+)
+fun undoLabel(table: String): String = tr(UNDO_BN[table] ?: "আইটেম", UNDO_EN[table] ?: "item")
 
 data class UiState(
     val checking: Boolean = true,
@@ -188,22 +196,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 val text = e.message.orEmpty()
                 val friendly = when {
-                    text.contains("Invalid login", ignoreCase = true) -> "ইমেইল বা পাসওয়ার্ড ভুল"
-                    text.contains("already registered", ignoreCase = true) -> "এই ইমেইল দিয়ে আগে অ্যাকাউন্ট খোলা হয়েছে"
-                    text.contains("Email not confirmed", ignoreCase = true) -> "ইমেইলে পাঠানো লিংকে ক্লিক করে অ্যাকাউন্ট কনফার্ম করুন"
-                    text.contains("profiles_username", ignoreCase = true) -> "এই ইউজারনেম আগে থেকে অন্য কেউ নিয়েছে"
-                    text.contains("duplicate key", ignoreCase = true) -> "এই নামে আগে থেকেই একটি আছে"
-                    text.contains("profiles_username_check", ignoreCase = true) || text.contains("username", ignoreCase = true) && text.contains("check", ignoreCase = true) -> "ইউজারনেম ৩–২০ অক্ষর হতে হবে: শুধু ইংরেজি ছোট হাতের অক্ষর, সংখ্যা ও _"
+                    text.contains("Invalid login", ignoreCase = true) -> tr("ইমেইল বা পাসওয়ার্ড ভুল", "Wrong email or password")
+                    text.contains("already registered", ignoreCase = true) -> tr("এই ইমেইল দিয়ে আগে অ্যাকাউন্ট খোলা হয়েছে", "An account already exists with this email")
+                    text.contains("Email not confirmed", ignoreCase = true) -> tr("ইমেইলে পাঠানো লিংকে ক্লিক করে অ্যাকাউন্ট কনফার্ম করুন", "Confirm your account using the link sent to your email")
+                    text.contains("profiles_username", ignoreCase = true) -> tr("এই ইউজারনেম আগে থেকে অন্য কেউ নিয়েছে", "This username is already taken")
+                    text.contains("duplicate key", ignoreCase = true) -> tr("এই নামে আগে থেকেই একটি আছে", "One with this name already exists")
+                    text.contains("profiles_username_check", ignoreCase = true) || text.contains("username", ignoreCase = true) && text.contains("check", ignoreCase = true) -> tr("ইউজারনেম ৩–২০ অক্ষর হতে হবে: শুধু ইংরেজি ছোট হাতের অক্ষর, সংখ্যা ও _", "Username must be 3–20 characters: lowercase English letters, digits and _")
                     else -> text
                 }
                 _state.update { it.copy(message = friendly) }
             }
         } catch (e: IllegalArgumentException) {
-            _state.update { it.copy(message = e.message ?: "ভুল তথ্য") }
+            _state.update { it.copy(message = e.message ?: tr("ভুল তথ্য", "Invalid details")) }
         } catch (e: IOException) {
-            _state.update { it.copy(message = "ইন্টারনেট সংযোগ চেক করুন") }
+            _state.update { it.copy(message = tr("ইন্টারনেট সংযোগ চেক করুন", "Check your internet connection")) }
         } catch (e: Exception) {
-            _state.update { it.copy(message = "সমস্যা হয়েছে: ${e.message}") }
+            _state.update { it.copy(message = tr("সমস্যা হয়েছে: ${e.message}", "Something went wrong: ${e.message}")) }
         } finally {
             _state.update { it.copy(busy = false) }
         }
@@ -218,7 +226,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun signUp(name: String, email: String, password: String) = act {
         val hasSession = repo.signUp(email, password, name)
         if (hasSession) loadAll()
-        else _state.update { it.copy(notice = "অ্যাকাউন্ট তৈরি হয়েছে। ইমেইলের কনফার্মেশন লিংকে ক্লিক করে লগইন করুন।") }
+        else _state.update { it.copy(notice = tr("অ্যাকাউন্ট তৈরি হয়েছে। ইমেইলের কনফার্মেশন লিংকে ক্লিক করে লগইন করুন।", "Account created. Click the confirmation link in your email, then log in.")) }
     }
 
     fun signIn(email: String, password: String) = act {
@@ -234,11 +242,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Re-checks the password, deletes the account on the server, then clears every local store. */
     fun deleteAccount(password: String) = act {
         val email = repo.accountEmail()
-        if (email.isBlank()) throw IllegalStateException("ইমেইল পাওয়া যায়নি, আবার লগইন করুন")
+        if (email.isBlank()) throw IllegalStateException(tr("ইমেইল পাওয়া যায়নি, আবার লগইন করুন", "Email not found, please log in again"))
         repo.signIn(email, password)
         repo.deleteAccount()
         clearLocalData()
-        _state.value = UiState(checking = false, notice = "আপনার অ্যাকাউন্ট ও সব ডেটা স্থায়ীভাবে মুছে ফেলা হয়েছে।")
+        _state.value = UiState(checking = false, notice = tr("আপনার অ্যাকাউন্ট ও সব ডেটা স্থায়ীভাবে মুছে ফেলা হয়েছে।", "Your account and all data have been permanently deleted."))
     }
 
     /** Login email from Auth (profiles has no email column). Used by Settings and account deletion. */
@@ -252,7 +260,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val url = repo.uploadAvatar(bytes)
         repo.updateProfile(row("avatar_url" to url))
         _state.update { it.copy(profile = JsonObject(state.value.profile.orEmpty() + row("avatar_url" to url))) }
-        _state.update { it.copy(notice = "প্রোফাইল ছবি সেভ হয়েছে") }
+        _state.update { it.copy(notice = tr("প্রোফাইল ছবি সেভ হয়েছে", "Profile photo saved")) }
     }
 
     /**
@@ -272,7 +280,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val name = f.name.removeSuffix(".xml")
             if (name != "fintracks") app.deleteSharedPreferences(name)
         }
-        _state.value = UiState(checking = false, notice = "এই ফোনের সব লোকাল ডেটা মুছে ফেলা হয়েছে। সার্ভারের ডেটা অক্ষত আছে।")
+        _state.value = UiState(checking = false, notice = tr("এই ফোনের সব লোকাল ডেটা মুছে ফেলা হয়েছে। সার্ভারের ডেটা অক্ষত আছে।", "All local data on this phone has been deleted. Server data is intact."))
     }
 
     private fun clearLocalData() {
@@ -368,8 +376,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val target = goal.num("target")
         val before = goal.num("saved")
         val after = before + delta
-        if (after > target + 0.005) throw IllegalArgumentException("লক্ষ্যের বেশি জমা করা যাবে না")
-        if (after < -0.005) throw IllegalArgumentException("জমার বেশি তোলা যাবে না")
+        if (after > target + 0.005) throw IllegalArgumentException(tr("লক্ষ্যের বেশি জমা করা যাবে না", "Cannot save more than the goal"))
+        if (after < -0.005) throw IllegalArgumentException(tr("জমার বেশি তোলা যাবে না", "Cannot withdraw more than saved"))
         val newSaved = after.coerceIn(0.0, target)
         repo.update("goals", goal.id(), row("saved" to newSaved))
         refreshTables()
@@ -406,7 +414,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (rows.isNotEmpty()) repo.upsert(table, rows)
         }
         refreshTables()
-        _state.update { it.copy(notice = "ব্যাকআপ থেকে ${plan.total}টি সারি ফিরিয়ে আনা হয়েছে") }
+        _state.update { it.copy(notice = tr("ব্যাকআপ থেকে ${plan.total}টি সারি ফিরিয়ে আনা হয়েছে", "Restored ${plan.total} rows from the backup")) }
     }
 
     // ---------- SMS suggestions ----------

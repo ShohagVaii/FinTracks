@@ -151,7 +151,7 @@ fun CalculatorDialog(onUse: (Double) -> Unit, onDismiss: () -> Unit) {
                 Text(tr("ক্যালকুলেটর", "Calculator"), fontWeight = FontWeight.Bold, color = Color.White)
                 Text(if (expr.isEmpty()) "0" else expr, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.fillMaxWidth())
                 Text(
-                    live?.let { "= " + fmtNum(it) } ?: "সম্পূর্ণ বা সঠিক নয়",
+                    live?.let { "= " + fmtNum(it) } ?: tr("সম্পূর্ণ বা সঠিক নয়", "Incomplete or invalid"),
                     fontSize = 13.sp, color = Color(0xCCFFFFFF)
                 )
                 keys.forEach { row ->
@@ -171,7 +171,7 @@ fun CalculatorDialog(onUse: (Double) -> Unit, onDismiss: () -> Unit) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel"), color = Color.White) }
                     Spacer(Modifier.width(8.dp))
-                    TextButton(enabled = live != null && live > 0, onClick = { onUse(live!!) }) { Text("ব্যবহার") }
+                    TextButton(enabled = live != null && live > 0, onClick = { onUse(live!!) }) { Text(tr("ব্যবহার", "Use")) }
                 }
             }
         }

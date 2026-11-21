@@ -62,12 +62,14 @@ import com.fintracks.app.data.id
 import kotlinx.serialization.json.JsonObject
 
 /** Full-screen tools opened from the Tools tab or the header. */
-enum class Overlay(val title: String) {
-    ZAKAT("যাকাত ক্যালকুলেটর"), TAX("ট্যাক্স ক্যালকুলেটর"), CURRENCY("কারেন্সি কনভার্টার"),
-    CHAT("AI সহকারী"), LOAN("লোন / EMI"), CREDIT("বাকি খাতা"), DEBTS("ধার ও পাওনা"),
-    BUDGETS("বাজেট এনভেলপ"), GOALS("সঞ্চয় লক্ষ্য"), INVESTMENTS("ইনভেস্টমেন্ট"),
-    SUBSCRIPTIONS("সাবস্ক্রিপশন"), ACCOUNTS("অ্যাকাউন্ট ও ট্রান্সফার"), REPORTS("পরিসংখ্যান ও রিপোর্ট"), SETTINGS("সেটিংস"),
-    COUNTER("টাকা গণক"), AGE("বয়স ক্যালকুলেটর"), NOTES("নোটপ্যাড")
+enum class Overlay(private val bnTitle: String, private val enTitle: String) {
+    ZAKAT("যাকাত ক্যালকুলেটর", "Zakat calculator"), TAX("ট্যাক্স ক্যালকুলেটর", "Tax calculator"), CURRENCY("কারেন্সি কনভার্টার", "Currency converter"),
+    CHAT("AI সহকারী", "AI assistant"), LOAN("লোন / EMI", "Loan / EMI"), CREDIT("বাকি খাতা", "Credit ledger"), DEBTS("ধার ও পাওনা", "Debts & dues"),
+    BUDGETS("বাজেট এনভেলপ", "Budget envelopes"), GOALS("সঞ্চয় লক্ষ্য", "Savings goals"), INVESTMENTS("ইনভেস্টমেন্ট", "Investments"),
+    SUBSCRIPTIONS("সাবস্ক্রিপশন", "Subscriptions"), ACCOUNTS("অ্যাকাউন্ট ও ট্রান্সফার", "Accounts & transfers"), REPORTS("পরিসংখ্যান ও রিপোর্ট", "Statistics & reports"), SETTINGS("সেটিংস", "Settings"),
+    COUNTER("টাকা গণক", "Money counter"), AGE("বয়স ক্যালকুলেটর", "Age calculator"), NOTES("নোটপ্যাড", "Notepad")
+
+    val title: String get() = tr(bnTitle, enTitle)
 }
 
 @Composable
@@ -125,8 +127,8 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
             snackbar.currentSnackbarData?.dismiss()
         }
         val result = snackbar.showSnackbar(
-            message = "${u.label} মুছে ফেলা হয়েছে",
-            actionLabel = "ফেরত আনুন",
+            message = tr("${u.label} মুছে ফেলা হয়েছে", "${u.label} deleted"),
+            actionLabel = tr("ফেরত আনুন", "Restore"),
             duration = SnackbarDuration.Indefinite
         )
         timer.cancel()
@@ -224,8 +226,8 @@ private fun Header(
             Text("PREMIUM FINANCE", color = Slate400, fontSize = 9.sp, letterSpacing = 3.sp)
         }
         HeaderIcon(Icons.Default.Calculate, tr("ক্যালকুলেটর", "Calculator"), onCalc)
-        HeaderIcon(Icons.Default.WbSunny, if (dark) "লাইট থিম" else "ডার্ক থিম", onToggleTheme, tint = Amber400)
-        HeaderIcon(if (privacy) Icons.Default.VisibilityOff else Icons.Default.Visibility, "প্রাইভেসি", onTogglePrivacy)
+        HeaderIcon(Icons.Default.WbSunny, if (dark) tr("লাইট থিম", "Light theme") else tr("ডার্ক থিম", "Dark theme"), onToggleTheme, tint = Amber400)
+        HeaderIcon(if (privacy) Icons.Default.VisibilityOff else Icons.Default.Visibility, tr("প্রাইভেসি", "Privacy"), onTogglePrivacy)
         HeaderIcon(Icons.Default.Settings, tr("সেটিংস", "Settings"), onSettings)
     }
 }

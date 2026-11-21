@@ -624,7 +624,7 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
 private fun MonthNav(ym: YearMonth, onChange: (YearMonth) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
         IconButton(onClick = { onChange(ym.minusMonths(1)) }) { Icon(Icons.Default.ChevronLeft, contentDescription = tr("আগের মাস", "Previous month")) }
-        Text("${BN_MONTHS[ym.monthValue - 1]} ${bnDigits(ym.year.toString())}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text(monthYearLabel(ym.year, ym.monthValue), fontWeight = FontWeight.Bold, fontSize = 16.sp)
         IconButton(onClick = { onChange(ym.plusMonths(1)) }) { Icon(Icons.Default.ChevronRight, contentDescription = tr("পরের মাস", "Next month")) }
     }
 }

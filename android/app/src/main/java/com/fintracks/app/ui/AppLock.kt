@@ -156,23 +156,23 @@ fun LockScreen(onSignOut: () -> Unit) {
             }
         }
         val builder = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("FinTrack আনলক")
-            .setSubtitle("ফিঙ্গারপ্রিন্ট বা ফেস দিয়ে আনলক করুন")
+            .setTitle(tr("FinTrack আনলক", "Unlock FinTrack"))
+            .setSubtitle(tr("ফিঙ্গারপ্রিন্ট বা ফেস দিয়ে আনলক করুন", "Unlock with fingerprint or face"))
             .setAllowedAuthenticators(auth)
         // A negative button is not allowed when device credential is enabled.
-        if (auth and BiometricManager.Authenticators.DEVICE_CREDENTIAL == 0) builder.setNegativeButtonText("PIN ব্যবহার করুন")
+        if (auth and BiometricManager.Authenticators.DEVICE_CREDENTIAL == 0) builder.setNegativeButtonText(tr("PIN ব্যবহার করুন", "Use PIN"))
         BiometricPrompt(activity, ContextCompat.getMainExecutor(activity), callback).authenticate(builder.build())
     }
 
     fun press(d: String) {
-        if (AppLock.lockoutRemaining(ctx) > 0) { error = "অনেকবার ভুল PIN। কিছুক্ষণ পর আবার চেষ্টা করুন"; return }
+        if (AppLock.lockoutRemaining(ctx) > 0) { error = tr("অনেকবার ভুল PIN। কিছুক্ষণ পর আবার চেষ্টা করুন", "Too many wrong PINs. Try again later"); return }
         if (pin.length >= 6) return
         pin += d
         if (pin.length >= 4 && AppLock.checkPin(ctx, pin)) {
             AppLock.unlock()
             pin = ""
         } else if (pin.length == 6) {
-            error = "ভুল PIN"
+            error = tr("ভুল PIN", "Wrong PIN")
             pin = ""
         }
     }
@@ -184,8 +184,8 @@ fun LockScreen(onSignOut: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("FinTrack লক করা আছে", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Text("PIN দিন", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(tr("FinTrack লক করা আছে", "FinTrack is locked"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Text(tr("PIN দিন", "Enter PIN"), color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(16.dp)) {
             repeat(6) { i ->
                 Box(
@@ -201,7 +201,7 @@ fun LockScreen(onSignOut: () -> Unit) {
         LaunchedEffect(remaining) {
             if (remaining > 0) { kotlinx.coroutines.delay(1000); remaining = AppLock.lockoutRemaining(ctx) }
         }
-        if (remaining > 0) Text("আবার চেষ্টা করুন: ${remaining} সেকেন্ড পর", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+        if (remaining > 0) Text(tr("আবার চেষ্টা করুন: ${remaining} সেকেন্ড পর", "Try again in ${remaining} seconds"), color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
         val keys = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"), listOf("bio", "0", "del"))
         keys.forEach { rowKeys ->
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(vertical = 6.dp)) {
@@ -224,7 +224,7 @@ fun LockScreen(onSignOut: () -> Unit) {
             }
         }
         Spacer16()
-        OutlinedButton(onClick = onSignOut) { Text("লগআউট") }
+        OutlinedButton(onClick = onSignOut) { Text(tr("লগআউট", "Sign out")) }
     }
 }
 
@@ -241,13 +241,13 @@ fun PinSetupDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("নতুন PIN সেট করুন", fontWeight = FontWeight.Bold) },
+        title = { Text(tr("নতুন PIN সেট করুন", "Set a new PIN"), fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(first, { first = it.filter(Char::isDigit).take(6) }, label = { Text("PIN (৪–৬ সংখ্যা)") },
+                OutlinedTextField(first, { first = it.filter(Char::isDigit).take(6) }, label = { Text(tr("PIN (৪–৬ সংখ্যা)", "PIN (4–6 digits)")) },
                     singleLine = true, visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
-                OutlinedTextField(second, { second = it.filter(Char::isDigit).take(6) }, label = { Text("আবার লিখুন") },
+                OutlinedTextField(second, { second = it.filter(Char::isDigit).take(6) }, label = { Text(tr("আবার লিখুন", "Re-enter")) },
                     singleLine = true, visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
@@ -256,8 +256,8 @@ fun PinSetupDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
         confirmButton = {
             TextButton(onClick = {
                 when {
-                    first.length !in 4..6 -> error = "PIN ৪ থেকে ৬ সংখ্যার হতে হবে"
-                    first != second -> error = "দুটি PIN মিলছে না"
+                    first.length !in 4..6 -> error = tr("PIN ৪ থেকে ৬ সংখ্যার হতে হবে", "PIN must be 4 to 6 digits")
+                    first != second -> error = tr("দুটি PIN মিলছে না", "The two PINs don't match")
                     else -> onSave(first)
                 }
             }) { Text(tr("সেভ", "Save")) }
@@ -277,7 +277,7 @@ fun PinVerifyDialog(title: String, onDismiss: () -> Unit, onVerified: () -> Unit
         title = { Text(title, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(pin, { pin = it.filter(Char::isDigit).take(6) }, label = { Text("বর্তমান PIN") },
+                OutlinedTextField(pin, { pin = it.filter(Char::isDigit).take(6) }, label = { Text(tr("বর্তমান PIN", "Current PIN")) },
                     singleLine = true, visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
@@ -285,8 +285,8 @@ fun PinVerifyDialog(title: String, onDismiss: () -> Unit, onVerified: () -> Unit
         },
         confirmButton = {
             TextButton(onClick = {
-                if (AppLock.checkPin(ctx, pin)) onVerified() else error = "ভুল PIN"
-            }) { Text("নিশ্চিত") }
+                if (AppLock.checkPin(ctx, pin)) onVerified() else error = tr("ভুল PIN", "Wrong PIN")
+            }) { Text(tr("নিশ্চিত", "Confirm")) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )

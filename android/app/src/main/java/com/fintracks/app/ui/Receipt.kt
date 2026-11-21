@@ -64,12 +64,12 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onDismiss: () -> Unit) {
             try {
                 if (asPdf) {
                     val file = withContext(Dispatchers.IO) { Voucher.singlePdf(ctx, state, t) }
-                    Export.share(ctx, file, "application/pdf", "FinTrack লেনদেন ভাউচার")
+                    Export.share(ctx, file, "application/pdf", tr("FinTrack লেনদেন ভাউচার", "FinTrack transaction voucher"))
                 } else {
                     val file = withContext(Dispatchers.IO) {
                         Voucher.pngFile(ctx, Voucher.renderSingle(ctx, state, t))
                     }
-                    Export.share(ctx, file, "image/png", "FinTrack লেনদেন ভাউচার")
+                    Export.share(ctx, file, "image/png", tr("FinTrack লেনদেন ভাউচার", "FinTrack transaction voucher"))
                 }
             } catch (e: Exception) {
                 Toast.makeText(ctx, tr("শেয়ার ব্যর্থ: ${e.message}", "Share failed: ${e.message}"), Toast.LENGTH_LONG).show()
@@ -83,7 +83,7 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onDismiss: () -> Unit) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("লেনদেনের ভাউচার", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                    Text(tr("লেনদেনের ভাউচার", "Transaction voucher"), fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close")) }
                 }
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -104,12 +104,12 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onDismiss: () -> Unit) {
                         onClick = { share(false) },
                         enabled = preview != null && !busy,
                         modifier = Modifier.weight(1f)
-                    ) { Text("ছবি শেয়ার") }
+                    ) { Text(tr("ছবি শেয়ার", "Share image")) }
                     OutlinedButton(
                         onClick = { share(true) },
                         enabled = preview != null && !busy,
                         modifier = Modifier.weight(1f)
-                    ) { Text("PDF শেয়ার") }
+                    ) { Text(tr("PDF শেয়ার", "Share PDF")) }
                 }
             }
         }
@@ -121,13 +121,13 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onDismiss: () -> Unit) {
 fun TxActionDialog(t: JsonObject, onEdit: () -> Unit, onDelete: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("লেনদেন", fontWeight = FontWeight.Bold) },
+        title = { Text(tr("লেনদেন", "Transaction"), fontWeight = FontWeight.Bold) },
         text = {
             Column {
                 Text(t.str("category").ifEmpty { "লেনদেন" }, fontSize = 14.sp)
-                TextButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) { Text("এডিট করুন") }
+                TextButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) { Text(tr("এডিট করুন", "Edit")) }
                 TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) {
-                    Text("মুছে ফেলুন", color = Color(0xFFF43F5E))
+                    Text(tr("মুছে ফেলুন", "Delete"), color = Color(0xFFF43F5E))
                 }
             }
         },

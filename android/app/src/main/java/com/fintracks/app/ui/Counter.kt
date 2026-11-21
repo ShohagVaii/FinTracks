@@ -237,9 +237,9 @@ fun MoneyCounterScreen(vm: AppViewModel) {
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("সর্বমোট", fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f), letterSpacing = 2.sp)
+            Text(tr("সর্বমোট", "Grand total"), fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f), letterSpacing = 2.sp)
             Text(bnDigits("৳ ${grouped(total)}"), fontSize = 38.sp, fontWeight = FontWeight.Black, color = Color.White)
-            Text("মোট নোট/কয়েন: ${bnDigits(pieces.toString())}টি", fontSize = 13.sp, color = Color.White.copy(alpha = 0.9f))
+            Text(tr("মোট নোট/কয়েন: ", "Notes/coins: ") + bnDigits(pieces.toString()) + tr("টি", ""), fontSize = 13.sp, color = Color.White.copy(alpha = 0.9f))
         }
 
         DENOMINATIONS.forEach { d ->
@@ -257,7 +257,7 @@ fun MoneyCounterScreen(vm: AppViewModel) {
                 OutlinedTextField(
                     value = inputs[d] ?: "",
                     onValueChange = { v -> inputs = inputs + (d to v.filter { it.isDigit() }.take(6)) },
-                    label = { Text("কয়টা") },
+                    label = { Text(tr("কয়টা", "Count")) },
                     singleLine = true,
                     modifier = Modifier.weight(1f)
                 )
@@ -273,28 +273,28 @@ fun MoneyCounterScreen(vm: AppViewModel) {
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(onClick = { inputs = DENOMINATIONS.associateWith { ""}; status = null }, modifier = Modifier.weight(1f)) {
-                Text("পরিষ্কার করুন")
+                Text(tr("পরিষ্কার করুন", "Clear"))
             }
             Button(
                 onClick = {
                     val toSave = counts
                     scope.launch {
                         val onServer = store.save(toSave)
-                        status = if (onServer) "✅ ডিভাইসে ও সার্ভারে সংরক্ষিত" else "💾 শুধু এই ফোনে সংরক্ষিত — সার্ভারে সিঙ্ক বাকি (ইন্টারনেট এলে নিজে যাবে)"
+                        status = if (onServer) tr("✅ ডিভাইসে ও সার্ভারে সংরক্ষিত", "✅ Saved on device and server") else "💾 শুধু এই ফোনে সংরক্ষিত — সার্ভারে সিঙ্ক বাকি (ইন্টারনেট এলে নিজে যাবে)"
                     }
                 },
                 enabled = total > 0,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF14B8A6), contentColor = Color.White),
                 modifier = Modifier.weight(1f)
-            ) { Text("সংরক্ষণ করুন") }
+            ) { Text(tr("সংরক্ষণ করুন", "Save")) }
         }
         status?.let { Text(it, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         if (pending > 0) {
-            Text("অপেক্ষমাণ সিঙ্ক: ${bnDigits(pending.toString())}টি", fontSize = 12.sp, color = Amber500)
+            Text(tr("অপেক্ষমাণ সিঙ্ক: ", "Pending sync: ") + bnDigits(pending.toString()) + tr("টি", ""), fontSize = 12.sp, color = Amber500)
         }
 
-        SectionTitle("গণনার ইতিহাস")
-        if (history.isEmpty()) EmptyHint("এখনো কোনো সংরক্ষিত গণনা নেই")
+        SectionTitle(tr("গণনার ইতিহাস", "Count history"))
+        if (history.isEmpty()) EmptyHint(tr("এখনো কোনো সংরক্ষিত গণনা নেই", "No saved counts yet"))
         history.forEach { r ->
             val open = expanded == r.id
             AppCard(onClick = { expanded = if (open) null else r.id }) {
@@ -302,12 +302,12 @@ fun MoneyCounterScreen(vm: AppViewModel) {
                     Column(Modifier.weight(1f)) {
                         Text(bnDigits(bdTime(r.at)), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(bnDigits("৳ ${grouped(r.total)}"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text(bnDigits("${r.pieces} টি নোট/কয়েন"), fontSize = 12.sp)
+                        Text(bnDigits("${r.pieces}") + tr(" টি নোট/কয়েন", " notes/coins"), fontSize = 12.sp)
                     }
                     IconButton(onClick = {
                         scope.launch {
                             val onServer = store.delete(r.id)
-                            status = if (onServer) "✅ গণনাটি মুছে ফেলা হয়েছে (ডিভাইস ও সার্ভার)" else "💾 এই ফোনে মুছেছে — সার্ভারে সিঙ্ক বাকি"
+                            status = if (onServer) tr("✅ গণনাটি মুছে ফেলা হয়েছে (ডিভাইস ও সার্ভার)", "✅ Count deleted (device and server)") else tr("💾 এই ফোনে মুছেছে — সার্ভারে সিঙ্ক বাকি", "💾 Deleted on this phone — server sync pending")
                         }
                         if (expanded == r.id) expanded = null
                     }) { Icon(Icons.Default.Delete, contentDescription = tr("মুছুন", "Delete"), tint = Rose500) }

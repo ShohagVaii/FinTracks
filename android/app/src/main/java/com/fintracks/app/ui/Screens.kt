@@ -375,7 +375,7 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                     try {
                         val ref = vm.summaryRef(filtered, range)
                         val file = withContext(Dispatchers.IO) { Voucher.summaryPdf(ctx, state, filtered, range.label, ref) }
-                        Export.share(ctx, file, "application/pdf", "FinTrack সারসংক্ষেপ ভাউচার")
+                        Export.share(ctx, file, "application/pdf", tr("FinTrack সারসংক্ষেপ ভাউচার", "FinTrack summary voucher"))
                     } catch (e: Exception) {
                         Toast.makeText(ctx, tr("ভাউচার ব্যর্থ: ${e.message}", "Voucher failed: ${e.message}"), Toast.LENGTH_LONG).show()
                     } finally { busy = false }
@@ -395,7 +395,7 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                         scope.launch {
                             try {
                                 val file = withContext(Dispatchers.IO) { Export.receiptFile(ctx, state, t) }
-                                Export.share(ctx, file, "application/pdf", "FinTrack লেনদেন ভাউচার")
+                                Export.share(ctx, file, "application/pdf", tr("FinTrack লেনদেন ভাউচার", "FinTrack transaction voucher"))
                             } catch (e: Exception) {
                                 Toast.makeText(ctx, tr("শেয়ার ব্যর্থ: ${e.message}", "Share failed: ${e.message}"), Toast.LENGTH_LONG).show()
                             }
@@ -576,9 +576,9 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                     modifier = Modifier.weight(1f)
                 )
                 if (existing == null) {
-                    RoundIcon(Icons.Default.PhotoCamera, "রসিদ ক্যামেরা") { launchCamera() }
-                    RoundIcon(Icons.Default.Mic, "ভয়েস") { launchVoice() }
-                    RoundIcon(Icons.Default.Image, "ছবি") { galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                    RoundIcon(Icons.Default.PhotoCamera, tr("রসিদ ক্যামেরা", "Receipt camera")) { launchCamera() }
+                    RoundIcon(Icons.Default.Mic, tr("ভয়েস", "Voice")) { launchVoice() }
+                    RoundIcon(Icons.Default.Image, tr("ছবি", "Photo")) { galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
                 }
                 RoundIcon(Icons.Default.Calculate, tr("ক্যালকুলেটর", "Calculator")) { showCalc = true }
             }
@@ -599,7 +599,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (accounts.isNotEmpty() && type != "Transfer") {
                     Column(Modifier.weight(1f)) {
-                        Text("অ্যাকাউন্ট", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(tr("অ্যাকাউন্ট", "Account"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         PickerField(accountId, listOf("" to "কোনোটি নয়") + accounts.map { it.id() to it.str("name") }) { accountId = it }
                     }
                 }
@@ -615,7 +615,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                     color = Sky400
                 )
             }
-            Text("মুড", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("মুড", "Mood"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MOODS.forEach { m ->
                     val on = mood == m
@@ -631,7 +631,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                     ) { Text(m, fontSize = 22.sp) }
                 }
             }
-            Text("হ্যাশ ট্যাগ", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("হ্যাশ ট্যাগ", "Hashtag"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextIn(tr("ট্যাগ লিখুন (যেমন: জরুরি)", "Enter a tag (e.g. urgent)"), tagInput, { tagInput = it }, modifier = Modifier.weight(1f))
                 Box(
@@ -747,7 +747,7 @@ private fun RoundIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, des
 @Composable
 private fun PickerField(value: String, options: List<Pair<String, String>>, onPick: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    val shown = options.firstOrNull { it.first == value }?.second ?: "বাছাই করুন"
+    val shown = options.firstOrNull { it.first == value }?.second ?: tr("বাছাই করুন", "Choose")
     Box {
         Row(
             Modifier

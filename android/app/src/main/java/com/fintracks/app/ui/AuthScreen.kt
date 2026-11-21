@@ -69,7 +69,7 @@ fun AuthScreen(
             color = MaterialTheme.colorScheme.primary
         )
         Text(
-            "আপনার স্মার্ট আর্থিক সহায়ক",
+            tr("আপনার স্মার্ট আর্থিক সহায়ক", "Your smart finance companion"),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(24.dp))
@@ -87,7 +87,7 @@ fun AuthScreen(
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
-            label = { Text("ইমেইল") },
+            label = { Text(tr("ইমেইল", "Email")) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             modifier = Modifier.fillMaxWidth()
@@ -96,7 +96,7 @@ fun AuthScreen(
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)") },
+            label = { Text(tr("পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)", "Password (at least 6 characters)")) },
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -122,10 +122,10 @@ fun AuthScreen(
             },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(if (isSignUp) "অ্যাকাউন্ট তৈরি করুন" else "লগইন")
+            Text(if (isSignUp) tr("অ্যাকাউন্ট তৈরি করুন", "Create account") else tr("লগইন", "Log in"))
         }
         TextButton(onClick = { isSignUp = !isSignUp; localError = null }) {
-            Text(if (isSignUp) "আগে থেকে অ্যাকাউন্ট আছে? লগইন করুন" else "নতুন অ্যাকাউন্ট খুলুন")
+            Text(if (isSignUp) tr("আগে থেকে অ্যাকাউন্ট আছে? লগইন করুন", "Already have an account? Log in") else tr("নতুন অ্যাকাউন্ট খুলুন", "Create a new account"))
         }
 
         Spacer(Modifier.height(8.dp))
@@ -135,20 +135,20 @@ fun AuthScreen(
             enabled = !state.busy,
             onClick = {
                 if (BuildConfig.GOOGLE_WEB_CLIENT_ID.isBlank()) {
-                    localError = "Google লগইন এখনো কনফিগার করা হয়নি"
+                    localError = tr("Google লগইন এখনো কনফিগার করা হয়নি", "Google login is not set up yet")
                     return@OutlinedButton
                 }
                 scope.launch {
                     try {
                         onGoogle(googleIdToken(context))
                     } catch (e: Exception) {
-                        localError = "Google লগইন ব্যর্থ হয়েছে"
+                        localError = tr("Google লগইন ব্যর্থ হয়েছে", "Google login failed")
                     }
                 }
             },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Google দিয়ে চালিয়ে যান")
+            Text(tr("Google দিয়ে চালিয়ে যান", "Continue with Google"))
         }
     }
 }

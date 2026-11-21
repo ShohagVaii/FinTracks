@@ -24,7 +24,7 @@ object MilestoneCard {
         } finally {
             bmp.recycle()
         }
-        Export.share(ctx, file, "image/png", "FinTrack লক্ষ্য অর্জন")
+        Export.share(ctx, file, "image/png", tr("FinTrack লক্ষ্য অর্জন", "FinTrack goal reached"))
     }
 
     private fun render(ctx: Context, c: GoalCelebration): Bitmap {
@@ -55,12 +55,12 @@ object MilestoneCard {
         }
 
         draw("FinTrack", 80f, 140f, 56f, bold, Paint.Align.LEFT)
-        draw("লক্ষ্য অর্জন", 80f, 210f, 40f, regular, Paint.Align.LEFT, 210)
+        draw(tr("লক্ষ্য অর্জন", "Goal reached"), 80f, 210f, 40f, regular, Paint.Align.LEFT, 210)
         draw("${c.percent}%", w / 2, 610f, 230f, bold, Paint.Align.CENTER)
         val name = if (c.goalName.length > 24) c.goalName.take(23) + "…" else c.goalName
         draw(name, w / 2, 730f, 60f, bold, Paint.Align.CENTER)
         draw("${taka(c.saved, false)} / ${taka(c.target, false)}", w / 2, 810f, 44f, regular, Paint.Align.CENTER)
-        draw("আর এগিয়ে যান, আপনি পারবেন!", w / 2, 960f, 36f, regular, Paint.Align.CENTER, 220)
+        draw(tr("আর এগিয়ে যান, আপনি পারবেন!", "Keep going, you can do it!"), w / 2, 960f, 36f, regular, Paint.Align.CENTER, 220)
         return bmp
     }
 }

@@ -197,7 +197,7 @@ fun ZakatScreen(state: UiState) {
             if (nisab == null) {
                 Text(tr("নিসাব জানতে রূপার দর (প্রতি গ্রাম) লিখুন।", "Enter the silver price per gram to find the nisab."), fontSize = 12.sp, color = Rose500)
             } else {
-                val basis = if (silverBasis) "রূপার ভিত্তিতে ${Web.NISAB_SILVER_GRAMS} গ্রাম" else "স্বর্ণের ভিত্তিতে ${Web.NISAB_GOLD_GRAMS} গ্রাম"
+                val basis = if (silverBasis) tr("রূপার ভিত্তিতে ${Web.NISAB_SILVER_GRAMS} গ্রাম", "silver basis, ${Web.NISAB_SILVER_GRAMS} g") else tr("স্বর্ণের ভিত্তিতে ${Web.NISAB_GOLD_GRAMS} গ্রাম", "gold basis, ${Web.NISAB_GOLD_GRAMS} g")
                 Text(tr("নিসাব: ${fmtMoney(nisab)} ($basis)", "Nisab: ${fmtMoney(nisab)} ($basis)"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -371,7 +371,7 @@ fun LoanScreen(state: UiState, vm: AppViewModel) {
                     if (!done) Button(onClick = {
                         vm.save("loans", row("paid" to (paid + 1).toDouble()), l.id())
                     }) { Text(tr("১ মাস পরিশোধ", "Pay 1 month")) }
-                    else Text("✅ সম্পন্ন", color = Emerald500)
+                    else Text(tr("✅ সম্পন্ন", "✅ Done"), color = Emerald500)
                 }
             }
         }
@@ -491,7 +491,7 @@ private fun IntelligenceCard(onOpen: () -> Unit) {
             Text("FINANCIAL INTELLIGENCE", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
         }
         Text(
-            "FinTrack AI আপনার খরচ বিশ্লেষণ করে বাজেট ভারসাম্য বজায় রাখতে সাহায্য করে।",
+            tr("FinTrack AI আপনার খরচ বিশ্লেষণ করে বাজেট ভারসাম্য বজায় রাখতে সাহায্য করে।", "FinTrack AI analyses your spending and helps keep your budget balanced."),
             fontSize = 14.sp,
             lineHeight = 22.sp,
             color = Slate400
@@ -503,7 +503,7 @@ private fun IntelligenceCard(onOpen: () -> Unit) {
                 .clickable(onClick = onOpen)
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
-            Text("বিস্তারিত বিশ্লেষণ", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(tr("বিস্তারিত বিশ্লেষণ", "Detailed analysis"), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
         }
     }
 }
@@ -517,7 +517,7 @@ internal fun ToolsFooter() {
     ) {
         Text("FinTrack AI", color = MaterialTheme.colorScheme.primary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Text(
-            "আপনার ব্যক্তিগত অর্থ ও লেনদেনের সবচেয়ে বুদ্ধিমান সমাধান।\nপ্রযুক্তির মাধ্যমে জীবন হোক আরও সহজ।",
+            "The smartest solution for your personal finance and transactions.\nMake life easier through technology.",
             color = Slate400,
             fontSize = 13.sp,
             lineHeight = 20.sp,

@@ -33,8 +33,9 @@ object Reminders {
             return runCatching { LocalDate.parse(d.take(10)) }.getOrNull()?.let { !it.isBefore(today.minusDays(0)) && !it.isAfter(soon) } == true
         }
         val items = mutableListOf<Pair<String, String>>()
-        tables["subscriptions"].orEmpty().filter { it.bool("is_active") && inWindow(it.strOrNull("renewal_date")) }.forEach {
-            items += "sub-${it.id()}" to "${it.str("name")} নবায়ন: ${it.str("renewal_date").take(10)} · ${fmtMoney(it.num("amount"))}"
+        tables["subscriptions"].orEmpty().filter { it.bool("is_active") && nextRenewal(it, today)?.let { d -> inWindow(d.toString()) } == true }.forEach {
+            val next = nextRenewal(it, today)?.toString().orEmpty()
+            items += "sub-${it.id()}" to "${it.str("name")} নবায়ন: $next · ${fmtMoney(it.num("amount"))}"
         }
         tables["debts"].orEmpty().filter { !it.bool("settled") && it.str("direction") == "owe" && inWindow(it.strOrNull("due_date")) }.forEach {
             items += "debt-${it.id()}" to "ধার পরিশোধ: ${it.str("person")} · ${fmtMoney(it.num("amount"))}"
@@ -58,13 +59,13 @@ object Reminders {
         ) return
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) {
-            nm.createNotificationChannel(NotificationChannel(CHANNEL, "বিল রিমাইন্ডার", NotificationManager.IMPORTANCE_DEFAULT))
+            nm.createNotificationChannel(NotificationChannel(CHANNEL, tr("বিল রিমাইন্ডার", "Bill reminder"), NotificationManager.IMPORTANCE_DEFAULT))
         }
         val launch = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName) ?: return
         val pending = PendingIntent.getActivity(ctx, 0, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(ctx, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle("FinTrack রিমাইন্ডার")
+            .setContentTitle(tr("FinTrack রিমাইন্ডার", "FinTrack reminder"))
             .setContentText(text)
             .setContentIntent(pending)
             .setAutoCancel(true)

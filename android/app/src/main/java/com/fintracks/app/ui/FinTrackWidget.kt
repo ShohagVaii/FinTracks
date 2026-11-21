@@ -26,7 +26,7 @@ class FinTrackWidgetProvider : AppWidgetProvider() {
             val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val views = RemoteViews(ctx.packageName, R.layout.widget_balance)
             views.setTextViewText(R.id.widget_balance, p.getString("balance", "৳ 0") ?: "৳ 0")
-            views.setTextViewText(R.id.widget_expense, p.getString("expense", "এই মাসের খরচ: ৳ 0") ?: "")
+            views.setTextViewText(R.id.widget_expense, p.getString("expense", tr("এই মাসের খরচ: ৳ 0", "This month's expense: ৳ 0")) ?: "")
             val launch = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
             if (launch != null) {
                 views.setOnClickPendingIntent(
@@ -47,7 +47,7 @@ class FinTrackWidgetProvider : AppWidgetProvider() {
             val expense = txs.filter { it.str("type") == "Expense" && dateOf(it, "tx_date").startsWith(month) }.sumOf { it.num("amount") }
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .putString("balance", taka(total, privacy))
-                .putString("expense", "এই মাসের খরচ: ${taka(expense, privacy)}")
+                .putString("expense", tr("এই মাসের খরচ: ${taka(expense, privacy)}", "This month's expense: ${taka(expense, privacy)}"))
                 .apply()
             val mgr = AppWidgetManager.getInstance(ctx)
             mgr.getAppWidgetIds(ComponentName(ctx, FinTrackWidgetProvider::class.java)).forEach { updateOne(ctx, mgr, it) }

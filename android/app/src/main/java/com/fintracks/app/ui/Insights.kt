@@ -132,7 +132,7 @@ fun InsightsCards(state: UiState) {
         } else {
             unusual.take(5).forEach { u ->
                 val pct = ((u.thisMonth - u.average) / u.average * 100).toInt()
-                Text("${catIcon(u.category)} ${u.category}: এই মাসে ${taka(u.thisMonth, p)} (গড়ের চেয়ে +$pct%)", fontSize = 13.sp, color = Color(0xFFF59E0B))
+                Text(tr("${catIcon(u.category)} ${u.category}: এই মাসে ${taka(u.thisMonth, p)} (গড়ের চেয়ে +$pct%)", "${catIcon(u.category)} ${u.category}: this month ${taka(u.thisMonth, p)} (+$pct% vs average)"), fontSize = 13.sp, color = Color(0xFFF59E0B))
             }
         }
     }
@@ -240,7 +240,7 @@ fun ExpenseTrendCard(txs: List<JsonObject>, privacy: Boolean) {
                 val d = today.minusDays(k.toLong())
                 TrendBucket(
                     short = bnDigits(d.dayOfMonth.toString()),
-                    full = "${bnDigits(d.dayOfMonth.toString())} ${BN_MONTHS[d.monthValue - 1]}",
+                    full = displayDate(d.toString()),
                     total = byDay[d.toString()] ?: 0.0
                 )
             }
@@ -311,7 +311,7 @@ fun ExpenseTrendCard(txs: List<JsonObject>, privacy: Boolean) {
             }
             if (peakIndex >= 0) {
                 Text(
-                    "সবচেয়ে বেশি খরচ: ${buckets[peakIndex].full} · ${taka(max, privacy)}",
+                    tr("সবচেয়ে বেশি খরচ: ${buckets[peakIndex].full} · ${taka(max, privacy)}", "Highest spending: ${buckets[peakIndex].full} · ${taka(max, privacy)}"),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = Rose500
@@ -326,7 +326,7 @@ fun ExpenseTrendCard(txs: List<JsonObject>, privacy: Boolean) {
 @Composable
 fun IncomeExpenseBars(income: Double, expense: Double, privacy: Boolean) {
     val max = maxOf(income, expense)
-    val rows = listOf(Triple("আয়", income, Emerald500), Triple("ব্যয়", expense, Rose500))
+    val rows = listOf(Triple(tr("আয়", "Income"), income, Emerald500), Triple(tr("ব্যয়", "Expense"), expense, Rose500))
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         rows.forEach { (label, value, color) ->
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -340,6 +340,6 @@ fun IncomeExpenseBars(income: Double, expense: Double, privacy: Boolean) {
                 }
             }
         }
-        Text("নিট: ${taka(income - expense, privacy)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(tr("নিট: ${taka(income - expense, privacy)}", "Net: ${taka(income - expense, privacy)}"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

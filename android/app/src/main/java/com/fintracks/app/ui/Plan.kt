@@ -49,9 +49,13 @@ fun effectiveBudgetLimit(budget: JsonObject, txs: List<JsonObject>, month: Strin
     if (!budget.bool("rollover")) return base
     val category = budget.str("category")
     val current = YearMonth.parse(month)
+    // Never carry money from months before the budget existed (created_at needs the budgets migration).
+    val since = budget.strOrNull("created_at")?.take(7)?.let { runCatching { YearMonth.parse(it) }.getOrNull() }
     var carry = 0.0
     for (back in 12 downTo 1) {
-        val m = current.minusMonths(back.toLong()).toString()
+        val ym = current.minusMonths(back.toLong())
+        if (since != null && ym < since) continue
+        val m = ym.toString()
         val available = base + carry
         carry = (available - spentIn(txs, category, m)).coerceAtLeast(0.0)
     }
@@ -67,13 +71,13 @@ fun BudgetsScreen(state: UiState, vm: AppViewModel) {
     val month = monthPrefix()
     val p = state.privacy
     Page {
-        AddButton("বাজেট সেট করুন") { showing = true }
+        AddButton(tr("বাজেট সেট করুন", "Set budget")) { showing = true }
         Text(
-            "প্রতিটি ক্যাটাগরির মাসিক সীমা। \"পরের মাসে নিয়ে যাও\" চালু থাকলে অব্যবহৃত টাকা পরের মাসের সীমায় যোগ হয়। ৮০% খরচে হলুদ, সীমা ছাড়ালে লাল সতর্কতা।",
+            "Monthly limit per category. With \"Carry to next month\" on, unused money is added to next month\'s limit. Yellow at 80% spent, red warning when over the limit.",
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        if (budgets.isEmpty()) EmptyHint("কোনো বাজেট নেই")
+        if (budgets.isEmpty()) EmptyHint(tr("কোনো বাজেট নেই", "No budgets"))
         budgets.forEach { b ->
             val cat = b.str("category")
             val spent = spentIn(txs, cat, month)
@@ -93,10 +97,10 @@ fun BudgetsScreen(state: UiState, vm: AppViewModel) {
                 }
                 ProgressBar(ratio.toFloat(), color)
                 val notes = buildList {
-                    if (b.bool("rollover")) add("পরের মাসে নিয়ে যাওয়া চালু")
-                    if (carry > 0.005) add("আগের মাস থেকে +${taka(carry, p)}")
-                    if (ratio >= 1.0) add("সীমা ছাড়িয়েছে")
-                    else if (ratio >= 0.8) add("৮০%+ খরচ হয়েছে")
+                    if (b.bool("rollover")) add(tr("পরের মাসে নিয়ে যাওয়া চালু", "Carry-over to next month on"))
+                    if (carry > 0.005) add(tr("আগের মাস থেকে +${taka(carry, p)}", "Carried from last month +${taka(carry, p)}"))
+                    if (ratio >= 1.0) add(tr("সীমা ছাড়িয়েছে", "Over limit"))
+                    else if (ratio >= 0.8) add(tr("৮০%+ খরচ হয়েছে", "80%+ spent"))
                 }
                 if (notes.isNotEmpty()) Text(notes.joinToString(" · "), fontSize = 11.sp, color = color)
                 DeleteButton { vm.remove("budgets", b.id()) }
@@ -108,7 +112,7 @@ fun BudgetsScreen(state: UiState, vm: AppViewModel) {
         var category by remember { mutableStateOf(existing?.str("category") ?: "খাদ্য") }
         var limit by remember { mutableStateOf(existing?.let { fmtNum(it.num("monthly_limit")) } ?: "") }
         var rollover by remember { mutableStateOf(existing?.bool("rollover") == true) }
-        FormDialog("মাসিক বাজেট", onDismiss = { showing = false; editing = null }, onConfirm = {
+        FormDialog(tr("মাসিক বাজেট", "Monthly budget"), onDismiss = { showing = false; editing = null }, onConfirm = {
             val l = parseAmount(limit)
             if (l != null && l >= 0) {
                 // Upsert: one budget per category, matching the web app's unique key.
@@ -119,9 +123,9 @@ fun BudgetsScreen(state: UiState, vm: AppViewModel) {
         }) {
             Text(tr("ক্যাটাগরি", "Category"), fontSize = 12.sp)
             ChoiceChips(ALL_CATS.map { it.name to "${it.icon} ${it.name}" }.distinctBy { it.first }, category) { category = it }
-            TextIn("মাসিক সীমা (৳)", limit, { limit = it }, number = true)
+            TextIn(tr("মাসিক সীমা (৳)", "Monthly limit (৳)"), limit, { limit = it }, number = true)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("অব্যবহৃত টাকা পরের মাসে নিয়ে যাবে", fontSize = 13.sp, modifier = Modifier.weight(1f))
+                Text(tr("অব্যবহৃত টাকা পরের মাসে নিয়ে যাবে", "Unused money carries to next month"), fontSize = 13.sp, modifier = Modifier.weight(1f))
                 Switch(checked = rollover, onCheckedChange = { rollover = it })
             }
         }
@@ -139,8 +143,8 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
     val goals = state.rows("goals")
     val p = state.privacy
     Page {
-        AddButton("নতুন লক্ষ্য") { adding = true }
-        if (goals.isEmpty()) EmptyHint("কোনো সঞ্চয় লক্ষ্য নেই")
+        AddButton(tr("নতুন লক্ষ্য", "New goal")) { adding = true }
+        if (goals.isEmpty()) EmptyHint(tr("কোনো সঞ্চয় লক্ষ্য নেই", "No savings goals"))
         goals.forEach { g ->
             val target = g.num("target")
             val saved = g.num("saved")
@@ -150,7 +154,7 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
                     Text(g.str("name"), fontWeight = FontWeight.Bold)
                     DeleteButton { vm.remove("goals", g.id()) }
                 }
-                KeyValue("জমা / লক্ষ্য", "${taka(saved, p)} / ${taka(target, p)}")
+                KeyValue(tr("জমা / লক্ষ্য", "Saved / goal"), "${taka(saved, p)} / ${taka(target, p)}")
                 ProgressBar((pct / 100).toFloat(), green)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     GOAL_MILESTONES.forEach { m ->
@@ -163,8 +167,8 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
                         )
                     }
                 }
-                g.strOrNull("deadline")?.let { Text("শেষ তারিখ: ${it.take(10)}", fontSize = 11.sp) }
-                OutlinedButton(onClick = { topUp = g }) { Text("জমা / তোলা") }
+                g.strOrNull("deadline")?.let { Text(tr("শেষ তারিখ: ${it.take(10)}", "Due: ${it.take(10)}"), fontSize = 11.sp) }
+                OutlinedButton(onClick = { topUp = g }) { Text(tr("জমা / তোলা", "Deposit / withdraw")) }
             }
         }
     }
@@ -172,15 +176,15 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
         var name by remember { mutableStateOf("") }
         var target by remember { mutableStateOf("") }
         var deadline by remember { mutableStateOf("") }
-        FormDialog("নতুন সঞ্চয় লক্ষ্য", onDismiss = { adding = false }, onConfirm = {
+        FormDialog(tr("নতুন সঞ্চয় লক্ষ্য", "New savings goal"), onDismiss = { adding = false }, onConfirm = {
             val t = parseAmount(target)
             if (name.isNotBlank() && t != null && t > 0 && (deadline.isBlank() || isValidIsoDate(deadline))) {
                 vm.save("goals", row("name" to name, "target" to t, "saved" to 0.0, "deadline" to nonEmpty(deadline)), null)
                 adding = false
             }
         }) {
-            TextIn("লক্ষ্যের নাম", name, { name = it })
-            TextIn("লক্ষ্য (৳)", target, { target = it }, number = true)
+            TextIn(tr("লক্ষ্যের নাম", "Goal name"), name, { name = it })
+            TextIn(tr("লক্ষ্য (৳)", "Goal (৳)"), target, { target = it }, number = true)
             DateField(tr("শেষ তারিখ (ঐচ্ছিক)", "Due date (optional)"), deadline, { deadline = it }, optional = true)
         }
     }
@@ -194,8 +198,8 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
         val after = saved + delta
         val error = when {
             a == null || a <= 0 -> null
-            after > target + 0.005 -> "লক্ষ্যের বেশি জমা করা যাবে না (বাকি জমার সুযোগ ${taka(target - saved, false)})"
-            after < -0.005 -> "জমার বেশি তোলা যাবে না (জমা আছে ${taka(saved, false)})"
+            after > target + 0.005 -> tr("লক্ষ্যের বেশি জমা করা যাবে না (বাকি জমার সুযোগ ${taka(target - saved, false)})", "Cannot save more than the goal (room left: ${taka(target - saved, false)})")
+            after < -0.005 -> tr("জমার বেশি তোলা যাবে না (জমা আছে ${taka(saved, false)})", "Cannot withdraw more than saved (saved: ${taka(saved, false)})")
             else -> null
         }
         val valid = a != null && a > 0 && error == null
@@ -205,8 +209,8 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
                 topUp = null
             }
         }) {
-            Text("বর্তমান জমা: ${taka(saved, false)} / ${taka(target, false)}", fontSize = 12.sp)
-            ChoiceChips(listOf("deposit" to "জমা", "withdraw" to "তোলা"), mode) { mode = it }
+            Text(tr("বর্তমান জমা: ${taka(saved, false)} / ${taka(target, false)}", "Current savings: ${taka(saved, false)} / ${taka(target, false)}"), fontSize = 12.sp)
+            ChoiceChips(listOf("deposit" to tr("জমা", "Deposit"), "withdraw" to tr("তোলা", "Withdraw")), mode) { mode = it }
             TextIn(tr("পরিমাণ (৳)", "Amount (৳)"), amount, { amount = it }, number = true)
             if (error != null) Text(error, fontSize = 12.sp, color = red)
         }
@@ -215,15 +219,15 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
         val ctx = LocalContext.current
         AlertDialog(
             onDismissRequest = { vm.dismissCelebration() },
-            title = { Text("অভিনন্দন! ${c.percent}% অর্জন", fontWeight = FontWeight.Bold) },
+            title = { Text(tr("অভিনন্দন! ${c.percent}% অর্জন", "Congratulations! ${c.percent}% reached"), fontWeight = FontWeight.Bold) },
             text = {
-                Text("\"${c.goalName}\" লক্ষ্যে ${taka(c.saved, p)} জমা হয়েছে। চালিয়ে যান!")
+                Text("\"${c.goalName}\" goal: ${taka(c.saved, p)} saved. Keep going!")
             },
             confirmButton = {
                 TextButton(onClick = {
                     MilestoneCard.share(ctx, c)
                     vm.dismissCelebration()
-                }) { Text("শেয়ার কার্ড") }
+                }) { Text(tr("শেয়ার কার্ড", "Share card")) }
             },
             dismissButton = { TextButton(onClick = { vm.dismissCelebration() }) { Text(tr("বন্ধ", "Off")) } }
         )

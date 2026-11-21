@@ -208,19 +208,19 @@ fun NotesScreen(vm: AppViewModel) {
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("${bnDigits(notes.size.toString())}টি নোট", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+            Text(bnDigits(notes.size.toString()) + tr("টি নোট", " notes"), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
             Button(
                 onClick = { openId = null; editorOpen = true },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFACC15), contentColor = Color(0xFF1F2937))
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
-                Text("নতুন নোট", fontWeight = FontWeight.Bold)
+                Text(tr("নতুন নোট", "New note"), fontWeight = FontWeight.Bold)
             }
         }
         if (pendingCount > 0) {
             Text(
-                "অফলাইন: ${bnDigits(pendingCount.toString())}টি পরিবর্তন সিঙ্ক বাকি। সংযোগ পেলে আপনাআপনি যাবে।",
+                tr("অফলাইন: ", "Offline: ") + bnDigits(pendingCount.toString()) + tr("টি পরিবর্তন সিঙ্ক বাকি। সংযোগ পেলে আপনাআপনি যাবে।", " changes waiting to sync. They sync automatically when online."),
                 fontSize = 12.sp,
                 color = Color(0xFFFACC15)
             )
@@ -228,11 +228,11 @@ fun NotesScreen(vm: AppViewModel) {
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("নোট খুঁজুন") },
+            label = { Text(tr("নোট খুঁজুন", "Search notes")) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
-        if (shown.isEmpty()) EmptyHint(if (notes.isEmpty()) "এখনো কোনো নোট নেই" else "কিছু পাওয়া যায়নি")
+        if (shown.isEmpty()) EmptyHint(if (notes.isEmpty()) tr("এখনো কোনো নোট নেই", "No notes yet") else tr("কিছু পাওয়া যায়নি", "Nothing found"))
         shown.forEach { n ->
             AppCard(onClick = { openId = n.id(); editorOpen = true }) {
                 Text(n.str("title").ifBlank { "(শিরোনামহীন)" }, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1)
@@ -278,7 +278,7 @@ private fun NoteEditor(initial: JsonObject?, vm: AppViewModel, onClose: () -> Un
                 val text = listOf(title, body).filter { it.isNotBlank() }.joinToString("\n\n")
                 if (text.isNotBlank()) {
                     val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, text) }
-                    ctx.startActivity(Intent.createChooser(send, "নোট শেয়ার করুন").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    ctx.startActivity(Intent.createChooser(send, tr("নোট শেয়ার করুন", "Share note")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
             }) { Icon(Icons.Default.Share, contentDescription = tr("শেয়ার", "Share")) }
             if (id != null) {
@@ -295,19 +295,19 @@ private fun NoteEditor(initial: JsonObject?, vm: AppViewModel, onClose: () -> Un
                 }
                 handled = true
                 onClose()
-            }) { Text("সংরক্ষণ") }
+            }) { Text(tr("সংরক্ষণ", "Save")) }
         }
         OutlinedTextField(
             value = title,
             onValueChange = { title = it },
-            label = { Text("শিরোনাম") },
+            label = { Text(tr("শিরোনাম", "Title")) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
         OutlinedTextField(
             value = body,
             onValueChange = { body = it },
-            label = { Text("লেখা") },
+            label = { Text(tr("লেখা", "Text")) },
             modifier = Modifier.fillMaxWidth().height(420.dp)
         )
     }

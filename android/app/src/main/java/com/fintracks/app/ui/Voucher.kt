@@ -41,7 +41,8 @@ object Voucher {
     private const val B = 814f
     private const val SEP = "\u001F"
 
-    private val MONTHS = listOf(
+    private val EN_MONTHS = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+    private val MONTHS get() = if (AppPrefs.english) EN_MONTHS else listOf(
         "জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন",
         "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"
     )

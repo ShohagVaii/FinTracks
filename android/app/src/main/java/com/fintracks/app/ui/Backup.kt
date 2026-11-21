@@ -54,33 +54,33 @@ object Backup {
         val root = try {
             Json.parseToJsonElement(text).jsonObject
         } catch (e: Exception) {
-            throw IllegalArgumentException("এটি সঠিক JSON ফাইল নয়")
+            throw IllegalArgumentException(tr("এটি সঠিক JSON ফাইল নয়", "This is not a valid JSON file"))
         }
         if (root.str("app") != "FinTrack") throw IllegalArgumentException("এটি FinTrack ব্যাকআপ ফাইল নয়")
         val version = (root["format_version"] as? JsonPrimitive)?.intOrNull ?: 0
         if (version < 1 || version > FORMAT_VERSION) {
-            throw IllegalArgumentException("এই ব্যাকআপের ফরম্যাট ($version) এই অ্যাপ সমর্থন করে না")
+            throw IllegalArgumentException(tr("এই ব্যাকআপের ফরম্যাট ($version) এই অ্যাপ সমর্থন করে না", "This backup format ($version) is not supported by this app"))
         }
-        val tablesObj = root["tables"] as? JsonObject ?: throw IllegalArgumentException("ব্যাকআপে টেবিল তথ্য নেই")
+        val tablesObj = root["tables"] as? JsonObject ?: throw IllegalArgumentException(tr("ব্যাকআপে টেবিল তথ্য নেই", "The backup has no table data"))
         val known = TABLES.map { it.first }.toSet()
         val out = LinkedHashMap<String, List<JsonObject>>()
         for ((name, value) in tablesObj) {
-            if (name !in known) throw IllegalArgumentException("অজানা টেবিল: $name")
-            val rows = (value as? JsonArray ?: throw IllegalArgumentException("$name তথ্য সঠিক নয়")).map {
-                it as? JsonObject ?: throw IllegalArgumentException("$name-এ একটি সারি সঠিক নয়")
+            if (name !in known) throw IllegalArgumentException(tr("অজানা টেবিল: $name", "Unknown table: $name"))
+            val rows = (value as? JsonArray ?: throw IllegalArgumentException(tr("$name তথ্য সঠিক নয়", "$name data is invalid"))).map {
+                it as? JsonObject ?: throw IllegalArgumentException(tr("$name-এ একটি সারি সঠিক নয়", "A row in $name is invalid"))
             }
             rows.forEach { row ->
-                if (!UUID_RE.matches(row.id())) throw IllegalArgumentException("$name-এ একটি সারির ID সঠিক নয়")
+                if (!UUID_RE.matches(row.id())) throw IllegalArgumentException(tr("$name-এ একটি সারির ID সঠিক নয়", "A row ID in $name is invalid"))
                 if (name == "transactions" && row.str("type") !in setOf("Income", "Expense")) {
-                    throw IllegalArgumentException("transactions-এ একটি সারির ধরন (Income/Expense) সঠিক নয়")
+                    throw IllegalArgumentException(tr("transactions-এ একটি সারির ধরন (Income/Expense) সঠিক নয়", "A transactions row has an invalid type (Income/Expense)"))
                 }
             }
-            if (rows.map { it.id() }.toSet().size != rows.size) throw IllegalArgumentException("$name-এ একই ID একাধিকবার আছে")
+            if (rows.map { it.id() }.toSet().size != rows.size) throw IllegalArgumentException(tr("$name-এ একই ID একাধিকবার আছে", "$name has duplicate IDs"))
             out[name] = rows
         }
         val plan = BackupPlan(out, root.str("exported_at"))
-        if (plan.total == 0) throw IllegalArgumentException("ব্যাকআপে কোনো ডেটা নেই")
-        if (plan.total > MAX_ROWS) throw IllegalArgumentException("ব্যাকআপ খুব বড় ($MAX_ROWS সারির বেশি)")
+        if (plan.total == 0) throw IllegalArgumentException(tr("ব্যাকআপে কোনো ডেটা নেই", "The backup has no data"))
+        if (plan.total > MAX_ROWS) throw IllegalArgumentException(tr("ব্যাকআপ খুব বড় ($MAX_ROWS সারির বেশি)", "Backup is too large (over $MAX_ROWS rows)"))
         return plan
     }
 }

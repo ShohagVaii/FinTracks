@@ -71,14 +71,14 @@ object DailyReminder {
         ) return
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) {
-            nm.createNotificationChannel(NotificationChannel(CHANNEL, "দৈনিক রিমাইন্ডার", NotificationManager.IMPORTANCE_DEFAULT))
+            nm.createNotificationChannel(NotificationChannel(CHANNEL, tr("দৈনিক রিমাইন্ডার", "Daily reminder"), NotificationManager.IMPORTANCE_DEFAULT))
         }
         val launch = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName) ?: return
         val pending = PendingIntent.getActivity(ctx, 0, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(ctx, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("FinTrack রিমাইন্ডার")
-            .setContentText("আজকের আয় ও ব্যয় লিখে ফেলেছেন? এখনই যোগ করুন।")
+            .setContentTitle(tr("FinTrack রিমাইন্ডার", "FinTrack reminder"))
+            .setContentText(tr("আজকের আয় ও ব্যয় লিখে ফেলেছেন? এখনই যোগ করুন।", "Have you logged today's income and expenses? Add them now."))
             .setContentIntent(pending)
             .setAutoCancel(true)
             .build()

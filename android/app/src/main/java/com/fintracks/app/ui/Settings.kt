@@ -291,8 +291,8 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                         scope.launch {
                             try {
                                 val txs = state.rows("transactions")
-                                val file = withContext(Dispatchers.IO) { Export.listFile(ctx, fmt, state, txs, "সব লেনদেন") }
-                                Export.share(ctx, file, fmt.mime, "FinTrack লেনদেন")
+                                val file = withContext(Dispatchers.IO) { Export.listFile(ctx, fmt, state, txs, tr("সব লেনদেন", "All transactions")) }
+                                Export.share(ctx, file, fmt.mime, tr("FinTrack লেনদেন", "FinTrack transactions"))
                             } catch (e: Exception) {
                                 Toast.makeText(ctx, tr("এক্সপোর্ট ব্যর্থ: ${e.message}", "Export failed: ${e.message}"), Toast.LENGTH_LONG).show()
                             } finally {
@@ -311,7 +311,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                 scope.launch {
                     try {
                         val file = withContext(Dispatchers.IO) { Backup.file(ctx, state) }
-                        Export.share(ctx, file, "application/json", "FinTrack ব্যাকআপ")
+                        Export.share(ctx, file, "application/json", tr("FinTrack ব্যাকআপ", "FinTrack backup"))
                     } catch (e: Exception) {
                         Toast.makeText(ctx, tr("ব্যাকআপ ব্যর্থ: ${e.message}", "Backup failed: ${e.message}"), Toast.LENGTH_LONG).show()
                     }
@@ -401,7 +401,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(tr("ব্যাকআপের তারিখ: ", "Backup date: ") + plan.exportedAt.take(10), fontSize = 13.sp)
                     plan.tables.filter { it.value.isNotEmpty() }.forEach { (t, rows) ->
-                        Text("$t: ${rows.size}টি", fontSize = 12.sp)
+                        Text("$t: ${rows.size}" + tr("টি", ""), fontSize = 12.sp)
                     }
                     Text(tr("বিদ্যমান ডেটা মুছবে না। একই ID থাকলে সেই সারি আপডেট হবে।", "Existing data is not deleted. Rows with the same ID are updated."),
                         fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

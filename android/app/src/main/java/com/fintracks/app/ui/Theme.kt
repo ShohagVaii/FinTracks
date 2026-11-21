@@ -12,11 +12,13 @@ import androidx.compose.ui.text.font.FontWeight
 import com.fintracks.app.R
 
 /** Accent palettes from the web app (sky / emerald / rose / amber). */
-enum class AccentColor(val key: String, val label: String, val darkPrimary: Color, val lightPrimary: Color, val gradientEnd: Color) {
-    SKY("sky", "স্কাই", Color(0xFF38BDF8), Color(0xFF0EA5E9), Color(0xFF2563EB)),
-    EMERALD("emerald", "এমারেল্ড", Color(0xFF34D399), Color(0xFF10B981), Color(0xFF059669)),
-    ROSE("rose", "রোজ", Color(0xFFFB7185), Color(0xFFF43F5E), Color(0xFFE11D48)),
-    AMBER("amber", "অ্যাম্বার", Color(0xFFFBBF24), Color(0xFFF59E0B), Color(0xFFD97706));
+enum class AccentColor(val key: String, private val bnLabel: String, private val enLabel: String, val darkPrimary: Color, val lightPrimary: Color, val gradientEnd: Color) {
+    SKY("sky", "স্কাই", "Sky", Color(0xFF38BDF8), Color(0xFF0EA5E9), Color(0xFF2563EB)),
+    EMERALD("emerald", "এমারেল্ড", "Emerald", Color(0xFF34D399), Color(0xFF10B981), Color(0xFF059669)),
+    ROSE("rose", "রোজ", "Rose", Color(0xFFFB7185), Color(0xFFF43F5E), Color(0xFFE11D48)),
+    AMBER("amber", "অ্যাম্বার", "Amber", Color(0xFFFBBF24), Color(0xFFF59E0B), Color(0xFFD97706));
+
+    val label: String get() = tr(bnLabel, enLabel)
 
     companion object {
         fun fromKey(key: String?): AccentColor = entries.firstOrNull { it.key == key } ?: SKY

@@ -70,57 +70,57 @@ object Assistant {
         return when {
             has(q, tr("বাকি", "Due"), "credit", "দোকান") -> {
                 val due = state.rows("credit_shops").sumOf { shopBalance(it.id(), state) }
-                "মোট বাকি আছে ${taka(due, p)}। দোকানভিত্তিক হিসাব বাকি মেনুতে দেখতে পারবেন।"
+                tr("মোট বাকি আছে ${taka(due, p)}। দোকানভিত্তিক হিসাব বাকি মেনুতে দেখতে পারবেন।", "Total due is ${taka(due, p)}. You can see the shop-wise breakdown in the Due menu.")
             }
             has(q, "ধার", "পাওনা", "debt", "loan", "লোন") -> {
                 val owe = state.rows("debts").filter { !it.bool("settled") && it.str("direction") == "owe" }.sumOf { it.num("amount") }
                 val owed = state.rows("debts").filter { !it.bool("settled") && it.str("direction") == "owed" }.sumOf { it.num("amount") }
-                "আপনি ধারি ${taka(owe, p)}, আপনার পাওনা ${taka(owed, p)}।"
+                tr("আপনি ধারি ${taka(owe, p)}, আপনার পাওনা ${taka(owed, p)}।", "You owe ${taka(owe, p)}, and you are owed ${taka(owed, p)}.")
             }
             has(q, "যাকাত", "zakat") -> {
                 val cash = txs.sumOf { if (it.str("type") == "Income") it.num("amount") else if (it.str("type") == "Expense") -it.num("amount") else 0.0 }
                 val assets = state.rows("investments").sumOf { it.num("current_value") }
-                "হিসাব অনুযায়ী মোট সম্পদ ${taka(cash + assets, p)}, যাকাত ২.৫%, তবে শুধু সম্পদ নিসাবের (রূপার ভিত্তিতে ৬১২.৩৬ গ্রাম) সমান বা বেশি হলে। নিসাব ও স্বর্ণ/রূপা যোগ করে যাকাত টুলসে হিসাব করুন।"
+                tr("হিসাব অনুযায়ী মোট সম্পদ ${taka(cash + assets, p)}, যাকাত ২.৫%, তবে শুধু সম্পদ নিসাবের (রূপার ভিত্তিতে ৬১২.৩৬ গ্রাম) সমান বা বেশি হলে। নিসাব ও স্বর্ণ/রূপা যোগ করে যাকাত টুলসে হিসাব করুন।", "Total assets: ${taka(cash + assets, p)}. Zakat is 2.5%, but only if assets meet or exceed the nisab (silver basis 612.36 g). Use the Zakat tool to calculate with the nisab and gold/silver prices.")
             }
-            has(q, "ট্যাক্স", "tax") -> "ট্যাক্স টুলসে বার্ষিক আয় লিখলে স্ল্যাব অনুযায়ী ট্যাক্স দেখাবে। সাধারণ করদাতার করমুক্ত সীমা ${taka(Web.GENERAL_TAX_THRESHOLD, false)}, মহিলা ও ৬৫+ এর জন্য ${taka(Web.WOMEN_TAX_THRESHOLD, false)}।"
+            has(q, "ট্যাক্স", "tax") -> "Enter yearly income in the Tax tool and it will show tax by slab. Tax-free limit for general taxpayers: ${taka(Web.GENERAL_TAX_THRESHOLD, false)}, for women and 65+: ${taka(Web.WOMEN_TAX_THRESHOLD, false)}."
             has(q, "বাজেট", "budget") -> {
                 val over = state.rows("budgets").filter { b ->
                     val spent = monthTx.filter { it.str("type") == "Expense" && it.str("category") == b.str("category") }.sumOf { it.num("amount") }
                     spent > b.num("monthly_limit") && b.num("monthly_limit") > 0
                 }
-                if (over.isEmpty()) "এই মাসে কোনো বাজেট ছাড়িয়ে যায়নি। ভালো কাজ চলছে!"
+                if (over.isEmpty()) tr("এই মাসে কোনো বাজেট ছাড়িয়ে যায়নি। ভালো কাজ চলছে!", "No budget was exceeded this month. Good work!")
                 else "এই ক্যাটাগরিগুলো বাজেট ছাড়িয়েছে: " + over.joinToString(", ") { it.str("category") } + "।"
             }
             has(q, "সঞ্চয়", "save", "saving") -> {
-                if (income <= 0) "এই মাসে আয় নেই, তাই সঞ্চয়ের হার হিসাব করা যাচ্ছে না। আয় যোগ করুন।"
-                else "এই মাসে সঞ্চয়ের হার ${String.format("%.0f", (income - expense) / income * 100)}%। ২০% বা তার বেশি হলে ভালো।"
+                if (income <= 0) tr("এই মাসে আয় নেই, তাই সঞ্চয়ের হার হিসাব করা যাচ্ছে না। আয় যোগ করুন।", "No income this month, so the savings rate can't be calculated. Add income.")
+                else tr("এই মাসে সঞ্চয়ের হার ${String.format("%.0f", (income - expense) / income * 100)}%। ২০% বা তার বেশি হলে ভালো।", "Savings rate this month: ${String.format("%.0f", (income - expense) / income * 100)}%. 20% or more is good.")
             }
             has(q, tr("আয়", "Income"), "income", "বেতন") -> "এই মাসে মোট আয় ${taka(income, p)}।"
             has(q, "খরচ", "expense", "spend") -> {
-                val extra = if (topCat != null) " সবচেয়ে বেশি খরচ '${topCat.key}' খাতে (${taka(topCat.value.sumOf { it.num("amount") }, p)})।" else ""
-                "এই মাসে মোট খরচ ${taka(expense, p)}।$extra"
+                val extra = if (topCat != null) tr(" সবচেয়ে বেশি খরচ '${topCat.key}' খাতে (${taka(topCat.value.sumOf { it.num("amount") }, p)})।", " Highest spending is in '${topCat.key}' (${taka(topCat.value.sumOf { it.num("amount") }, p)}).") else ""
+                tr("এই মাসে মোট খরচ ${taka(expense, p)}।$extra", "Total spending this month: ${taka(expense, p)}.$extra")
             }
             has(q, "ব্যালেন্স", "balance", "কত টাকা", "আছে") -> {
                 val total = state.rows("accounts").sumOf { accountBalance(it, txs) } +
                     (if (state.rows("accounts").isEmpty()) txs.sumOf { if (it.str("type") == "Income") it.num("amount") else if (it.str("type") == "Expense") -it.num("amount") else 0.0 } else 0.0)
-                "আপনার মোট ব্যালেন্স ${taka(total, p)}।"
+                tr("আপনার মোট ব্যালেন্স ${taka(total, p)}।", "Your total balance is ${taka(total, p)}.")
             }
             has(q, "সাবস্ক্রিপশন", "subscription") -> {
-                val monthly = state.rows("subscriptions").filter { it.bool("is_active") }.sumOf { it.num("amount") }
-                "সক্রিয় সাবস্ক্রিপশনের মাসিক খরচ আনুমানিক ${taka(monthly, p)}।"
+                val monthly = state.rows("subscriptions").filter { it.bool("is_active") }.sumOf { subscriptionMonthly(it) }
+                tr("সক্রিয় সাবস্ক্রিপশনের মাসিক খরচ আনুমানিক ${taka(monthly, p)}।", "Estimated monthly cost of active subscriptions: ${taka(monthly, p)}.")
             }
             has(q, "পরামর্শ", "tip", "advice", "সাজেশন", "উপদেশ") -> tips(state, income, expense, topCat?.key)
-            else -> "আমি খরচ, আয়, বাজেট, সঞ্চয়, বাকি, ধার, যাকাত, ট্যাক্স বা ব্যালেন্স নিয়ে প্রশ্নের উত্তর দিতে পারি। যেমন: \"এই মাসে কত খরচ?\""
+            else -> "I can answer questions about spending, income, budget, savings, dues, debts, zakat, tax or balance. For example: \"How much did I spend this month?\""
         }
     }
 
     private fun tips(state: UiState, income: Double, expense: Double, topCat: String?): String {
         val list = mutableListOf<String>()
-        if (income > 0 && expense > income * 0.8) list += "খরচ আয়ের ৮০% ছাড়িয়েছে। অপ্রয়োজনীয় খরচ কমান।"
-        if (topCat != null) list += "'$topCat' খাতে সবচেয়ে বেশি খরচ, সেখানে বাজেট সেট করুন।"
-        if (state.rows("goals").isEmpty()) list += "একটি সঞ্চয় লক্ষ্য তৈরি করুন, যেমন জরুরি তহবিল।"
-        if (state.rows("budgets").isEmpty()) list += "মাসিক বাজেট এনভেলপ সেট করলে খরচ নিয়ন্ত্রণে থাকে।"
-        return if (list.isEmpty()) "সব ঠিক আছে। এভাবে চালিয়ে যান!" else list.joinToString(" ")
+        if (income > 0 && expense > income * 0.8) list += tr("খরচ আয়ের ৮০% ছাড়িয়েছে। অপ্রয়োজনীয় খরচ কমান।", "Spending is over 80% of income. Cut unnecessary costs.")
+        if (topCat != null) list += tr("'$topCat' খাতে সবচেয়ে বেশি খরচ, সেখানে বাজেট সেট করুন।", "Highest spending is in '$topCat'. Set a budget there.")
+        if (state.rows("goals").isEmpty()) list += tr("একটি সঞ্চয় লক্ষ্য তৈরি করুন, যেমন জরুরি তহবিল।", "Create a savings goal, such as an emergency fund.")
+        if (state.rows("budgets").isEmpty()) list += tr("মাসিক বাজেট এনভেলপ সেট করলে খরচ নিয়ন্ত্রণে থাকে।", "Setting monthly budget envelopes keeps spending under control.")
+        return if (list.isEmpty()) tr("সব ঠিক আছে। এভাবে চালিয়ে যান!", "All good. Keep it up!") else list.joinToString(" ")
     }
 }
 
@@ -149,7 +149,7 @@ fun aiContext(state: UiState): String {
 @Composable
 fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
-    val greeting = "হ্যালো! আমি FinTrack AI। আমি আপনাকে বাজেট, সঞ্চয় বা বিনিয়োগের পরামর্শ দিয়ে সাহায্য করতে পারি। আপনি কী জানতে চান?"
+    val greeting = tr("হ্যালো! আমি FinTrack AI। আমি আপনাকে বাজেট, সঞ্চয় বা বিনিয়োগের পরামর্শ দিয়ে সাহায্য করতে পারি। আপনি কী জানতে চান?", "Hello! I'm FinTrack AI. I can help with budgets, savings and investment advice. What would you like to know?")
     val messages = remember { mutableStateListOf("assistant" to greeting) }
     var input by remember { mutableStateOf("") }
     var thinking by remember { mutableStateOf(false) }
@@ -165,7 +165,7 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
                 vm.askAi(q, aiContext(state))
             } catch (e: Exception) {
                 // Offline or AI not available: answer from local data, and say so.
-                Assistant.answer(q, state) + "\n\n(AI সংযোগ নেই, স্থানীয় হিসাব থেকে উত্তর দেওয়া হয়েছে)"
+                Assistant.answer(q, state) + "\n\n(No AI connection; answered from local data)"
             }
             messages += "assistant" to reply
             thinking = false
@@ -217,14 +217,14 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
                     }
                 }
             }
-            if (thinking) item { Text("ভাবছি…", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp) }
+            if (thinking) item { Text(tr("ভাবছি…", "Thinking…"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp) }
         }
         Row(
             Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            TextIn("আপনার বিষয়টি লিখুন...", input, { input = it }, modifier = Modifier.weight(1f))
+            TextIn(tr("আপনার বিষয়টি লিখুন...", "Type your question..."), input, { input = it }, modifier = Modifier.weight(1f))
             Box(
                 Modifier
                     .size(54.dp)

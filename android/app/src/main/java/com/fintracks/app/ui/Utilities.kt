@@ -139,7 +139,7 @@ fun AgeCalcScreen() {
         AppCard {
             Text(tr("জন্ম তারিখ", "Birth date"), fontWeight = FontWeight.Bold)
             OutlinedButton(onClick = { pickingBirth = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(b?.let { bnDate(it) } ?: "তারিখ বাছাই করুন")
+                Text(b?.let { bnDate(it) } ?: tr("তারিখ বাছাই করুন", "Pick a date"))
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(tr("অন্য তারিখ পর্যন্ত হিসাব", "Calculate up to another date"), modifier = Modifier.weight(1f), fontSize = 13.sp)
