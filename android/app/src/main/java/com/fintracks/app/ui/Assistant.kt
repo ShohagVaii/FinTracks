@@ -80,9 +80,9 @@ object Assistant {
             has(q, "যাকাত", "zakat") -> {
                 val cash = txs.sumOf { if (it.str("type") == "Income") it.num("amount") else if (it.str("type") == "Expense") -it.num("amount") else 0.0 }
                 val assets = state.rows("investments").sumOf { it.num("current_value") }
-                "হিসাব অনুযায়ী মোট সম্পদ ${taka(cash + assets, p)}, যাকাত (২.৫%) ${taka((cash + assets) * Web.ZAKAT_RATE, p)}। স্বর্ণ/রূপা যোগ করে যাকাত টুলসে সঠিক হিসাব করুন।"
+                "হিসাব অনুযায়ী মোট সম্পদ ${taka(cash + assets, p)}, যাকাত ২.৫%, তবে শুধু সম্পদ নিসাবের (রূপার ভিত্তিতে ৬১২.৩৬ গ্রাম) সমান বা বেশি হলে। নিসাব ও স্বর্ণ/রূপা যোগ করে যাকাত টুলসে হিসাব করুন।"
             }
-            has(q, "ট্যাক্স", "tax") -> "ট্যাক্স টুলসে বার্ষিক আয় লিখলে স্ল্যাব অনুযায়ী ট্যাক্স দেখাবে। মহিলা করদাতার সীমা ${taka(Web.FEMALE_THRESHOLD, false)}, পুরুষের ${taka(Web.MALE_THRESHOLD, false)}।"
+            has(q, "ট্যাক্স", "tax") -> "ট্যাক্স টুলসে বার্ষিক আয় লিখলে স্ল্যাব অনুযায়ী ট্যাক্স দেখাবে। সাধারণ করদাতার করমুক্ত সীমা ${taka(Web.GENERAL_TAX_THRESHOLD, false)}, মহিলা ও ৬৫+ এর জন্য ${taka(Web.WOMEN_TAX_THRESHOLD, false)}।"
             has(q, "বাজেট", "budget") -> {
                 val over = state.rows("budgets").filter { b ->
                     val spent = monthTx.filter { it.str("type") == "Expense" && it.str("category") == b.str("category") }.sumOf { it.num("amount") }

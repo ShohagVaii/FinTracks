@@ -24,6 +24,7 @@ import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import android.widget.Toast
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -71,13 +72,13 @@ import java.util.Locale
 import kotlin.math.pow
 import kotlin.math.roundToLong
 
-/** Web constants (constants.ts). */
+/** Audited constants. Tax: Finance Act 2026, assessment year 2026-27. Zakat: nisab in grams (gold 87.48 g, silver 612.36 g). */
 object Web {
     const val ZAKAT_RATE = 0.025
-    const val MALE_THRESHOLD = 350000.0
-    const val FEMALE_THRESHOLD = 400000.0
-    val SLABS = listOf(100000.0 to 0.05, 300000.0 to 0.10, 400000.0 to 0.15, 500000.0 to 0.20, Double.POSITIVE_INFINITY to 0.25)
-    val RATES = mapOf("BDT" to 1.0, "USD" to 121.50, "EUR" to 132.20, "GBP" to 154.80)
+    const val GENERAL_TAX_THRESHOLD = 400000.0
+    const val WOMEN_TAX_THRESHOLD = 450000.0
+    const val MIN_TAX = 5000.0
+    val SLABS = listOf(300000.0 to 0.10, 400000.0 to 0.15, 500000.0 to 0.20, 2000000.0 to 0.25, Double.POSITIVE_INFINITY to 0.30)
     const val NISAB_GOLD_GRAMS = 87.48
     const val NISAB_SILVER_GRAMS = 612.36
 }
@@ -170,10 +171,14 @@ fun ZakatScreen(state: UiState) {
     val txs = state.rows("transactions")
     var gold by remember { mutableStateOf("0") }
     var silver by remember { mutableStateOf("0") }
+    var goldPerGram by remember { mutableStateOf("") }
+    var silverPerGram by remember { mutableStateOf("") }
     val cash = txs.sumOf { when (it.str("type")) { "Income" -> it.num("amount"); "Expense" -> -it.num("amount"); else -> 0.0 } }
     val assets = state.rows("investments").sumOf { it.num("current_value") }
     val wealth = cash + assets + (gold.toDoubleOrNull() ?: 0.0) + (silver.toDoubleOrNull() ?: 0.0)
-    val zakat = wealth * Web.ZAKAT_RATE
+    val nisab = zakatNisab(goldPerGram.toDoubleOrNull(), silverPerGram.toDoubleOrNull())
+    val zakat = zakatDue(wealth, nisab)
+    val silverBasis = (silverPerGram.toDoubleOrNull() ?: 0.0) > 0
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AppCard {
             Text("যাকাত ক্যালকুলেটর", fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -183,74 +188,145 @@ fun ZakatScreen(state: UiState) {
             TextIn("রূপা (৳)", silver, { silver = it }, number = true)
         }
         AppCard {
+            Text("নিসাবের হিসাব", fontWeight = FontWeight.Bold)
+            TextIn("রূপার দর (প্রতি গ্রাম, ৳)", silverPerGram, { silverPerGram = it }, number = true)
+            TextIn("স্বর্ণের দর (প্রতি গ্রাম, ৳)", goldPerGram, { goldPerGram = it }, number = true)
+            if (nisab == null) {
+                Text("নিসাব জানতে রূপার দর (প্রতি গ্রাম) লিখুন।", fontSize = 12.sp, color = Rose500)
+            } else {
+                val basis = if (silverBasis) "রূপার ভিত্তিতে ${Web.NISAB_SILVER_GRAMS} গ্রাম" else "স্বর্ণের ভিত্তিতে ${Web.NISAB_GOLD_GRAMS} গ্রাম"
+                Text("নিসাব: ${fmtMoney(nisab)} ($basis)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        AppCard {
             Text("প্রদেয় যাকাত (২.৫%)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(fmtMoney(zakat), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Color(0xFFFBBF24))
-            Text("নিসাব: স্বর্ণ ${Web.NISAB_GOLD_GRAMS} গ্রাম, রূপা ${Web.NISAB_SILVER_GRAMS} গ্রাম (তথ্যের জন্য)", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(if (zakat == null) "—" else fmtMoney(zakat), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Color(0xFFFBBF24))
+            val status = when {
+                nisab == null -> "নিসাব না জানা পর্যন্ত যাকাত হিসাব করা যাবে না।"
+                wealth >= nisab -> "সম্পদ নিসাবের সমান বা বেশি, তাই যাকাত দেওয়ার পর্যায়ে।"
+                else -> "সম্পদ নিসাবের নিচে, তাই যাকাত নেই।"
+            }
+            Text(status, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
-/** Progressive BD tax on income above the threshold. Female threshold applies when the profile name contains "Ms". */
-fun bdTax(income: Double, name: String): Double {
-    var taxable = income - bdThreshold(name)
+/** Money value of the nisab. Silver basis when a silver price is given (the lower threshold), else gold basis. */
+fun zakatNisab(goldPerGram: Double?, silverPerGram: Double?): Double? = when {
+    silverPerGram != null && silverPerGram > 0 -> Web.NISAB_SILVER_GRAMS * silverPerGram
+    goldPerGram != null && goldPerGram > 0 -> Web.NISAB_GOLD_GRAMS * goldPerGram
+    else -> null
+}
+
+/** 2.5% when wealth reaches the nisab (equal counts), 0 below it, null when the nisab is unknown. */
+fun zakatDue(wealth: Double, nisab: Double?): Double? = nisab?.let { if (wealth >= it) wealth * Web.ZAKAT_RATE else 0.0 }
+
+/** Tax-free limit for the chosen category. */
+fun bdThreshold(women: Boolean): Double = if (women) Web.WOMEN_TAX_THRESHOLD else Web.GENERAL_TAX_THRESHOLD
+
+/** Progressive tax on income above the tax-free limit; the minimum tax applies once the limit is exceeded. */
+fun bdTax(income: Double, women: Boolean): Double {
+    var taxable = income - bdThreshold(women)
     if (taxable <= 0) return 0.0
     var tax = 0.0
-    // Same as the web: each slab limit is the size of that band, not a running total.
+    // Each slab limit is the size of that band, not a running total.
     for ((limit, rate) in Web.SLABS) {
         val amount = minOf(taxable, limit)
         tax += amount * rate
         taxable -= amount
         if (taxable <= 0) break
     }
-    return tax
+    return maxOf(tax, Web.MIN_TAX)
 }
 
 @Composable
 fun TaxScreen(state: UiState) {
     var income by remember { mutableStateOf("500000") }
+    var women by remember { mutableStateOf(false) }
     val inc = income.toDoubleOrNull() ?: 0.0
-    val tax = bdTax(inc, state.name)
+    val threshold = bdThreshold(women)
+    val tax = bdTax(inc, women)
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AppCard {
             Text("ট্যাক্স ক্যালকুলেটর (বার্ষিক)", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            ChoiceChips(listOf("general" to "সাধারণ", "women" to "মহিলা বা ৬৫+"), if (women) "women" else "general") { women = it == "women" }
             TextIn("বার্ষিক আয় (৳)", income, { income = it }, number = true)
-            KeyValue("করযোগ্য সীমা", fmtMoney(if (inc > bdThreshold(state.name)) inc - bdThreshold(state.name) else 0.0))
-            KeyValue("সীমা", fmtMoney(bdThreshold(state.name)))
+            KeyValue("করযোগ্য সীমা", fmtMoney(if (inc > threshold) inc - threshold else 0.0))
+            KeyValue("করমুক্ত সীমা", fmtMoney(threshold))
         }
         AppCard {
             Text("মোট ট্যাক্স", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(fmtMoney(tax), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Rose500)
             Text("কার্যকর হার: ${if (inc > 0) String.format(Locale.US, "%.2f", tax / inc * 100) else "0.00"}%", fontSize = 12.sp)
         }
-        Text("স্ল্যাব: ১ লাখ @৫%, পরের ৩ লাখ @১০%, পরের ৪ লাখ @১৫%, পরের ৫ লাখ @২০%, বাকিটা @২৫%", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "স্ল্যাব (করমুক্ত সীমার উপরে): ১০% প্রথম ৩ লাখ, ১৫% পরের ৪ লাখ, ২০% পরের ৫ লাখ, ২৫% পরের ২০ লাখ, বাকিটা ৩০%। ন্যূনতম ট্যাক্স ৫,০০০ টাকা (সীমার উপরে হলে)। অর্থ আইন ২০২৬, অ্যাসেসমেন্ট বছর ২০২৬-২৭।",
+            fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
-fun bdThreshold(name: String): Double = if (name.contains("Ms")) Web.FEMALE_THRESHOLD else Web.MALE_THRESHOLD
-
 @Composable
 fun CurrencyScreen() {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     var value by remember { mutableStateOf("100") }
     var from by remember { mutableStateOf("USD") }
     var to by remember { mutableStateOf("BDT") }
+    var snap by remember { mutableStateOf(FxStore.load(ctx)) }
+    var loading by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+
+    fun refresh() {
+        if (loading) return
+        loading = true
+        scope.launch {
+            val res = withContext(Dispatchers.IO) { FxStore.fetch(ctx) }
+            res.onSuccess { snap = it; failed = false }
+            res.onFailure { failed = true }
+            loading = false
+        }
+    }
+    // Fetch on open when there is no saved rate or the saved one is older than 12 hours.
+    LaunchedEffect(Unit) {
+        val first = snap
+        if (first == null || System.currentTimeMillis() - first.fetchedAt > FxStore.MAX_AGE_MS) refresh()
+    }
+
     val v = value.toDoubleOrNull() ?: 0.0
-    val result = v * (Web.RATES[from] ?: 1.0) / (Web.RATES[to] ?: 1.0)
+    val s = snap
+    val result = s?.let { fxConvert(v, from, to, it.rates) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AppCard {
             Text("কারেন্সি কনভার্টার", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             TextIn("পরিমাণ", value, { value = it }, number = true)
             Text("থেকে", fontSize = 12.sp)
-            ChoiceChips(Web.RATES.keys.map { it to it }, from) { from = it }
+            ChoiceChips(FxStore.CURRENCIES.map { it to it }, from) { from = it }
             Text("তে", fontSize = 12.sp)
-            ChoiceChips(Web.RATES.keys.map { it to it }, to) { to = it }
+            ChoiceChips(FxStore.CURRENCIES.map { it to it }, to) { to = it }
         }
         AppCard {
             Text("ফলাফল", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("${String.format(Locale.US, "%,.2f", result)} $to", fontSize = 26.sp, fontWeight = FontWeight.Black, color = Color(0xFF34D399))
-            Text("রেট স্থির (ডেমো রেট, লাইভ নয়)", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (result != null) {
+                Text(String.format(Locale.US, "%,.2f", result) + " $to", fontSize = 26.sp, fontWeight = FontWeight.Black, color = Color(0xFF34D399))
+            } else {
+                Text("রেট পাওয়া যায়নি। ইন্টারনেট দিয়ে একবার রেট আনুন।", fontSize = 13.sp, color = Rose500)
+            }
+            if (s != null) {
+                val at = fxUpdatedLocal(s.updatedUtc)
+                val stamp = at?.let { displayDate(it.toLocalDate().toString()) + " " + String.format(Locale.US, "%02d:%02d", it.hour, it.minute) } ?: s.updatedUtc
+                val stale = System.currentTimeMillis() - s.fetchedAt > FxStore.MAX_AGE_MS
+                Text("রেটের সময়: $stamp (ডিভাইসের সময়)" + if (stale) " · পুরনো ক্যাশ" else "", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (failed) Text("নতুন রেট আনা যায়নি, তাই ক্যাশ করা রেট দেখানো হচ্ছে।", fontSize = 11.sp, color = Rose500)
+            }
+            OutlinedButton(onClick = { refresh() }, enabled = !loading) {
+                Text(if (loading) "রেট আনা হচ্ছে…" else "রেট নতুন করে আনুন")
+            }
+            Text("রেট সরবরাহ: ExchangeRate-API (open access)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
+
 
 /** EMI = P·r·(1+r)^n / ((1+r)^n − 1), with r = annual rate / 12 / 100. */
 fun emiFor(principal: Double, annualPercent: Double, months: Int): Double {
