@@ -186,7 +186,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Sends a question with a short financial summary to the server-side AI function. */
-    suspend fun askAi(question: String, context: String): String = repo.askAi(question, context)
+    suspend fun askAi(question: String, context: String, language: String): String = repo.askAi(question, context, language)
 
     /** Shows busy state, converts errors into readable messages, and signs out on expired sessions. */
     private suspend fun runGuarded(block: suspend () -> Unit) {

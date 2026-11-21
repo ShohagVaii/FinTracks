@@ -137,10 +137,12 @@ class Repository(context: Context) {
     }
 
     /** Calls the server-side AI function. The Gemini key never leaves Supabase. */
-    suspend fun askAi(question: String, context: String): String {
+    suspend fun askAi(question: String, context: String, language: String): String {
         val body = buildJsonObject {
             put("question", question)
             put("context", context)
+            // "en" makes the server answer in English; anything else gets the Bengali answer.
+            put("language", language)
         }
         val text = authed("POST", "/functions/v1/ai-chat", body)
         return json.parseToJsonElement(text).jsonObject["answer"]?.jsonPrimitive?.content

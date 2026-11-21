@@ -67,6 +67,14 @@ fun Page(content: @Composable () -> Unit) {
 
 // ======================= ধার ও পাওনা =======================
 
+/**
+ * Local calendar date (yyyy-MM-dd) of a server timestamp such as "2026-11-19T12:06:24.381962+00:00".
+ * Converting to the device zone keeps a late-evening Bangladesh entry on the right day.
+ */
+fun localDateOf(timestamp: String): String = runCatching {
+    java.time.OffsetDateTime.parse(timestamp).atZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalDate().toString()
+}.getOrElse { timestamp.take(10) }
+
 /** Amount already paid back on one debt (sum of its payment rows). */
 fun debtPaid(debt: JsonObject, payments: List<JsonObject>): Double =
     payments.filter { it.str("debt_id") == debt.id() }.sumOf { it.num("amount") }
@@ -220,6 +228,7 @@ fun DebtsScreen(state: UiState, vm: AppViewModel) {
                                 if (isOwe) tr("আমি দেবো", "I will pay") else tr("আমি পাবো", "I will get"),
                                 fontSize = 11.sp, color = dirColor, fontWeight = FontWeight.Bold
                             )
+                            d.strOrNull("created_at")?.let { Text(tr("নেওয়া", "Taken") + ": ${displayDate(localDateOf(it))}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                             d.strOrNull("due_date")?.let { Text(tr("শেষ তারিখ", "Due") + ": ${displayDate(it)}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         }
                     }

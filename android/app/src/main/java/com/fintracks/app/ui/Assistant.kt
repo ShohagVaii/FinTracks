@@ -136,12 +136,18 @@ fun aiContext(state: UiState): String {
         .map { (k, v) -> k to v.sumOf { it.num("amount") } }.sortedByDescending { it.second }.take(5)
     val owe = debtsRemaining(state, "owe")
     val owed = debtsRemaining(state, "owed")
+    val none = tr("নেই", "none")
     return buildString {
-        append("মুদ্রা: ${state.currency}. মাস: $month. মোট আয়: ${m(income)}. মোট ব্যয়: ${m(expense)}.\n")
-        append("শীর্ষ ব্যয়ের ক্যাটাগরি: ")
-        append(cats.joinToString(", ") { "${it.first} ${m(it.second)}" }.ifEmpty { "নেই" })
-        append(".\nআপনার ধার: ${m(owe)}. আপনার পাওনা: ${m(owed)}.\n")
-        append("বাজেট সংখ্যা: ${state.rows("budgets").size}, লক্ষ্য সংখ্যা: ${state.rows("goals").size}.")
+        append(tr("মুদ্রা: ", "Currency: ")).append(state.currency)
+        append(tr(". মাস: ", ". Month: ")).append(month)
+        append(tr(". মোট আয়: ", ". Total income: ")).append(m(income))
+        append(tr(". মোট ব্যয়: ", ". Total expense: ")).append(m(expense)).append(".\n")
+        append(tr("শীর্ষ ব্যয়ের ক্যাটাগরি: ", "Top expense categories: "))
+        append(cats.joinToString(", ") { "${catLabel(it.first)} ${m(it.second)}" }.ifEmpty { none })
+        append(tr(".\nআপনার ধার: ", ".\nYou owe: ")).append(m(owe))
+        append(tr(". আপনার পাওনা: ", ". Owed to you: ")).append(m(owed)).append(".\n")
+        append(tr("বাজেট সংখ্যা: ", "Budgets: ")).append(state.rows("budgets").size)
+        append(tr(", লক্ষ্য সংখ্যা: ", ", goals: ")).append(state.rows("goals").size).append(".")
     }.take(3900)
 }
 
@@ -161,7 +167,7 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
         thinking = true
         scope.launch {
             val reply = try {
-                vm.askAi(q, aiContext(state))
+                vm.askAi(q, aiContext(state), if (AppPrefs.english) "en" else "bn")
             } catch (e: Exception) {
                 // Offline or AI not available: answer from local data, and say so.
                 Assistant.answer(q, state) + "\n\n(No AI connection; answered from local data)"

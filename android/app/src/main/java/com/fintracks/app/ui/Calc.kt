@@ -136,7 +136,9 @@ fun CalculatorDialog(onUse: (Double) -> Unit, onDismiss: () -> Unit) {
             }
         }
     }
-    val glass = Color(0xB3101828)
+    // Android 12+ blurs the window behind the popup, so a lighter tint shows the blur.
+    // Older devices cannot blur, so the panel gets a darker tint to stay readable.
+    val glass = if (Build.VERSION.SDK_INT >= 31) Color(0x99101828) else Color(0xE6101828)
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Column(
