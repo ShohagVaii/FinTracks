@@ -349,18 +349,18 @@ fun ReportsScreen(state: UiState) {
         Text(range.label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         InsightsCards(state)
         AppCard {
-            KeyValue("আয়", taka(income, p), Color(0xFF10B981))
-            KeyValue("ব্যয়", taka(expense, p), Color(0xFFF43F5E))
-            KeyValue("নিট", taka(income - expense, p), Color(0xFF38BDF8))
-            KeyValue("লেনদেন সংখ্যা", txs.size.toString(), Color(0xFF94A3B8))
+            KeyValue(tr("আয়", "Income"), taka(income, p), Color(0xFF10B981))
+            KeyValue(tr("ব্যয়", "Expense"), taka(expense, p), Color(0xFFF43F5E))
+            KeyValue(tr("নিট", "Net"), taka(income - expense, p), Color(0xFF38BDF8))
+            KeyValue(tr("লেনদেন সংখ্যা", "Transactions"), txs.size.toString(), Color(0xFF94A3B8))
         }
         AppCard {
-            Text("আয় বনাম ব্যয় (সারসংক্ষেপ)", fontWeight = FontWeight.Bold)
+            Text(tr("আয় বনাম ব্যয় (সারসংক্ষেপ)", "Income vs expense (summary)"), fontWeight = FontWeight.Bold)
             IncomeExpenseBars(income, expense, p)
         }
         AppCard {
-            Text("খাতওয়ারি ব্যয়", fontWeight = FontWeight.Bold)
-            if (cats.isEmpty()) Text("কোনো ব্যয় নেই", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("খাতওয়ারি ব্যয়", "Expense by category"), fontWeight = FontWeight.Bold)
+            if (cats.isEmpty()) Text(tr("কোনো ব্যয় নেই", "No expenses"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             cats.forEach { (name, v) ->
                 val pct = if (expense > 0) (v / expense).toFloat() else 0f
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -373,7 +373,7 @@ fun ReportsScreen(state: UiState) {
         // Trend uses fixed windows (7 days / 30 days / 12 months) chosen by its own tabs, not the period picker above.
         ExpenseTrendCard(state.rows("transactions"), p)
         AppCard {
-            Text("রিপোর্ট এক্সপোর্ট", fontWeight = FontWeight.Bold)
+            Text(tr("রিপোর্ট এক্সপোর্ট", "Export report"), fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(Export.Format.PDF to "PDF", Export.Format.XLSX to "Excel", Export.Format.CSV to "CSV").forEach { (fmt, label) ->
                     OutlinedButton(enabled = !busy && txs.isNotEmpty(), onClick = {
@@ -381,7 +381,7 @@ fun ReportsScreen(state: UiState) {
                         scope.launch {
                             try {
                                 val file = withContext(Dispatchers.IO) { Export.listFile(ctx, fmt, state, txs, range.label) }
-                                Export.share(ctx, file, fmt.mime, "FinTrack রিপোর্ট - ${range.label}")
+                                Export.share(ctx, file, fmt.mime, tr("FinTrack রিপোর্ট", "FinTrack report") + " - ${range.label}")
                             } catch (e: Exception) {
                                 Toast.makeText(ctx, "এক্সপোর্ট ব্যর্থ: ${e.message}", Toast.LENGTH_LONG).show()
                             } finally { busy = false }

@@ -133,15 +133,15 @@ private fun BillSplitSection(state: UiState, vm: AppViewModel) {
     AddButton(tr("নতুন বিল", "New bill")) { adding = true }
     if (unsettled.isNotEmpty()) {
         AppCard {
-            Text("অমীমাংসিত বিল: সব মিলিয়ে", fontWeight = FontWeight.Bold)
+            Text(tr("অমীমাংসিত বিল: সব মিলিয়ে", "Unsettled bills, total"), fontWeight = FontWeight.Bold)
             if (overallPayouts.isEmpty()) {
-                Text("কারও কাছে কিছু পাওনা বা দেনা নেই।", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr("কারও কাছে কিছু পাওনা বা দেনা নেই।", "Nobody owes or is owed anything."), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
-                overallPayouts.forEach { Text("${it.from} দেবেন ${it.to}-কে: ${taka(it.amount, p)}", fontSize = 14.sp) }
+                overallPayouts.forEach { Text(tr("${it.from} দেবেন ${it.to}-কে: ${taka(it.amount, p)}", "${it.from} owes ${it.to}: ${taka(it.amount, p)}"), fontSize = 14.sp) }
             }
         }
     }
-    if (bills.isEmpty()) EmptyHint("কোনো বিল ভাগ নেই")
+    if (bills.isEmpty()) EmptyHint(tr("কোনো বিল ভাগ নেই", "No bill splits yet"))
     bills.forEach { b -> BillCard(b, vm, p) }
     if (adding) NewBillDialog(state, vm) { adding = false }
 }
@@ -158,26 +158,26 @@ private fun BillCard(b: JsonObject, vm: AppViewModel, p: Boolean) {
             Column(Modifier.weight(1f)) {
                 Text(b.str("title"), fontWeight = FontWeight.Bold)
                 Text(
-                    "পরিশোধ করেছেন: ${b.str("payer")} · ${dateOf(b, "split_date")} · ${if (custom) "কাস্টম ভাগ" else "সমান ভাগ"}",
+                    tr("পরিশোধ করেছেন", "Paid by") + ": ${b.str("payer")} · ${displayDate(dateOf(b, "split_date"))} · ${if (custom) tr("কাস্টম ভাগ", "Custom split") else tr("সমান ভাগ", "Equal split")}",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(taka(total, p), fontWeight = FontWeight.Bold)
         }
-        b.strList("participants").forEach { n -> KeyValue("$n-এর ভাগ", taka(billShare(b, n), p)) }
-        Text("ফলাফল", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        b.strList("participants").forEach { n -> KeyValue(tr("$n-এর ভাগ", "$n's share"), taka(billShare(b, n), p)) }
+        Text(tr("ফলাফল", "Result"), fontWeight = FontWeight.Bold, fontSize = 13.sp)
         net.forEach { (n, v) ->
             when {
-                v > 0.005 -> KeyValue("$n · পাবেন", taka(v, p), Emerald500)
-                v < -0.005 -> KeyValue("$n · দেবেন", taka(-v, p), Rose500)
-                else -> KeyValue(n, "মিটে গেছে")
+                v > 0.005 -> KeyValue("$n · " + tr("পাবেন", "gets back"), taka(v, p), Emerald500)
+                v < -0.005 -> KeyValue("$n · " + tr("দেবেন", "owes"), taka(-v, p), Rose500)
+                else -> KeyValue(n, tr("মিটে গেছে", "Settled"))
             }
         }
-        payouts.forEach { Text("${it.from} → ${it.to}-কে ফেরত: ${taka(it.amount, p)}", fontSize = 13.sp) }
+        payouts.forEach { Text(tr("${it.from} → ${it.to}-কে ফেরত: ${taka(it.amount, p)}", "${it.from} → ${it.to} repays: ${taka(it.amount, p)}"), fontSize = 13.sp) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(onClick = { vm.save("bill_splits", row("is_settled" to !settled), b.id()) }) {
-                Text(if (settled) "অমীমাংসিত করুন" else "মিটে গেছে")
+                Text(if (settled) tr("অমীমাংসিত করুন", "Mark unsettled") else tr("মিটে গেছে", "Settled"))
             }
             DeleteButton { vm.remove("bill_splits", b.id()) }
         }
@@ -237,7 +237,7 @@ private fun NewBillDialog(state: UiState, vm: AppViewModel, onDone: () -> Unit) 
     }) {
         TextIn("বিলের নাম (যেমন: বাসা ভাড়া, খাবার)", title, { title = it })
         TextIn("মোট টাকা (৳)", total, { total = it }, number = true)
-        Text("অংশগ্রহণকারী", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(tr("অংশগ্রহণকারী", "Participants"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (known.isNotEmpty()) {
             ToggleChips(known, people) { n ->
                 people = if (n in people) people - n else people + n
@@ -253,21 +253,21 @@ private fun NewBillDialog(state: UiState, vm: AppViewModel, onDone: () -> Unit) 
                     if (n !in people) people = people + n
                     newName = ""
                 }
-            }) { Text("যোগ") }
+            }) { Text(tr("যোগ", "Add")) }
         }
         if (people.isNotEmpty()) {
-            Text("কে পরিশোধ করেছেন", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("কে পরিশোধ করেছেন", "Paid by"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             ChoiceChips(people.map { it to it }, payer) { payer = it }
         }
-        Text("ভাগের ধরন", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        ChoiceChips(listOf("equal" to "সমান ভাগ", "custom" to "কাস্টম পরিমাণ"), mode) { mode = it }
+        Text(tr("ভাগের ধরন", "Split type"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ChoiceChips(listOf("equal" to tr("সমান ভাগ", "Equal split"), "custom" to tr("কাস্টম পরিমাণ", "Custom amounts")), mode) { mode = it }
         if (mode == "custom") {
             people.forEach { n ->
                 TextIn("$n-এর ভাগ (৳)", amounts[n] ?: "", { v -> amounts = amounts + (n to v) }, number = true)
             }
-            if (t != null) Text("বাকি: ${taka(tv - customSum)}", fontSize = 12.sp)
+            if (t != null) Text(tr("বাকি", "Left") + ": ${taka(tv - customSum)}", fontSize = 12.sp)
         } else if (t != null && people.isNotEmpty()) {
-            Text("জনপ্রতি: ${taka(tv / people.size)}", fontSize = 12.sp)
+            Text(tr("জনপ্রতি", "Per person") + ": ${taka(tv / people.size)}", fontSize = 12.sp)
         }
         error?.let { Text(it, color = Rose500, fontSize = 12.sp) }
     }
@@ -299,20 +299,20 @@ private fun ShoppingSection(state: UiState, vm: AppViewModel) {
             },
             enabled = name.isNotBlank(),
             colors = ButtonDefaults.buttonColors(containerColor = Emerald500, contentColor = Color.White)
-        ) { Text("যোগ করুন") }
+        ) { Text(tr("যোগ করুন", "Add")) }
     }
     AppCard {
         Text(tr("বাজেট বনাম খরচ", "Budget vs spending"), fontWeight = FontWeight.Bold)
-        KeyValue("মোট বাজেট", taka(budgetTotal, p))
-        KeyValue("মোট খরচ (কেনা আইটেম)", taka(spent, p))
+        KeyValue(tr("মোট বাজেট", "Total budget"), taka(budgetTotal, p))
+        KeyValue(tr("মোট খরচ (কেনা আইটেম)", "Total spent (bought items)"), taka(spent, p))
         KeyValue(
-            if (diff >= 0) "বাজেটের বাকি" else "বাজেটের বেশি খরচ",
+            if (diff >= 0) tr("বাজেটের বাকি", "Budget left") else tr("বাজেটের বেশি খরচ", "Over budget"),
             taka(kotlin.math.abs(diff), p),
             if (diff >= 0) Emerald500 else Rose500
         )
         ProgressBar(if (budgetTotal > 0) (spent / budgetTotal).toFloat() else 0f, Sky500)
     }
-    if (items.isEmpty()) EmptyHint("শপিং লিস্ট খালি")
+    if (items.isEmpty()) EmptyHint(tr("শপিং লিস্ট খালি", "Shopping list is empty"))
     items.forEach { i ->
         val done = i.bool("is_done")
         AppCard {
@@ -324,8 +324,8 @@ private fun ShoppingSection(state: UiState, vm: AppViewModel) {
                         color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified
                     )
                     Text(
-                        if (done) "বাজেট ${taka(i.num("estimated_price"), p)} · কেনা দাম ${taka(i.num("actual_price"), p)}"
-                        else "আনুমানিক ${taka(i.num("estimated_price"), p)}",
+                        if (done) tr("বাজেট", "Budget") + " ${taka(i.num("estimated_price"), p)} · " + tr("কেনা দাম", "bought at") + " ${taka(i.num("actual_price"), p)}"
+                        else tr("আনুমানিক", "Estimated") + " ${taka(i.num("estimated_price"), p)}",
                         fontSize = 12.sp
                     )
                 }
@@ -333,12 +333,12 @@ private fun ShoppingSection(state: UiState, vm: AppViewModel) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (done) {
-                    OutlinedButton(onClick = { buying = i }) { Text("দাম বদলান") }
+                    OutlinedButton(onClick = { buying = i }) { Text(tr("দাম বদলান", "Change price")) }
                     OutlinedButton(onClick = { vm.save("shopping_items", row("is_done" to false, "actual_price" to JsonNull), i.id()) }) {
-                        Text("আবার কিনতে হবে")
+                        Text(tr("আবার কিনতে হবে", "Need to buy again"))
                     }
                 } else {
-                    Button(onClick = { buying = i }) { Text("কেনা হয়েছে") }
+                    Button(onClick = { buying = i }) { Text(tr("কেনা হয়েছে", "Bought")) }
                 }
             }
         }
@@ -400,38 +400,38 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
 
     MonthNav(ym) { ym = it }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        StatPill("মোট বাজার", taka(totalBazaar, p), Emerald500, Modifier.weight(1f))
-        StatPill("মোট মিল", fmtNum(totalMeals), Sky400, Modifier.weight(1f))
-        StatPill("মিল রেট", taka(rate, p), Amber500, Modifier.weight(1f))
+        StatPill(tr("মোট বাজার", "Total bazaar"), taka(totalBazaar, p), Emerald500, Modifier.weight(1f))
+        StatPill(tr("মোট মিল", "Total meals"), fmtNum(totalMeals), Sky400, Modifier.weight(1f))
+        StatPill(tr("মিল রেট", "Meal rate"), taka(rate, p), Amber500, Modifier.weight(1f))
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
             onClick = { addingMember = true },
             colors = ButtonDefaults.buttonColors(containerColor = Emerald500, contentColor = Color.White),
             modifier = Modifier.weight(1f)
-        ) { Text("+ সদস্য") }
+        ) { Text(tr("+ সদস্য", "+ Member")) }
         Button(
             onClick = { addingDeposit = true },
             enabled = members.isNotEmpty(),
             colors = ButtonDefaults.buttonColors(containerColor = Amber500, contentColor = Color.White),
             modifier = Modifier.weight(1f)
-        ) { Text("জমা এন্ট্রি") }
+        ) { Text(tr("জমা এন্ট্রি", "Deposit entry")) }
     }
     Button(
         onClick = { addingBazaar = true },
         enabled = members.isNotEmpty(),
         colors = ButtonDefaults.buttonColors(containerColor = Emerald500, contentColor = Color.White),
         modifier = Modifier.fillMaxWidth().height(52.dp)
-    ) { Text("বাজার এন্ট্রি", fontWeight = FontWeight.Bold) }
+    ) { Text(tr("বাজার এন্ট্রি", "Bazaar entry"), fontWeight = FontWeight.Bold) }
     Button(
         onClick = { addingMeal = true },
         enabled = members.isNotEmpty(),
         colors = ButtonDefaults.buttonColors(containerColor = Sky500, contentColor = Color.White),
         modifier = Modifier.fillMaxWidth().height(52.dp)
-    ) { Text("মিল এন্ট্রি", fontWeight = FontWeight.Bold) }
+    ) { Text(tr("মিল এন্ট্রি", "Meal entry"), fontWeight = FontWeight.Bold) }
 
     SectionTitle(tr("সদস্য ও হিসাব", "Members & accounts"))
-    if (members.isEmpty()) EmptyHint("কোনো সদস্য নেই। উপরে '+ সদস্য' দিয়ে যোগ করুন।")
+    if (members.isEmpty()) EmptyHint(tr("কোনো সদস্য নেই। উপরে '+ সদস্য' দিয়ে যোগ করুন।", "No members yet. Add one with '+ Member' above."))
     members.forEach { m ->
         val paid = bazaars.filter { it.str("member_id") == m.id() }.sumOf { it.num("amount") }
         val cash = deposits.filter { it.str("member_id") == m.id() }.sumOf { it.num("amount") }
@@ -445,15 +445,15 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
                     DeleteButton { vm.remove("mess_members", m.id()) }
                 }
             }
-            KeyValue("জমা মোট (বাজার + ক্যাশ)", taka(paid + cash, p))
-            KeyValue("  · বাজার এন্ট্রি", taka(paid, p))
-            KeyValue("  · ক্যাশ জমা", taka(cash, p))
+            KeyValue(tr("জমা মোট (বাজার + ক্যাশ)", "Total deposits (bazaar + cash)"), taka(paid + cash, p))
+            KeyValue(tr("  · বাজার এন্ট্রি", "  · bazaar entries"), taka(paid, p))
+            KeyValue(tr("  · ক্যাশ জমা", "  · cash deposits"), taka(cash, p))
             KeyValue("মিল", fmtNum(mealN))
-            KeyValue("তার খরচ (মিল × রেট)", taka(mealN * rate, p))
+            KeyValue(tr("তার খরচ (মিল × রেট)", "Their cost (meals × rate)"), taka(mealN * rate, p))
             when {
-                bal > 0.005 -> KeyValue("পাবেন", taka(bal, p), Emerald500)
-                bal < -0.005 -> KeyValue("দেবেন", taka(-bal, p), Rose500)
-                else -> KeyValue("হিসাব", "মিটে গেছে")
+                bal > 0.005 -> KeyValue(tr("পাবেন", "Gets back"), taka(bal, p), Emerald500)
+                bal < -0.005 -> KeyValue(tr("দেবেন", "Owes"), taka(-bal, p), Rose500)
+                else -> KeyValue(tr("হিসাব", "Balance"), tr("মিটে গেছে", "Settled"))
             }
         }
     }
@@ -461,23 +461,23 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
     SectionTitle(tr("হিসাব নিষ্পত্তি (সেটল-আপ)", "Settle up"))
     AppCard {
         when {
-            members.isEmpty() -> Text("সদস্য যোগ করলে এখানে কে কাকে কত দেবে তা দেখাবে।", fontSize = 13.sp)
-            payouts.isEmpty() -> Text("এই মাসে কারও কাছে কিছু পাওনা বা দেনা নেই।", fontSize = 13.sp)
+            members.isEmpty() -> Text(tr("সদস্য যোগ করলে এখানে কে কাকে কত দেবে তা দেখাবে।", "Add members to see who pays whom here."), fontSize = 13.sp)
+            payouts.isEmpty() -> Text(tr("এই মাসে কারও কাছে কিছু পাওনা বা দেনা নেই।", "Nobody owes or is owed anything this month."), fontSize = 13.sp)
             else -> payouts.forEach {
-                Text("${nameOf[it.from].orEmpty()} দেবেন ${nameOf[it.to].orEmpty()}-কে: ${taka(it.amount, p)}", fontSize = 14.sp)
+                Text(tr("${nameOf[it.from].orEmpty()} দেবেন ${nameOf[it.to].orEmpty()}-কে: ${taka(it.amount, p)}", "${nameOf[it.from].orEmpty()} owes ${nameOf[it.to].orEmpty()}: ${taka(it.amount, p)}"), fontSize = 14.sp)
             }
         }
     }
 
     SectionTitle(tr("জমার হিসাব", "Deposits"))
-    if (deposits.isEmpty()) EmptyHint("এই মাসে কোনো জমা এন্ট্রি নেই")
+    if (deposits.isEmpty()) EmptyHint(tr("এই মাসে কোনো জমা এন্ট্রি নেই", "No deposit entries this month"))
     deposits.sortedByDescending { dateOf(it, "deposit_date") }.forEach { d ->
         AppCard {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("${nameOf[d.str("member_id")].orEmpty()} · ক্যাশ জমা", fontWeight = FontWeight.Bold)
                     Text(
-                        listOf(dateOf(d, "deposit_date"), d.str("note")).filter { it.isNotBlank() }.joinToString(" · "),
+                        listOf(displayDate(dateOf(d, "deposit_date")), d.str("note")).filter { it.isNotBlank() }.joinToString(" · "),
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -489,13 +489,13 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
     }
 
     SectionTitle(tr("বাজারের হিসাব", "Bazaar"))
-    if (bazaars.isEmpty()) EmptyHint("এই মাসে কোনো বাজার এন্ট্রি নেই")
+    if (bazaars.isEmpty()) EmptyHint(tr("এই মাসে কোনো বাজার এন্ট্রি নেই", "No bazaar entries this month"))
     bazaars.sortedByDescending { dateOf(it, "bazaar_date") }.forEach { b ->
         AppCard {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("${nameOf[b.str("member_id")].orEmpty()} · ${b.str("item").ifBlank { "বাজার" }}", fontWeight = FontWeight.Bold)
-                    Text(dateOf(b, "bazaar_date"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(displayDate(dateOf(b, "bazaar_date")), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(taka(b.num("amount"), p), fontWeight = FontWeight.Bold)
                 DeleteButton { vm.remove("mess_bazaars", b.id()) }
@@ -504,13 +504,13 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
     }
 
     SectionTitle(tr("মিলের হিসাব", "Meals"))
-    if (meals.isEmpty()) EmptyHint("এই মাসে কোনো মিল নেই")
+    if (meals.isEmpty()) EmptyHint(tr("এই মাসে কোনো মিল নেই", "No meals this month"))
     meals.sortedByDescending { dateOf(it, "meal_date") }.forEach { m ->
         AppCard {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("${nameOf[m.str("member_id")].orEmpty()} · ${fmtNum(m.num("meal_count"))} মিল", fontWeight = FontWeight.Bold)
-                    Text(dateOf(m, "meal_date"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(displayDate(dateOf(m, "meal_date")), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 DeleteButton { vm.remove("mess_meals", m.id()) }
             }
@@ -570,7 +570,7 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
         var item by remember { mutableStateOf("") }
         var date by remember { mutableStateOf(todayIso()) }
         var error by remember { mutableStateOf<String?>(null) }
-        SharedDialog("বাজার এন্ট্রি", "সেভ", onDismiss = { addingBazaar = false }, onConfirm = {
+        SharedDialog(tr("বাজার এন্ট্রি", "Bazaar entry"), "সেভ", onDismiss = { addingBazaar = false }, onConfirm = {
             val a = parseAmount(amount)
             when {
                 a == null || a <= 0 -> error = "সঠিক টাকার পরিমাণ লিখুন"
@@ -594,7 +594,7 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
         var count by remember { mutableStateOf(1.0) }
         var date by remember { mutableStateOf(todayIso()) }
         var error by remember { mutableStateOf<String?>(null) }
-        SharedDialog("মিল এন্ট্রি", "মিল যোগ করুন", onDismiss = { addingMeal = false }, onConfirm = {
+        SharedDialog(tr("মিল এন্ট্রি", "Meal entry"), "মিল যোগ করুন", onDismiss = { addingMeal = false }, onConfirm = {
             when {
                 count <= 0 -> error = "মিলের সংখ্যা ০-এর বেশি হতে হবে"
                 !isValidIsoDate(date) -> error = "তারিখ লিখুন (YYYY-MM-DD)"

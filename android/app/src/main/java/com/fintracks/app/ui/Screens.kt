@@ -783,7 +783,7 @@ private fun SmsParserCard(state: UiState, vm: AppViewModel) {
     var open by remember { mutableStateOf(false) }
     AppCard(onClick = { open = true }) {
         Text("SMART SMS PARSER", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-        Text("bKash, Nagad বা ব্যাংকের SMS থেকে লেনদেন বের করুন", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(tr("bKash, Nagad বা ব্যাংকের SMS থেকে লেনদেন বের করুন", "Pull transactions from bKash, Nagad or bank SMS"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     if (open) SmsParserDialog(state, vm) { open = false }
 }

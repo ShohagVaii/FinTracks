@@ -124,11 +124,11 @@ fun CreditDueCard(state: UiState, onOpen: () -> Unit) {
     AppCard(onClick = onOpen) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
-                Text("মোট বাকি দেনা", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                Text(tr("মোট বাকি দেনা", "Total credit due"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 Text(taka(due, p), fontSize = 22.sp, fontWeight = FontWeight.Black, color = BakiRed)
-                Text("দোকানের বাকি · ধার/লোন থেকে আলাদা", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr("দোকানের বাকি · ধার/লোন থেকে আলাদা", "Shop credit · separate from loans"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (overdue > 0) Text("$overdue টি মেয়াদোত্তীর্ণ", color = BakiRed, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            if (overdue > 0) Text(tr("$overdue টি মেয়াদোত্তীর্ণ", "$overdue overdue"), color = BakiRed, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -151,7 +151,7 @@ fun BakiScreen(state: UiState, vm: AppViewModel) {
 
     Page {
         AppCard {
-            Text("মোট বাকি দেনা", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+            Text(tr("মোট বাকি দেনা", "Total credit due"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
             Text(taka(totalDue, p), fontSize = 26.sp, fontWeight = FontWeight.Black, color = BakiRed)
             if (overdue > 0) Text("$overdue টি কেনার শেষ তারিখ পার হয়ে গেছে", fontSize = 12.sp, color = BakiRed)
             Text("ধার/লোন থেকে আলাদা হিসাব। দোকান ও ব্যক্তির বাকি এখানে।", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -257,7 +257,7 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
                 KeyValue("পরিশোধ", taka(st?.paid ?: 0.0, p), BakiGreen)
                 KeyValue("বাকি", taka(st?.remaining ?: e.num("total"), p), if ((st?.remaining ?: 0.0) > EPS) BakiRed else BakiGreen)
                 Text(
-                    "কেনা: ${dateOf(e, "purchase_date")}" + (e.strOrNull("due_date")?.take(10)?.let { " · শেষ তারিখ: $it" } ?: ""),
+                    tr("কেনা", "Bought") + ": ${displayDate(dateOf(e, "purchase_date"))}" + (e.strOrNull("due_date")?.take(10)?.let { " · " + tr("শেষ তারিখ", "Due") + ": ${displayDate(it)}" } ?: ""),
                     fontSize = 11.sp,
                     color = if (overdue) BakiRed else MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -276,7 +276,7 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text(taka(pay.num("amount"), p), fontWeight = FontWeight.Bold, color = BakiGreen)
-                        Text(dateOf(pay, "paid_on") + (if (pay.str("note").isNotBlank()) " · ${pay.str("note")}" else ""), fontSize = 11.sp)
+                        Text(displayDate(dateOf(pay, "paid_on")) + (if (pay.str("note").isNotBlank()) " · ${pay.str("note")}" else ""), fontSize = 11.sp)
                     }
                     DeleteButton { vm.remove("credit_payments", pay.id()) }
                 }

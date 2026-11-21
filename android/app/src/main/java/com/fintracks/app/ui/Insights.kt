@@ -174,7 +174,7 @@ fun HeatmapCard(txs: List<JsonObject>, privacy: Boolean, ym: YearMonth, onPrev: 
                 Icon(Icons.Default.ChevronLeft, contentDescription = "আগের মাস")
             }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("এক্সপেন্স হিটম্যাপ", fontWeight = FontWeight.Bold)
+                Text(tr("এক্সপেন্স হিটম্যাপ", "Expense heatmap"), fontWeight = FontWeight.Bold)
                 Text(
                     monthYearLabel(ym.year, ym.monthValue),
                     fontSize = 11.sp,
@@ -207,7 +207,7 @@ fun HeatmapCard(txs: List<JsonObject>, privacy: Boolean, ym: YearMonth, onPrev: 
                 repeat(7 - week.size) { Spacer(Modifier.weight(1f)) }
             }
         }
-        Text("মোট ব্যয় (এই মাস): ${taka(perDay.sum(), privacy)}", fontSize = 12.sp)
+        Text(tr("মোট ব্যয় (এই মাস)", "Total expense (this month)") + ": ${taka(perDay.sum(), privacy)}", fontSize = 12.sp)
     }
 }
 
@@ -261,7 +261,7 @@ fun ExpenseTrendCard(txs: List<JsonObject>, privacy: Boolean) {
     AppCard {
         Text("ব্যয়ের ট্রেন্ড", fontWeight = FontWeight.Bold)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("week" to "সাপ্তাহিক", "month" to "মাসিক", "year" to "বাৎসরিক").forEach { (key, label) ->
+            listOf("week" to tr("সাপ্তাহিক", "Weekly"), "month" to tr("মাসিক", "Monthly"), "year" to tr("বাৎসরিক", "Yearly")).forEach { (key, label) ->
                 val on = view == key
                 Box(
                     Modifier

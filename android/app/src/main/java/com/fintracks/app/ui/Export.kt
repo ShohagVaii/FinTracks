@@ -33,10 +33,10 @@ object Export {
         PDF("pdf", "application/pdf")
     }
 
-    private val header = listOf("তারিখ", "ধরন", "ক্যাটাগরি", "পরিমাণ (৳)", "পেমেন্ট মাধ্যম", "অ্যাকাউন্ট", "নোট")
+    private fun header(): List<String> = listOf(tr("তারিখ", "Date"), tr("ধরন", "Type"), tr("ক্যাটাগরি", "Category"), tr("পরিমাণ (৳)", "Amount (৳)"), tr("পেমেন্ট মাধ্যম", "Payment mode"), tr("অ্যাকাউন্ট", "Account"), tr("নোট", "Note"))
 
     fun typeBn(t: String): String = when (t) {
-        "Income" -> "আয়"; "Expense" -> "ব্যয়"; "Transfer" -> "ট্রান্সফার"; else -> t
+        "Income" -> tr("আয়", "Income"); "Expense" -> tr("ব্যয়", "Expense"); "Transfer" -> tr("ট্রান্সফার", "Transfer"); else -> t
     }
 
     /** Western digits to Bengali digits, for printed PDFs. */
@@ -65,8 +65,8 @@ object Export {
         val file = newFile(ctx, format, "fintrack-list")
         val data = rows(state, txs)
         when (format) {
-            Format.CSV -> writeCsv(file, listOf(header as List<Any>) + data)
-            Format.XLSX -> writeXlsx(file, listOf(header as List<Any>) + data)
+            Format.CSV -> writeCsv(file, listOf(header() as List<Any>) + data)
+            Format.XLSX -> writeXlsx(file, listOf(header() as List<Any>) + data)
             Format.PDF -> writeListPdf(ctx, file, title, txs, state)
         }
         return file
@@ -187,15 +187,15 @@ object Export {
             y = 50f
         }
 
-        c.drawText("FinTrack লেনদেনের প্রতিবেদন", 40f, y, h1); y += 20f
+        c.drawText(tr("FinTrack লেনদেনের প্রতিবেদন", "FinTrack transaction report"), 40f, y, h1); y += 20f
         // The title already carries the formatted period; the creation date follows the date setting.
-        c.drawText("$title · তৈরি: ${displayDate(todayIso())} · মোট ${bn(txs.size.toString())} টি লেনদেন", 40f, y, small); y += 28f
+        c.drawText("$title · " + tr("তৈরি", "Created") + ": ${displayDate(todayIso())} · " + tr("মোট", "Total") + " ${bn(txs.size.toString())} " + tr("টি লেনদেন", "transactions"), 40f, y, small); y += 28f
 
         // Summary boxes
         val boxes = listOf(
-            Triple("মোট আয়", income, "#10B981"),
-            Triple("মোট ব্যয়", expense, "#F43F5E"),
-            Triple("নিট", income - expense, "#0EA5E9")
+            Triple(tr("মোট আয়", "Total income"), income, "#10B981"),
+            Triple(tr("মোট ব্যয়", "Total expense"), expense, "#F43F5E"),
+            Triple(tr("নিট", "Net"), income - expense, "#0EA5E9")
         )
         boxes.forEachIndexed { i, (label, value, col) ->
             val left = 40f + i * 175f
@@ -211,11 +211,11 @@ object Export {
             val hb = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#0F172A") }
             c.drawRect(RectF(40f, y - 14f, 555f, y + 6f), hb)
             val hp = paint(ctx, 10f, Color.WHITE, bold = true)
-            c.drawText("তারিখ", colX[0] + 4f, y, hp)
-            c.drawText("ধরন", colX[1], y, hp)
-            c.drawText("ক্যাটাগরি", colX[2], y, hp)
-            c.drawText("মাধ্যম", colX[3], y, hp)
-            c.drawText("পরিমাণ", 548f, y, paint(ctx, 10f, Color.WHITE, bold = true, align = Paint.Align.RIGHT))
+            c.drawText(tr("তারিখ", "Date"), colX[0] + 4f, y, hp)
+            c.drawText(tr("ধরন", "Type"), colX[1], y, hp)
+            c.drawText(tr("ক্যাটাগরি", "Category"), colX[2], y, hp)
+            c.drawText(tr("মাধ্যম", "Mode"), colX[3], y, hp)
+            c.drawText(tr("পরিমাণ", "Amount"), 548f, y, paint(ctx, 10f, Color.WHITE, bold = true, align = Paint.Align.RIGHT))
             y += 22f
         }
         tableHeader()
@@ -244,7 +244,7 @@ object Export {
                 y += 12f
             }
         }
-        if (txs.isEmpty()) c.drawText("এই সময়সীমায় কোনো লেনদেন নেই", 40f, y + 10f, body)
+        if (txs.isEmpty()) c.drawText(tr("এই সময়সীমায় কোনো লেনদেন নেই", "No transactions in this period"), 40f, y + 10f, body)
         doc.finishPage(page)
         file.outputStream().use { doc.writeTo(it) }
         doc.close()

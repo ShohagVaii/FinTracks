@@ -62,7 +62,7 @@ import kotlin.math.min
 
 // ======================= বয়স ক্যালকুলেটর =======================
 
-private fun bnDate(d: LocalDate): String = bnDigits("${d.dayOfMonth} ${BN_MONTHS[d.monthValue - 1]} ${d.year}")
+private fun bnDate(d: LocalDate): String = displayDate(d.toString())
 
 private fun bnWeekday(d: java.time.DayOfWeek): String = when (d) {
     java.time.DayOfWeek.SATURDAY -> "শনিবার"

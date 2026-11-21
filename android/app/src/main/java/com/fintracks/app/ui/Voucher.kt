@@ -308,7 +308,7 @@ object Voucher {
     private fun footer(c: Canvas, ctx: Context, sepY: Float) {
         c.drawLine(84f, sepY, 511f, sepY, line("#E2E8F0"))
         c.drawText(
-            "FinTrack সুরক্ষিত লেজার — শুধুমাত্র আপনার জন্য",
+            tr("FinTrack সুরক্ষিত লেজার — শুধুমাত্র আপনার জন্য", "FinTrack secure ledger — for you only"),
             PAGE_W / 2, sepY + 22f, text(ctx, 11f, "#0F172A", true, Paint.Align.CENTER)
         )
         val small = text(ctx, 9.5f, "#94A3B8")
@@ -332,9 +332,9 @@ object Voucher {
         c.drawBitmap(qr, null, RectF(qrRect.left + pad, qrRect.top + pad, qrRect.right - pad, qrRect.bottom - pad), null)
         qr.recycle()
         c.drawText(secureLabel, textX, textY, text(ctx, 15f, "#0F172A", true))
-        c.drawText("চেকসাম:", textX, textY + 30f, text(ctx, 11f, "#64748B"))
+        c.drawText(tr("চেকসাম:", "Checksum:"), textX, textY + 30f, text(ctx, 11f, "#64748B"))
         c.drawText(checksum, textX + 68f, textY + 30f, text(ctx, 13f, "#0F172A", true))
-        c.drawText("অ্যাপ ডাউনলোড:", textX, textY + 60f, text(ctx, 11f, "#64748B"))
+        c.drawText(tr("অ্যাপ ডাউনলোড:", "Download app:"), textX, textY + 60f, text(ctx, 11f, "#64748B"))
         c.drawText("shohagvaii.github.io/FinTracks", textX, textY + 78f, text(ctx, 12f, "#0369A1", true))
     }
 
@@ -374,7 +374,7 @@ object Voucher {
         }
 
         base(c, ctx)
-        header(c, ctx, "TRX ID: #${rec.trx}", "অফিসিয়াল লেনদেন ভাউচার", "ইস্যু সময়: ${issueText(now)}")
+        header(c, ctx, "TRX ID: #${rec.trx}", tr("অফিসিয়াল লেনদেন ভাউচার", "Official transaction voucher"), tr("ইস্যু সময়: ${issueText(now)}", "Issued: ${issueText(now)}"))
 
         // Amount card (green for income, red for expense)
         val box = RectF(60f, 180f, 535f, 326f)
@@ -383,9 +383,9 @@ object Voucher {
         })
         c.drawRoundRect(box, 18f, 18f, line(edge, 1.2f))
         val label = when {
-            income -> "মোট আয় (INCOME)"
-            expense -> "মোট ব্যয় (EXPENSE)"
-            else -> "ট্রান্সফার (TRANSFER)"
+            income -> tr("মোট আয় (INCOME)", "TOTAL INCOME")
+            expense -> tr("মোট ব্যয় (EXPENSE)", "TOTAL EXPENSE")
+            else -> tr("ট্রান্সফার (TRANSFER)", "TRANSFER")
         }
         c.drawText(label, 297f, 206f, text(ctx, 13f, accent, true, Paint.Align.CENTER))
         val sign = when {
@@ -394,7 +394,7 @@ object Voucher {
             else -> ""
         }
         c.drawText(money(amt, sign, twoDecimals = true), 297f, 266f, text(ctx, 42f, valueColor, true, Paint.Align.CENTER))
-        val subText = "যাচাইকৃত ও FinTrack-এ সংরক্ষিত"
+        val subText = tr("যাচাইকৃত ও FinTrack-এ সংরক্ষিত", "Verified and saved in FinTrack")
         val subP = text(ctx, 11f, accent, true, Paint.Align.CENTER)
         c.drawText(subText, 297f, 298f, subP)
         // Check mark drawn as a path (the Bengali font may not include the glyph)
@@ -405,13 +405,13 @@ object Voucher {
 
         // Detail table
         val rows = listOf(
-            "লেনদেনের তারিখ" to bnDate(date),
-            "ক্যাটাগরি" to t.str("category").ifEmpty { "-" },
-            "পেমেন্ট মেথড" to t.str("payment_mode").ifEmpty { "-" },
-            "অ্যাকাউন্ট" to Export.accountName(state, t).ifEmpty { "-" },
-            "মুড" to t.str("mood").ifEmpty { "-" },
-            "নোট" to t.str("note").ifEmpty { "-" },
-            "প্রোফাইল" to rec.profile.ifEmpty { "-" }
+            tr("লেনদেনের তারিখ", "Transaction date") to bnDate(date),
+            tr("ক্যাটাগরি", "Category") to t.str("category").ifEmpty { "-" },
+            tr("পেমেন্ট মেথড", "Payment method") to t.str("payment_mode").ifEmpty { "-" },
+            tr("অ্যাকাউন্ট", "Account") to Export.accountName(state, t).ifEmpty { "-" },
+            tr("মুড", "Mood") to t.str("mood").ifEmpty { "-" },
+            tr("নোট", "Note") to t.str("note").ifEmpty { "-" },
+            tr("প্রোফাইল", "Profile") to rec.profile.ifEmpty { "-" }
         )
         val labelP = text(ctx, 12.5f, "#64748B")
         val valueP = text(ctx, 13f, "#0F172A", true, Paint.Align.RIGHT)
@@ -434,7 +434,7 @@ object Voucher {
             textX = 250f,
             textY = 616f
         )
-        c.drawText("যাচাই করতে স্ক্যান করুন", 154f, 742f, text(ctx, 9.5f, "#64748B", false, Paint.Align.CENTER))
+        c.drawText(tr("যাচাই করতে স্ক্যান করুন", "Scan to verify"), 154f, 742f, text(ctx, 9.5f, "#64748B", false, Paint.Align.CENTER))
         footer(c, ctx, 762f)
     }
 
@@ -449,10 +449,10 @@ object Voucher {
 
         base(c, ctx)
         val issue = fitText(
-            "ইস্যু সময়: ${issueText(now)} · সময়কাল: $label",
+            tr("ইস্যু সময়: ${issueText(now)} · সময়কাল: $label", "Issued: ${issueText(now)} · period: $label"),
             text(ctx, 11f, "#64748B", true, Paint.Align.CENTER), 500f
         )
-        header(c, ctx, "BATCH: #${ref.batch}", "লেনদেনের সারসংক্ষেপ ভাউচার", issue)
+        header(c, ctx, "BATCH: #${ref.batch}", tr("লেনদেনের সারসংক্ষেপ ভাউচার", "Transaction summary voucher"), issue)
 
         // Totals strip
         val strip = RectF(60f, 180f, 535f, 246f)
@@ -460,9 +460,9 @@ object Voucher {
         c.drawRoundRect(strip, 16f, 16f, line("#E2E8F0"))
         val colW = strip.width() / 3f
         val stats = listOf(
-            Triple("মোট আয়", money(income, "+ "), "#047857"),
-            Triple("মোট ব্যয়", money(expense, "- "), "#BE123C"),
-            Triple("নিট", money(abs(net), if (net < 0) "- " else "+ "), netColor)
+            Triple(tr("মোট আয়", "Total income"), money(income, "+ "), "#047857"),
+            Triple(tr("মোট ব্যয়", "Total expense"), money(expense, "- "), "#BE123C"),
+            Triple(tr("নিট", "Net"), money(abs(net), if (net < 0) "- " else "+ "), netColor)
         )
         stats.forEachIndexed { i, (k, v, col) ->
             val cx = strip.left + colW * i + colW / 2
@@ -473,10 +473,10 @@ object Voucher {
 
         // Entries table: rows shrink to fit; anything that does not fit is said in one line, never clipped
         val headP = text(ctx, 10.5f, "#64748B", true)
-        c.drawText("তারিখ", 84f, 270f, headP)
-        c.drawText("বিবরণ", 168f, 270f, headP)
-        c.drawText("মেথড", 368f, 270f, headP)
-        c.drawText("পরিমাণ", 511f, 270f, text(ctx, 10.5f, "#64748B", true, Paint.Align.RIGHT))
+        c.drawText(tr("তারিখ", "Date"), 84f, 270f, headP)
+        c.drawText(tr("বিবরণ", "Details"), 168f, 270f, headP)
+        c.drawText(tr("মেথড", "Method"), 368f, 270f, headP)
+        c.drawText(tr("পরিমাণ", "Amount"), 511f, 270f, text(ctx, 10.5f, "#64748B", true, Paint.Align.RIGHT))
         c.drawLine(84f, 278f, 511f, 278f, line("#94A3B8", 1f))
 
         val n = txs.size
@@ -491,7 +491,7 @@ object Voucher {
         val size = (rowH * 0.5f).coerceIn(8f, 11f)
         var top = 282f
         if (n == 0) {
-            c.drawText("এই সময়কালে কোনো লেনদেন নেই", 297f, 312f, text(ctx, 12f, "#64748B", false, Paint.Align.CENTER))
+            c.drawText(tr("এই সময়কালে কোনো লেনদেন নেই", "No transactions in this period"), 297f, 312f, text(ctx, 12f, "#64748B", false, Paint.Align.CENTER))
         }
         txs.take(shown).forEach { t ->
             val baseY = top + rowH * 0.68f
@@ -517,14 +517,14 @@ object Voucher {
             top += rowH
         }
         if (!showAll) {
-            val more = "… আরও ${Export.bn((n - shown).toString())} টি এন্ট্রি (সম্পূর্ণ তালিকা CSV/Excel-এ পাওয়া যাবে)"
+            val more = tr("… আরও ${Export.bn((n - shown).toString())} টি এন্ট্রি (সম্পূর্ণ তালিকা CSV/Excel-এ পাওয়া যাবে)", "… ${Export.bn((n - shown).toString())} more entries (full list in CSV/Excel)")
             c.drawText(fitText(more, text(ctx, size, "#64748B"), 427f), 84f, top + rowH * 0.68f, text(ctx, size, "#64748B"))
         }
 
         // Totals line and QR block
-        c.drawText("মোট ${Export.bn(n.toString())} টি লেনদেন", 84f, 578f, text(ctx, 12f, "#0F172A", true))
+        c.drawText(tr("মোট ${Export.bn(n.toString())} টি লেনদেন", "Total ${Export.bn(n.toString())} transactions"), 84f, 578f, text(ctx, 12f, "#0F172A", true))
         c.drawText(
-            "নিট: ${money(abs(net), if (net < 0) "- " else "+ ")}",
+            tr("নিট", "Net") + ": ${money(abs(net), if (net < 0) "- " else "+ ")}",
             511f, 578f, text(ctx, 12f, netColor, true, Paint.Align.RIGHT)
         )
         c.drawLine(84f, 592f, 511f, 592f, dash)
@@ -537,7 +537,7 @@ object Voucher {
             textX = 224f,
             textY = 630f
         )
-        c.drawText("যাচাই করতে স্ক্যান করুন", 142f, 738f, text(ctx, 9.5f, "#64748B", false, Paint.Align.CENTER))
+        c.drawText(tr("যাচাই করতে স্ক্যান করুন", "Scan to verify"), 142f, 738f, text(ctx, 9.5f, "#64748B", false, Paint.Align.CENTER))
         footer(c, ctx, 752f)
     }
 

@@ -70,7 +70,7 @@ fun DebtsScreen(state: UiState, vm: AppViewModel) {
                     }
                     Text(taka(d.num("amount"), p), fontWeight = FontWeight.Bold, color = if (d.bool("settled")) MaterialTheme.colorScheme.onSurfaceVariant else if (d.str("direction") == "owe") red else green)
                 }
-                d.strOrNull("due_date")?.let { Text("শেষ তারিখ: $it", fontSize = 11.sp) }
+                d.strOrNull("due_date")?.let { Text(tr("শেষ তারিখ", "Due") + ": ${displayDate(it)}", fontSize = 11.sp) }
                 if (d.str("note").isNotBlank()) Text(d.str("note"), fontSize = 11.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { vm.save("debts", row("settled" to !d.bool("settled")), d.id()) }) {
@@ -178,7 +178,7 @@ fun SubscriptionsScreen(state: UiState, vm: AppViewModel) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text(s.str("name"), fontWeight = FontWeight.Bold)
-                        Text("${s.str("frequency")} · ${s.str("renewal_date").ifEmpty { "-" }}", fontSize = 11.sp)
+                        Text("${s.str("frequency")} · ${displayDate(s.str("renewal_date")).ifEmpty { "-" }}", fontSize = 11.sp)
                     }
                     Text(taka(s.num("amount"), state.privacy), fontWeight = FontWeight.Bold)
                 }
