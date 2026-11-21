@@ -38,8 +38,13 @@ object Sync {
         ctx.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong("last_ok", 0L)
 
     suspend fun fetchTables(repo: Repository): Map<String, List<JsonObject>> = coroutineScope {
+        // Required tables still fail the whole fetch as before. An optional table that cannot be read
+        // is left out of the map, so callers keep its last known rows instead of wiping them.
         TABLES.map { (t, q) ->
-            async { t to (if (t in OPTIONAL_TABLES) runCatching { repo.list(t, q) }.getOrNull() else repo.list(t, q)) }
+            async {
+                if (t in OPTIONAL_TABLES) t to runCatching { repo.list(t, q) }.getOrNull()
+                else t to repo.list(t, q)
+            }
         }.awaitAll().mapNotNull { (t, rows) -> rows?.let { t to it } }.toMap()
     }
 

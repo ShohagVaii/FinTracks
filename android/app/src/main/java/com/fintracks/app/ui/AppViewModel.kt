@@ -129,7 +129,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun refreshTables() {
         val fetched = Sync.fetchTables(repo)
         // debt_payments is optional until its migration is applied; keep the last known rows if it could not be read.
-        val tables = if ("debt_payments" in fetched) fetched else fetched + ("debt_payments" to state.value.rows("debt_payments"))
+        val tables = if ("debt_payments" in fetched) fetched
+            else fetched + ("debt_payments" to state.value.rows("debt_payments"))
         Sync.markOk(getApplication<Application>())
         _state.update { it.copy(tables = tables) }
         syncRegistry(state.value.profile, tables["transactions"].orEmpty())
