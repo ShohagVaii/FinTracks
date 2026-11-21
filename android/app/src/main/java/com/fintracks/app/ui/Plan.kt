@@ -92,7 +92,7 @@ fun BudgetsScreen(state: UiState, vm: AppViewModel) {
             }
             AppCard(onClick = { editing = b.id() }) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("${catIcon(cat)} $cat", fontWeight = FontWeight.Bold)
+                    Text("${catIcon(cat)} ${catLabel(cat)}", fontWeight = FontWeight.Bold)
                     Text("${taka(spent, p)} / ${taka(limit, p)}", fontSize = 12.sp)
                 }
                 ProgressBar(ratio.toFloat(), color)

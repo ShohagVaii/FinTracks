@@ -50,7 +50,7 @@ object Export {
     private fun rows(state: UiState, txs: List<JsonObject>): List<List<Any>> =
         txs.sortedBy { dateOf(it, "tx_date") }.map { t ->
             listOf(
-                displayDate(dateOf(t, "tx_date")), typeBn(t.str("type")), t.str("category"), t.num("amount"),
+                displayDate(dateOf(t, "tx_date")), typeBn(t.str("type")), catLabel(t.str("category")), t.num("amount"),
                 t.str("payment_mode"), accountName(state, t), t.str("note")
             )
         }
@@ -230,7 +230,7 @@ object Export {
             val amountColor = when (t.str("type")) { "Income" -> "#059669"; "Expense" -> "#E11D48"; else -> "#0284C7" }
             c.drawText(displayDate(dateOf(t, "tx_date")), colX[0] + 4f, y, body)
             c.drawText(typeBn(t.str("type")), colX[1], y, body)
-            c.drawText(t.str("category").take(14), colX[2], y, body)
+            c.drawText(catLabel(t.str("category")).take(14), colX[2], y, body)
             c.drawText(t.str("payment_mode"), colX[3], y, body)
             c.drawText(
                 bn(String.format("%,.2f", t.num("amount"))),

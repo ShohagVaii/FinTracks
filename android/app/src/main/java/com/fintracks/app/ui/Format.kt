@@ -22,6 +22,18 @@ data class Cat(val name: String, val icon: String)
 val EXPENSE_CATS = listOf(Cat("খাদ্য", "🍔"), Cat("যাতায়াত", "🚗"), Cat("শপিং", "🛍️"), Cat("বিল", "📜"), Cat("অন্যান্য", "📦"))
 val INCOME_CATS = listOf(Cat("বেতন", "💰"), Cat("অন্যান্য", "📦"))
 val ALL_CATS = (EXPENSE_CATS + INCOME_CATS).distinctBy { it.name }
+/**
+ * Default category names are stored in the database in Bengali (the same keys as the web app), so the
+ * stored value never changes. Only the text shown on screen follows the language switch.
+ */
+private val DEFAULT_CAT_EN = mapOf(
+    "খাদ্য" to "Food", "যাতায়াত" to "Transport", "শপিং" to "Shopping", "বিল" to "Bills",
+    "অন্যান্য" to "Other", "বেতন" to "Salary", "ট্রান্সফার" to "Transfer", "বাকি পরিশোধ" to "Credit payment"
+)
+
+/** Display name for a category. Custom (user-typed) names are returned unchanged. */
+fun catLabel(name: String): String = if (AppPrefs.english) DEFAULT_CAT_EN[name] ?: name else name
+
 fun catIcon(name: String): String =
     (ALL_CATS + AppPrefs.customCats.map { Cat(it.name, it.icon) }).firstOrNull { it.name == name }?.icon ?: "📦"
 

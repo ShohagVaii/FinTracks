@@ -267,7 +267,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
                     val frac = if (limit > 0) (spent / limit).toFloat() else 0f
                     val color = if (frac >= 1f) expenseRed else if (frac >= 0.8f) Amber500 else Sky500
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("${catIcon(cat)} $cat")
+                        Text("${catIcon(cat)} ${catLabel(cat)}")
                         Text("${taka(spent, p)} / ${taka(limit, p)}", fontSize = 12.sp)
                     }
                     ProgressBar(frac, color)
@@ -307,7 +307,7 @@ fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onDelete: (() -> 
             ) { Text(t.str("mood").ifBlank { catIcon(t.str("category")) }, fontSize = 22.sp) }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(t.strOrNull("note")?.takeIf { it.isNotBlank() } ?: t.str("category"), fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(t.strOrNull("note")?.takeIf { it.isNotBlank() } ?: catLabel(t.str("category")), fontWeight = FontWeight.Bold, maxLines = 1)
                 Text("${displayDate(dateOf(t, "tx_date"))} · ${t.str("payment_mode")}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text("$sign ${taka(t.num("amount"), state.privacy)}", color = amountColor, fontWeight = FontWeight.Bold)
@@ -589,7 +589,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                 if (type != "Transfer") {
                     Column(Modifier.weight(1f)) {
                         Text(if (type == "Income") tr("আয়ের উৎস", "Income source") else tr("ক্যাটাগরি", "Category"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        PickerField(category, cats.map { it.name to "${it.icon} ${it.name}" }) { category = it }
+                        PickerField(category, cats.map { it.name to "${it.icon} ${catLabel(it.name)}" }) { category = it }
                     }
                 }
                 Column(Modifier.weight(1f)) {

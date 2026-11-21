@@ -64,7 +64,7 @@ fun CategoryManager(state: UiState, vm: AppViewModel) {
         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(c.icon, fontSize = 20.sp)
             Spacer(Modifier.width(10.dp))
-            Text(c.name, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+            Text(catLabel(c.name), modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
             Text(tr("ডিফল্ট", "Default"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

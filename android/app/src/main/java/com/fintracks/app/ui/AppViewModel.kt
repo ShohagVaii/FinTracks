@@ -316,7 +316,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun recordDebtPayment(shopName: String, amount: Double, date: String, note: String, shopId: String) {
         val paymentId = java.util.UUID.randomUUID().toString()
-        val label = "দোকান: $shopName" + if (note.isNotBlank()) " · $note" else ""
+        val label = tr("দোকান: ", "Shop: ") + shopName + if (note.isNotBlank()) " · $note" else ""
         batch(
             listOf(
                 Triple("credit_payments", row("id" to paymentId, "shop_id" to shopId, "amount" to amount, "paid_on" to date, "note" to note), null),

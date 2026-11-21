@@ -132,7 +132,7 @@ fun InsightsCards(state: UiState) {
         } else {
             unusual.take(5).forEach { u ->
                 val pct = ((u.thisMonth - u.average) / u.average * 100).toInt()
-                Text(tr("${catIcon(u.category)} ${u.category}: এই মাসে ${taka(u.thisMonth, p)} (গড়ের চেয়ে +$pct%)", "${catIcon(u.category)} ${u.category}: this month ${taka(u.thisMonth, p)} (+$pct% vs average)"), fontSize = 13.sp, color = Color(0xFFF59E0B))
+                Text(tr("${catIcon(u.category)} ${catLabel(u.category)}: এই মাসে ${taka(u.thisMonth, p)} (গড়ের চেয়ে +$pct%)", "${catIcon(u.category)} ${catLabel(u.category)}: this month ${taka(u.thisMonth, p)} (+$pct% vs average)"), fontSize = 13.sp, color = Color(0xFFF59E0B))
             }
         }
     }
