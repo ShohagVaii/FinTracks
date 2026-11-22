@@ -86,6 +86,7 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onDismiss: () -> Unit) {
                     Text(tr("লেনদেনের ভাউচার", "Transaction voucher"), fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close")) }
                 }
+                if (t.str("attachment_url").isNotEmpty()) AttachmentImage(t.id(), t.str("attachment_url"))
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val bmp = preview
                     if (bmp != null) {

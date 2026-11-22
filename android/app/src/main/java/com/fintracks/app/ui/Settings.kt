@@ -165,7 +165,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
 
             Text(tr("মুদ্রা", "Currency"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             ChoiceChips(
-                listOf("BDT" to "৳ BDT", "USD" to "$ USD", "EUR" to "€ EUR", "GBP" to "£ GBP"),
+                listOf("BDT" to "${currencySymbol("BDT")} BDT", "USD" to "${currencySymbol("USD")} USD", "EUR" to "${currencySymbol("EUR")} EUR", "GBP" to "${currencySymbol("GBP")} GBP"),
                 state.currency
             ) { vm.saveProfile(row("currency" to it)) }
 

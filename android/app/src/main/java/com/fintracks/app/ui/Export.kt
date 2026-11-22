@@ -134,7 +134,7 @@ object Export {
                 "</Relationships>")
             put("xl/workbook.xml", h +
                 "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">" +
-                "<sheets><sheet name=\"${if (AppPrefs.english) "Transactions" else "লেনদেন"}\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>")
+                "<sheets><sheet name=\"${tr("লেনদেন", "Transactions")}\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>")
             put("xl/_rels/workbook.xml.rels", h +
                 "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
                 "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/>" +
@@ -202,7 +202,7 @@ object Export {
             val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F1F5F9") }
             c.drawRoundRect(RectF(left, y, left + 160f, y + 58f), 12f, 12f, bg)
             c.drawText(label, left + 12f, y + 22f, small)
-            c.drawText("৳ " + bn(String.format("%,.2f", value)), left + 12f, y + 44f, paint(ctx, 14f, Color.parseColor(col), bold = true))
+            c.drawText(AppPrefs.symbol + " " + bn(String.format("%,.2f", value)), left + 12f, y + 44f, paint(ctx, 14f, Color.parseColor(col), bold = true))
         }
         y += 84f
 

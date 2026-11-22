@@ -59,6 +59,36 @@ class SupabaseApi {
         }
     }
 
+    /** Downloads one private storage object (attachment photo). */
+    suspend fun download(path: String, token: String): ByteArray = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(BuildConfig.SUPABASE_URL.trimEnd('/') + path)
+            .header("apikey", BuildConfig.SUPABASE_KEY)
+            .header("Authorization", "Bearer $token")
+            .get()
+            .build()
+        http.newCall(request).execute().use { resp ->
+            val bytes = resp.body?.bytes() ?: ByteArray(0)
+            if (!resp.isSuccessful) throw SupabaseException(resp.code, parseError(bytes.decodeToString(), resp.code))
+            bytes
+        }
+    }
+
+    /** Deletes one storage object. A missing object (404) counts as deleted. */
+    suspend fun deleteObject(path: String, token: String) = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(BuildConfig.SUPABASE_URL.trimEnd('/') + path)
+            .header("apikey", BuildConfig.SUPABASE_KEY)
+            .header("Authorization", "Bearer $token")
+            .delete()
+            .build()
+        http.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful && resp.code != 404) {
+                throw SupabaseException(resp.code, parseError(resp.body?.string().orEmpty(), resp.code))
+            }
+        }
+    }
+
     suspend fun call(
         method: String,
         path: String,

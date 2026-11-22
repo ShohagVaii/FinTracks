@@ -336,6 +336,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Refreshes every table now. Settings uses this for the manual sync button. */
     fun syncNow() = act {
+        processAttachments()
         val r = outbox.flush()
         if (r.dropped > 0) _state.update { it.copy(syncError = refusedText(r.dropped)) }
         if (!r.drained) {
@@ -482,6 +483,52 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Every local write runs through here: saved, shown at once, sent (or queued offline). */
     private fun localChange(ops: List<JsonObject>, done: String? = null) = act {
         reportSync(saveAndSend(ops), done)
+        processAttachments()
+    }
+
+    /** Drops a transaction's photo: its waiting upload, its local copy, and (queued) its Storage object. */
+    private fun queueAttachmentDelete(txId: String, row: JsonObject?) {
+        val app = getApplication<Application>()
+        val path = row?.str("attachment_url").orEmpty()
+        if (path.isNotEmpty()) AttachmentStore.queueDelete(app, path)
+        AttachmentStore.purge(app, txId)
+    }
+
+    /**
+     * Uploads waiting transaction photos and deletes removed ones in Storage. Each finished upload writes
+     * attachment_url through the outbox. A failure (offline, server refused) leaves the item queued for the next try.
+     */
+    fun processAttachments() {
+        val app = getApplication<Application>()
+        if (AttachmentStore.pendingIds(app).isEmpty() && AttachmentStore.pendingDeletes(app).isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            for (txId in AttachmentStore.pendingIds(app)) {
+                val file = AttachmentStore.file(app, txId)
+                val existing = state.value.rows("transactions").firstOrNull { it.id() == txId }
+                if (file == null || existing == null) {
+                    AttachmentStore.purge(app, txId)
+                    continue
+                }
+                try {
+                    val path = repo.uploadAttachment(txId, file.readBytes())
+                    AttachmentStore.unstage(app, txId)
+                    val change = JsonObject(mapOf("attachment_url" to JsonPrimitive(path)))
+                    withContext(Dispatchers.Main) {
+                        localChange(listOf(LocalOutbox.op("update", "transactions", txId, change, JsonObject(existing + change))))
+                    }
+                } catch (e: Exception) {
+                    // Offline or refused: the photo stays queued and is tried again on the next sync.
+                }
+            }
+            for (path in AttachmentStore.pendingDeletes(app)) {
+                try {
+                    repo.deleteAttachment(path)
+                    AttachmentStore.doneDelete(app, path)
+                } catch (e: Exception) {
+                    // Stays queued until the server answers.
+                }
+            }
+        }
     }
 
     private fun newId(): String = java.util.UUID.randomUUID().toString()
@@ -586,6 +633,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Deletes a row with everything that depends on it. Only a plain single row can be undone. */
     fun remove(table: String, id: String) {
         val row = state.value.rows(table).firstOrNull { it.id() == id }
+        if (table == "transactions") queueAttachmentDelete(id, row)
         val ops = deleteOps(table, id)
         localChange(ops)
         val plain = ops.size == 1 && table !in setOf("credit_shops", "mess_members", "debts", "debt_people", "debt_payments")
@@ -596,6 +644,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Deletes several rows of one table in one local batch. Mirrored rows (debt / dues payments) follow the same rule as remove. */
     fun removeMany(table: String, ids: List<String>) {
         if (ids.isEmpty()) return
+        if (table == "transactions") ids.forEach { id -> queueAttachmentDelete(id, state.value.rows(table).firstOrNull { it.id() == id }) }
         localChange(ids.flatMap { deleteOps(table, it) })
     }
 

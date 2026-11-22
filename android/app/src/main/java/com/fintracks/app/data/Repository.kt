@@ -138,6 +138,33 @@ class Repository(context: Context) {
         return BuildConfig.SUPABASE_URL.trimEnd('/') + "/storage/v1/object/public/avatars/$uid/avatar.jpg?v=${System.currentTimeMillis()}"
     }
 
+    /** Runs one storage call with the saved token; on 401 it refreshes the session once and tries again. */
+    private suspend fun <T> withAuth(block: suspend (String) -> T): T {
+        val current = session ?: throw SupabaseException(401, "লগইন করা নেই")
+        return try {
+            block(current.accessToken)
+        } catch (e: SupabaseException) {
+            if (e.code != 401) throw e
+            val fresh = api.refresh(current.refreshToken)
+            session = fresh
+            block(fresh.accessToken)
+        }
+    }
+
+    /** Uploads a transaction photo to the user's own folder. Returns the storage path (not a URL). */
+    suspend fun uploadAttachment(txId: String, bytes: ByteArray): String {
+        val path = "${uid()}/$txId.jpg"
+        withAuth { token -> api.upload("/storage/v1/object/tx-attachments/$path", bytes, "image/jpeg", token) }
+        return path
+    }
+
+    suspend fun downloadAttachment(path: String): ByteArray =
+        withAuth { token -> api.download("/storage/v1/object/authenticated/tx-attachments/$path", token) }
+
+    suspend fun deleteAttachment(path: String) {
+        withAuth { token -> api.deleteObject("/storage/v1/object/tx-attachments/$path", token) }
+    }
+
     suspend fun updateProfile(fields: JsonObject) {
         authed("PATCH", "/rest/v1/profiles?id=eq.${uid()}", fields, "return=minimal")
     }

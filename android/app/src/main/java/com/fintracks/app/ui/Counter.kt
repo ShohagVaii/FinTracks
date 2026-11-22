@@ -275,7 +275,7 @@ fun MoneyCounterScreen(vm: AppViewModel, showHistory: Boolean, onHistory: (Boole
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(tr("সর্বমোট", "Grand total"), fontSize = 11.sp, color = Color.White.copy(alpha = 0.8f), letterSpacing = 2.sp)
-                    Text(bnDigits("৳ ${grouped(total)}"), fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(bnDigits("${AppPrefs.symbol} ${grouped(total)}"), fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(tr("মোট নোট/কয়েন", "Notes/coins"), fontSize = 11.sp, color = Color.White.copy(alpha = 0.8f))
@@ -320,8 +320,8 @@ private fun NoteCell(denomination: Int, value: String, subtotal: Long, modifier:
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Column(Modifier.weight(1f)) {
-            Text(bnDigits("৳$denomination"), fontWeight = FontWeight.Bold, fontSize = 17.sp)
-            Text(bnDigits("= ৳${grouped(subtotal)}"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            Text(bnDigits("${AppPrefs.symbol}$denomination"), fontWeight = FontWeight.Bold, fontSize = 17.sp)
+            Text(bnDigits("= ${AppPrefs.symbol}${grouped(subtotal)}"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
         Box(
             Modifier
@@ -376,7 +376,7 @@ private fun CounterHistory(store: CashCountStore, history: List<CountRecord>, on
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(bnDigits(bdTime(r.at)), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(bnDigits("৳ ${grouped(r.total)}"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text(bnDigits("${AppPrefs.symbol} ${grouped(r.total)}"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
                             Text(bnDigits("${r.pieces}") + tr(" টি নোট/কয়েন", " notes/coins"), fontSize = 12.sp)
                         }
                         IconButton(onClick = {
@@ -389,7 +389,7 @@ private fun CounterHistory(store: CashCountStore, history: List<CountRecord>, on
                     }
                     if (open) {
                         r.counts.filter { it.value > 0 }.forEach { (d, n) ->
-                            KeyValue(bnDigits("৳$d × $n"), bnDigits("৳ ${grouped(d.toLong() * n)}"))
+                            KeyValue(bnDigits("${AppPrefs.symbol}$d × $n"), bnDigits("${AppPrefs.symbol} ${grouped(d.toLong() * n)}"))
                         }
                     }
                 }

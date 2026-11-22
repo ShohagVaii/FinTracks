@@ -25,7 +25,7 @@ class FinTrackWidgetProvider : AppWidgetProvider() {
         private fun updateOne(ctx: Context, mgr: AppWidgetManager, id: Int) {
             val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val views = RemoteViews(ctx.packageName, R.layout.widget_balance)
-            views.setTextViewText(R.id.widget_balance, p.getString("balance", "৳ 0") ?: "৳ 0")
+            views.setTextViewText(R.id.widget_balance, p.getString("balance", "${AppPrefs.symbol} 0") ?: "${AppPrefs.symbol} 0")
             views.setTextViewText(R.id.widget_expense, p.getString("expense", tr("এই মাসের খরচ: ৳ 0", "This month's expense: ৳ 0")) ?: "")
             val launch = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
             if (launch != null) {

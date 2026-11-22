@@ -1,5 +1,9 @@
 package com.fintracks.app.ui
 
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Checkbox
@@ -325,7 +329,7 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("all") }
-    var segment by remember { mutableStateOf("history") } // history | auto (created from বাকি / SMS)
+    var segment by remember { mutableStateOf("history") } // history | auto (created from dues / SMS)
     var modeFilter by remember { mutableStateOf("") }
     var period by remember { mutableStateOf(Period.MONTH) }
     var customFrom by remember { mutableStateOf(todayIso().substring(0, 8) + "01") }
@@ -469,6 +473,31 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
     var reading by remember { mutableStateOf(false) }
     var captureNote by remember { mutableStateOf<String?>(null) }
     var cameraUri by remember { mutableStateOf<Uri?>(null) }
+    // Photo for this transaction. A new one gets its id now, so the photo can be filed under it before the save.
+    val txId = remember { existing?.id() ?: java.util.UUID.randomUUID().toString() }
+    val attachPath = existing?.str("attachment_url").orEmpty()
+    var attachBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var attachPreview by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var attachRemoved by remember { mutableStateOf(false) }
+    var attachCamUri by remember { mutableStateOf<Uri?>(null) }
+    fun setAttach(bytes: ByteArray?) {
+        attachBytes = bytes
+        attachPreview = bytes?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
+        attachRemoved = false
+    }
+    val attachGallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) setAttach(AttachmentStore.readImage(ctx, uri))
+    }
+    val attachCamera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val uri = attachCamUri
+        if (ok && uri != null) setAttach(AttachmentStore.readImage(ctx, uri))
+    }
+    fun launchAttachCamera() {
+        val file = File(File(ctx.cacheDir, "exports").apply { mkdirs() }, "photo-${System.currentTimeMillis()}.jpg")
+        val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
+        attachCamUri = uri
+        attachCamera.launch(uri)
+    }
 
     // Fills the form from a receipt. Nothing is saved until the user presses সেভ.
     fun applyReceipt(r: ReceiptData) {
@@ -548,8 +577,11 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         when {
             amt == null || amt <= 0 -> error = tr("সঠিক পরিমাণ লিখুন", "Enter a valid amount")
             !isValidIsoDate(date) -> error = tr("তারিখ বাছাই করুন", "Pick a date")
-            else -> onSave(
-                row(
+            else -> {
+                // Photo first: it is saved on the device, then the row is saved, and the ViewModel uploads it.
+                attachBytes?.let { AttachmentStore.stage(ctx, txId, it) }
+                if (attachRemoved) AttachmentStore.purge(ctx, txId)
+                val body = row(
                     "type" to type, "amount" to amt, "currency" to state.currency,
                     "category" to if (type == "Transfer") "ট্রান্সফার" else category,
                     "note" to note, "tx_date" to date, "payment_mode" to mode, "mood" to mood,
@@ -558,9 +590,11 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                     "to_account_id" to JsonNull,
                     "is_recurring" to recurring,
                     "tags" to JsonArray(tagsText.split(',', '#').map { it.trim() }.filter { it.isNotEmpty() }.distinct().map { JsonPrimitive(it) })
-                ),
-                existing?.id()
-            )
+                )
+                val withPhoto = if (attachRemoved) JsonObject(body + ("attachment_url" to JsonNull)) else body
+                onSave(if (existing == null) JsonObject(withPhoto + ("id" to JsonPrimitive(txId))) else withPhoto, existing?.id())
+                if (attachRemoved && attachPath.isNotEmpty()) AttachmentStore.queueDelete(ctx, attachPath)
+            }
         }
     }
 
@@ -599,7 +633,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
             }
             // Amount with camera / mic / image / calculator, like the reference sheet.
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("৳", fontSize = 26.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(AppPrefs.symbol, fontSize = 26.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextField(
                     value = amount,
                     onValueChange = { amount = it },
@@ -658,6 +692,27 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                     fontSize = 12.sp,
                     color = Sky400
                 )
+            }
+            Text(tr("ছবি (ঐচ্ছিক)", "Photo (optional)"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val pv = attachPreview
+            if (pv != null) {
+                Image(
+                    bitmap = pv.asImageBitmap(),
+                    contentDescription = tr("লেনদেনের ছবি", "Transaction photo"),
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).clip(RoundedCornerShape(16.dp))
+                )
+            } else if (attachPath.isNotEmpty() && !attachRemoved) {
+                AttachmentImage(txId, attachPath, Modifier.heightIn(max = 180.dp))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(modifier = Modifier.weight(1f), onClick = { attachGallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { Text(tr("গ্যালারি", "Gallery"), maxLines = 1) }
+                OutlinedButton(modifier = Modifier.weight(1f), onClick = { launchAttachCamera() }) { Text(tr("ক্যামেরা", "Camera"), maxLines = 1) }
+                if (pv != null || (attachPath.isNotEmpty() && !attachRemoved)) {
+                    OutlinedButton(modifier = Modifier.weight(1f), onClick = { attachBytes = null; attachPreview = null; attachRemoved = true }) {
+                        Text(tr("ছবি সরান", "Remove"), color = Rose500, maxLines = 1)
+                    }
+                }
             }
             Text(tr("মুড", "Mood"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

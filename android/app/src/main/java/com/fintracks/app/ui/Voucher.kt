@@ -203,7 +203,7 @@ object Voucher {
 
     private fun money(v: Double, signPrefix: String = "", twoDecimals: Boolean = false): String {
         val body = String.format(Locale.US, if (twoDecimals || v % 1.0 != 0.0) "%,.2f" else "%,.0f", abs(v))
-        return signPrefix + "৳ " + Export.bn(body)
+        return signPrefix + AppPrefs.symbol + " " + Export.bn(body)
     }
 
     // ---------------- Drawing helpers ----------------
