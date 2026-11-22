@@ -127,7 +127,7 @@ private fun toolEnglishName(bn: String): String = when (bn) {
 }
 
 private const val TOOLS_ORDER_KEY = "tools_order"
-private const val TOOLS_PER_ROW = 3
+private const val TOOLS_PER_ROW = 4
 
 private fun defaultTools(): List<ToolTile> = listOf(
     ToolTile(Overlay.CHAT, "AI সহকারী", Icons.Default.Info, Indigo400),
@@ -168,7 +168,6 @@ fun ToolsScreen(onOpen: (Overlay) -> Unit) {
     var dragStart by remember { mutableStateOf(0) }
     var dragAcc by remember { mutableStateOf(Offset.Zero) }
     val density = LocalDensity.current
-    val isDefault = order.map { it.label } == defaults.map { it.label }
 
     fun save(list: List<ToolTile>) {
         order = list
@@ -178,19 +177,17 @@ fun ToolsScreen(onOpen: (Overlay) -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Financial Hub", fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Text("FINTRACK PREMIUM TOOLS GRID", fontSize = 10.sp, letterSpacing = 2.sp, color = Slate500)
-        Text(
-            tr("ধরে টেনে ক্রম বদলান", "Press and hold, then drag to reorder"),
-            fontSize = 11.sp,
-            color = Slate500
-        )
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val gap = 12.dp
+            val gap = 8.dp
             val tile = (maxWidth - gap * (TOOLS_PER_ROW - 1)) / TOOLS_PER_ROW
-            val cellPx = with(density) { (tile + gap).toPx() }
+            // Tiles are a little taller than wide; the grid cell is the same size, so drag maths stays exact.
+            val tileH = tile * 1.2f
+            val cellXPx = with(density) { (tile + gap).toPx() }
+            val cellYPx = with(density) { (tileH + gap).toPx() }
             val rows = (order.size + TOOLS_PER_ROW - 1) / TOOLS_PER_ROW
-            val gridHeight = tile * rows + gap * (rows - 1)
+            val gridHeight = tileH * rows + gap * (rows - 1)
 
-            fun slotPx(index: Int): Offset = Offset((index % TOOLS_PER_ROW) * cellPx, (index / TOOLS_PER_ROW) * cellPx)
+            fun slotPx(index: Int): Offset = Offset((index % TOOLS_PER_ROW) * cellXPx, (index / TOOLS_PER_ROW) * cellYPx)
 
             Box(Modifier.fillMaxWidth().height(gridHeight)) {
                 order.forEachIndexed { index, t ->
@@ -207,7 +204,7 @@ fun ToolsScreen(onOpen: (Overlay) -> Unit) {
                     Column(
                         Modifier
                             .offset { shown }
-                            .size(tile)
+                            .size(width = tile, height = tileH)
                             .zIndex(if (dragging) 1f else 0f)
                             .graphicsLayer {
                                 if (dragging) {
@@ -220,7 +217,7 @@ fun ToolsScreen(onOpen: (Overlay) -> Unit) {
                             .clip(RoundedCornerShape(32.dp))
                             .background(MaterialTheme.colorScheme.surface)
                             .border(1.dp, if (dragging) t.color.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.08f), RoundedCornerShape(32.dp))
-                            .pointerInput(t.label, cellPx) {
+                            .pointerInput(t.label, cellXPx, cellYPx) {
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = {
                                         dragLabel = t.label
@@ -233,8 +230,8 @@ fun ToolsScreen(onOpen: (Overlay) -> Unit) {
                                         val base = slotPx(dragStart)
                                         val x = base.x + dragAcc.x
                                         val y = base.y + dragAcc.y
-                                        val col = (x / cellPx).roundToInt().coerceIn(0, TOOLS_PER_ROW - 1)
-                                        val row = (y / cellPx).roundToInt().coerceIn(0, rows - 1)
+                                        val col = (x / cellXPx).roundToInt().coerceIn(0, TOOLS_PER_ROW - 1)
+                                        val row = (y / cellYPx).roundToInt().coerceIn(0, rows - 1)
                                         val to = (row * TOOLS_PER_ROW + col).coerceIn(0, order.size - 1)
                                         val from = order.indexOfFirst { it.label == t.label }
                                         if (to != from && from >= 0) {
@@ -254,30 +251,21 @@ fun ToolsScreen(onOpen: (Overlay) -> Unit) {
                                 )
                             }
                             .clickable { if (dragLabel == null) onOpen(t.overlay) }
-                            .padding(10.dp),
+                            .padding(6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
                         Box(
-                            Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(t.color.copy(alpha = 0.15f)),
+                            Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(t.color.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(t.icon, contentDescription = tr(t.label, toolEnglishName(t.label)), tint = t.color, modifier = Modifier.size(24.dp))
+                            Icon(t.icon, contentDescription = tr(t.label, toolEnglishName(t.label)), tint = t.color, modifier = Modifier.size(20.dp))
                         }
-                        Spacer(Modifier.height(8.dp))
-                        Text(tr(t.label, toolEnglishName(t.label)), fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(Modifier.height(6.dp))
+                        Text(tr(t.label, toolEnglishName(t.label)), fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, lineHeight = 13.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }
-        }
-        if (!isDefault) {
-            OutlinedButton(
-                onClick = {
-                    prefs.edit().remove(TOOLS_ORDER_KEY).apply()
-                    order = defaults
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(tr("ডিফল্ট ক্রমে ফেরত", "Reset to default order")) }
         }
         IntelligenceCard { onOpen(Overlay.REPORTS) }
         ToolsFooter()

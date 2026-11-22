@@ -520,9 +520,7 @@ private fun ProfileCard(state: UiState, email: String, emailLoaded: Boolean, onE
 @Composable
 private fun AvatarImage(url: String, fallback: String, size: Dp) {
     val bmp by produceState<ImageBitmap?>(null, url) {
-        value = if (url.isBlank()) null else withContext(Dispatchers.IO) {
-            runCatching { URL(url).openStream().use { BitmapFactory.decodeStream(it)?.asImageBitmap() } }.getOrNull()
-        }
+        value = if (!url.startsWith("https://")) null else withContext(Dispatchers.IO) { loadAvatarBitmap(url) }
     }
     Box(
         Modifier
@@ -539,6 +537,19 @@ private fun AvatarImage(url: String, fallback: String, size: Dp) {
         }
     }
 }
+
+/** Loads a profile photo over HTTPS. A bad URL, an HTTP error or a broken image gives null, so the letter shows. */
+private fun loadAvatarBitmap(url: String): ImageBitmap? = runCatching {
+    val conn = URL(url).openConnection() as java.net.HttpURLConnection
+    try {
+        conn.connectTimeout = 10_000
+        conn.readTimeout = 15_000
+        if (conn.responseCode !in 200..299) null
+        else conn.inputStream.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
+    } finally {
+        conn.disconnect()
+    }
+}.getOrNull()
 
 /** Edit name, username, birth date, phone, address and photo. Changes go to the profile on the server. */
 @Composable
@@ -562,19 +573,35 @@ private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () ->
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
         if (uri != null) scope.launch {
             uploading = true
-            val bytes = withContext(Dispatchers.IO) { compressAvatar(ctx, uri) }
-            if (bytes == null) {
-                Toast.makeText(ctx, tr("ছবিটি পড়া যায়নি", "Could not read the photo"), Toast.LENGTH_SHORT).show()
-            } else {
-                vm.saveAvatar(bytes)
+            try {
+                val bytes = withContext(Dispatchers.IO) { compressAvatar(ctx, uri) }
+                if (bytes == null) {
+                    Toast.makeText(ctx, tr("ছবিটি পড়া যায়নি", "Could not read the photo"), Toast.LENGTH_SHORT).show()
+                } else {
+                    // The new URL goes into this dialog at once, so Save cannot write the old value back.
+                    photoUrl = vm.uploadAvatar(bytes)
+                    Toast.makeText(ctx, tr("প্রোফাইল ছবি সেভ হয়েছে", "Profile photo saved"), Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // The real reason, shown right here; a silent failure would look like nothing happened.
+                Toast.makeText(
+                    ctx,
+                    tr("ছবি আপলোড ব্যর্থ: ${e.message ?: "অজানা ত্রুটি"}", "Photo upload failed: ${e.message ?: "unknown error"}"),
+                    Toast.LENGTH_LONG
+                ).show()
+            } finally {
+                uploading = false
             }
-            uploading = false
         }
     }
 
     val u = username.trim().lowercase()
     val error = when {
         name.isBlank() -> tr("নাম লিখুন", "Enter a name")
+        photoUrl.isNotBlank() && !photoUrl.trim().startsWith("https://") ->
+            tr("ছবির URL অবশ্যই https:// দিয়ে শুরু হতে হবে (অথবা খালি রাখুন)", "The photo URL must start with https:// (or leave it empty)")
         u.isNotEmpty() && !USERNAME_RE.matches(u) -> tr("ইউজারনেম ৩–২০ অক্ষর: ইংরেজি ছোট হাতের অক্ষর, সংখ্যা বা _", "Username: 3–20 lowercase letters, digits or _")
         else -> null
     }

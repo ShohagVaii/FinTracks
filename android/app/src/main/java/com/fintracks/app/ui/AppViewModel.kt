@@ -377,13 +377,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Uploads a profile photo (needs internet), then saves its URL on the profile through the queue. */
-    fun saveAvatar(bytes: ByteArray) = act {
+    /**
+     * Uploads a profile photo (needs internet), then saves its URL on the profile. The profile state is updated at once.
+     * Errors are thrown to the caller, so the photo dialog can show the real reason. Returns the saved URL.
+     */
+    suspend fun uploadAvatar(bytes: ByteArray): String {
         val url = repo.uploadAvatar(bytes)
         val uid = repo.uid()
         val b = row("avatar_url" to url)
         val existing = state.value.profile ?: JsonObject(emptyMap())
-        reportSync(saveAndSend(listOf(LocalOutbox.op("update", "profiles", uid, b, JsonObject(existing + b)))), tr("প্রোফাইল ছবি সেভ হয়েছে", "Profile photo saved"))
+        reportSync(saveAndSend(listOf(LocalOutbox.op("update", "profiles", uid, b, JsonObject(existing + b)))), null)
+        return url
     }
 
     /**

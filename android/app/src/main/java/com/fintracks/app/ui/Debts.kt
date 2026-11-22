@@ -58,6 +58,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -786,6 +787,11 @@ private fun EntryDetail(
                 DetailStat(tr("বাকি", "Left"), taka(remaining, privacy), accent, Modifier.weight(1f))
             }
             DebtProgress(fraction, accent)
+            // Confetti fires once, at the moment the debt reaches zero while this screen is open.
+            val settledPrev = remember(entry.id()) { mutableStateOf(settled) }
+            val settleCelebrate = remember(entry.id()) { mutableStateOf(0) }
+            LaunchedEffect(settled) { if (settled && !settledPrev.value) settleCelebrate.value++; settledPrev.value = settled }
+            if (settleCelebrate.value > 0) key(settleCelebrate.value) { Box(Modifier.fillMaxWidth().height(120.dp)) { ConfettiBurst(Modifier.matchParentSize()) } }
             if (settled) Text(tr("পরিশোধিত", "Settled"), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = readableOn(Emerald500))
             Text(tr("পরিশোধের ইতিহাস", "Payment history"), fontWeight = FontWeight.Bold, fontSize = 14.sp)
             if (history.isEmpty()) {

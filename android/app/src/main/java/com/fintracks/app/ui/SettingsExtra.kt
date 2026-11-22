@@ -471,6 +471,11 @@ private data class Faq(val q: String, val qEn: String, val a: String, val aEn: S
 
 private val FAQS = listOf(
     Faq(
+        "টুলসের ক্রম বদলাবো কীভাবে?", "How do I change the order of the tools?",
+        "১) টুলস স্ক্রিনে যান। ২) যে টাইলটি সরাতে চান সেটি কিছুক্ষণ চেপে ধরুন। ৩) না ছেড়ে পছন্দের জায়গায় টেনে নিয়ে ছাড়ুন। ৪) নতুন ক্রম নিজে থেকেই এই ফোনে সেভ থাকে, অ্যাপ বন্ধ করলেও।",
+        "1) Go to the Tools screen. 2) Press and hold the tile you want to move. 3) Drag it to the place you like, then let go. 4) The new order is saved on this phone automatically, even after you close the app."
+    ),
+    Faq(
         "অফলাইনে কী কী করা যায়?", "What works offline?",
         "লেনদেন, বাকি, ধার, বাজেট, লক্ষ্য, সাবস্ক্রিপশন, অ্যাকাউন্ট, ক্যাটাগরি ও প্রোফাইল অফলাইনে দেখা ও যোগ/বদলানো যায়। ইন্টারনেট এলে সব নিজে থেকে সার্ভারে যায়।",
         "Transactions, dues, debts, budgets, goals, subscriptions, accounts, categories and profile can be viewed and added or changed offline. When the internet returns, everything syncs by itself."

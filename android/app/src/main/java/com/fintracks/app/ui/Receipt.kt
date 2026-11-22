@@ -14,6 +14,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
+import kotlinx.coroutines.delay
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -93,6 +94,7 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onEdit: () -> Unit, onDelete: (
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var gone by remember { mutableStateOf(false) }
     // TRX and checksum come from the saved record (created on first sight, then kept).
     val rec = remember(t, state.profile) { Voucher.storedFor(ctx, state.profile, t) }
 
@@ -150,6 +152,8 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onEdit: () -> Unit, onDelete: (
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+          // Deleting fades and slides the receipt out first, then removes the row.
+          AnimatedVisibility(visible = !gone, modifier = Modifier.fillMaxSize(), exit = fadeOut(tween(250)) + slideOutHorizontally(tween(250)) { -it / 3 }) {
             Column(
                 Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -238,6 +242,7 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onEdit: () -> Unit, onDelete: (
                     Text(tr("ওয়েবে যাচাই করুন", "Verify on the web"))
                 }
             }
+          }
         }
     }
 
@@ -246,7 +251,16 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onEdit: () -> Unit, onDelete: (
             text = tr("এই লেনদেনটি মুছবেন?", "Delete this transaction?"),
             confirmText = tr("মুছে ফেলুন", "Delete"),
             cancelText = tr("বাতিল", "Cancel"),
-            onConfirm = { confirmDelete = false; onDelete() },
+            onConfirm = {
+                confirmDelete = false
+                if (!gone) {
+                    gone = true
+                    scope.launch {
+                        delay(if (motionReduced(ctx)) 0L else 260L)
+                        onDelete()
+                    }
+                }
+            },
             onDismiss = { confirmDelete = false }
         )
     }
