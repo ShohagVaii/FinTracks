@@ -129,6 +129,11 @@ class SupabaseApi {
         return if ("access_token" in obj) codec.decodeFromString(Session.serializer(), text) else null
     }
 
+    /** Asks Supabase to email a password-reset link. */
+    suspend fun recover(email: String) {
+        call("POST", "/auth/v1/recover", buildJsonObject { put("email", email) })
+    }
+
     suspend fun signIn(email: String, password: String): Session {
         val body = buildJsonObject { put("email", email); put("password", password) }
         val text = call("POST", "/auth/v1/token?grant_type=password", body)

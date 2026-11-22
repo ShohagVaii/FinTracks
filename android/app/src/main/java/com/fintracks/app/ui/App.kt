@@ -98,7 +98,8 @@ fun FinTracksApp(vm: AppViewModel = viewModel()) {
                     state = state,
                     onSignIn = { e, p -> vm.signIn(e, p) },
                     onSignUp = { n, e, p -> vm.signUp(n, e, p) },
-                    onGoogle = { token -> vm.signInWithGoogle(token) }
+                    onGoogle = { token -> vm.signInWithGoogle(token) },
+                    onReset = { email -> vm.resetPassword(email) }
                 )
                 locked -> LockScreen(onSignOut = { AppLock.unlock(); vm.signOut() })
                 else -> MainScaffold(state, vm)

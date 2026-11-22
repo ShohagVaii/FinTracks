@@ -50,6 +50,9 @@ class Repository(context: Context) {
         session = api.signIn(email, password)
     }
 
+    /** Sends the password-reset email. */
+    suspend fun sendPasswordReset(email: String) = api.recover(email)
+
     suspend fun signInWithGoogle(idToken: String) {
         session = api.signInWithGoogle(idToken)
     }

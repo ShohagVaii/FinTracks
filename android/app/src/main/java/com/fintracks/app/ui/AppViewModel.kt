@@ -314,6 +314,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         else _state.update { it.copy(notice = tr("অ্যাকাউন্ট তৈরি হয়েছে। ইমেইলের কনফার্মেশন লিংকে ক্লিক করে লগইন করুন।", "Account created. Click the confirmation link in your email, then log in.")) }
     }
 
+    fun resetPassword(email: String) = act {
+        repo.sendPasswordReset(email)
+        _state.update { it.copy(notice = tr("পাসওয়ার্ড রিসেট লিংক ইমেইলে পাঠানো হয়েছে।", "A password reset link was sent to your email.")) }
+    }
+
     fun signIn(email: String, password: String) = act {
         repo.signIn(email, password)
         loadAll()
