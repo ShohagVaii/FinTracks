@@ -1,5 +1,7 @@
 package com.fintracks.app.ui
 
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.runtime.saveable.rememberSaveable
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -136,8 +138,32 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
     val dateStyle = if (state.profile?.str("date_format") == "bn") "bn" else "en"
     val langStyle = if (AppPrefs.english) "en" else "bn"
 
+    // Sub-pages replace this page; their own BackHandler returns here.
+    var page by rememberSaveable { mutableStateOf("") }
+    if (page == "login") {
+        LoginSecurityPage(vm, lockOn, hasPin, bioOn, bioHardware) { page = "" }
+        return
+    }
+    if (page == "faq") {
+        FaqPage { page = "" }
+        return
+    }
+    val uid = remember { vm.currentUid() }
+
     Page {
         ProfileCard(state, email, emailLoaded) { editProfile = true }
+        AppCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(tr("ইউজার আইডি", "User ID"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (uid.isEmpty()) "—" else uid.take(8) + "…", fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+                if (uid.isNotEmpty()) TextButton(onClick = { copyText(ctx, "FinTrack user id", uid) }) { Text(tr("কপি", "Copy")) }
+            }
+        }
+        AppCard {
+            SettingLink(tr("লগইন ও নিরাপত্তা", "Login & security"), tr("ইমেইল, Google, পাসওয়ার্ড, ফোনের লক", "Email, Google, password, phone lock")) { page = "login" }
+        }
 
         // ---- চেহারা ও পছন্দ ----
         AppCard {
@@ -334,8 +360,6 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
         // ---- অ্যাকাউন্ট ----
         AppCard {
             SectionTitle(tr("অ্যাকাউন্ট", "Account"))
-            OutlinedButton(onClick = { vm.signOut() }) { Text(tr("লগআউট", "Log out")) }
-            Spacer(Modifier.height(4.dp))
             Text(tr("বিপজ্জনক এলাকা", "Danger zone"), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
             Text(tr("অ্যাকাউন্ট মুছলে আপনার সব লেনদেন, বাকি, ধার, বাজেট ও অন্য সব ডেটা স্থায়ীভাবে চলে যাবে। এটি ফিরিয়ে আনা যাবে না।",
                 "Deleting the account permanently removes all your transactions, credit, debts, budgets and other data. This cannot be undone."),
@@ -345,7 +369,25 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
             }
         }
 
+        AppCard {
+            SectionTitle(tr("সাহায্য ও তথ্য", "Help & info"))
+            SettingLink(tr("প্রশ্ন-উত্তর", "Questions & answers"), tr("অফলাইনেও পড়া যায়", "Readable offline")) { page = "faq" }
+            SettingLink(tr("সাপোর্ট ইমেইল", "Support email"), SUPPORT_EMAIL) { sendSupportMail(ctx) }
+            SettingLink(tr("প্রাইভেসি পলিসি", "Privacy policy")) { openUrl(ctx, PRIVACY_URL) }
+            SettingLink(tr("টার্মস ও শর্তাবলি", "Terms of use")) { openUrl(ctx, TERMS_URL) }
+        }
+        AppCard {
+            SectionTitle(tr("শেয়ার ও রেটিং", "Share & rate"))
+            SettingLink(tr("অ্যাপ শেয়ার করুন", "Share the app")) { shareApp(ctx) }
+            SettingLink(
+                tr("রেট দিন", "Rate the app"),
+                tr("এখন ওয়েবসাইটে যাবে; Play Store-এ এখনো নেই", "Opens the website for now; not on Play Store yet")
+            ) { openUrl(ctx, WEBSITE_URL) }
+        }
+        SocialRow(ctx)
         ToolsFooter()
+        // Logout is the last row, in its own rose band.
+        LogoutRow { vm.signOut() }
     }
 
     // ---- dialogs ----
@@ -463,6 +505,8 @@ private fun ProfileCard(state: UiState, email: String, emailLoaded: Boolean, onE
             }
             IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, contentDescription = tr("প্রোফাইল এডিট", "Edit profile")) }
         }
+        Spacer(Modifier.height(10.dp))
+        CompletenessBar(profileChecks(state.profile), showMissing = false)
     }
 }
 
@@ -502,6 +546,10 @@ private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () ->
     var phone by remember { mutableStateOf(p?.str("phone").orEmpty()) }
     var address by remember { mutableStateOf(p?.str("address").orEmpty()) }
     var photoUrl by remember { mutableStateOf(p?.str("avatar_url").orEmpty()) }
+    var district by remember { mutableStateOf(p?.str("district").orEmpty()) }
+    var occupation by remember { mutableStateOf(p?.str("occupation").orEmpty()) }
+    var pickDistrict by remember { mutableStateOf(false) }
+    var pickOccupation by remember { mutableStateOf(false) }
     var pickingDob by remember { mutableStateOf(false) }
     var uploading by remember { mutableStateOf(false) }
 
@@ -545,6 +593,22 @@ private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () ->
                 OutlinedTextField(phone, { phone = it.take(20) }, label = { Text(tr("ফোন নম্বর", "Phone")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(address, { address = it.take(200) }, label = { Text(tr("ঠিকানা", "Address")) }, modifier = Modifier.fillMaxWidth().height(90.dp))
                 OutlinedTextField(photoUrl, { photoUrl = it.take(500) }, label = { Text(tr("ছবির URL (ঐচ্ছিক)", "Photo URL (optional)")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedButton(onClick = { pickDistrict = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(tr("জেলা: ", "District: ") + (if (district.isBlank()) tr("বাছাই করুন", "choose") else if (district == OTHER_CAT) tr("অন্যান্য", "Other") else district))
+                }
+                if (district == OTHER_CAT || (district.isNotBlank() && DISTRICTS.none { it.first == district })) {
+                    CustomWordField(tr("জেলার নাম লিখুন", "Type the district name"), if (district == OTHER_CAT) "" else district) { district = it }
+                }
+                OutlinedButton(onClick = { pickOccupation = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(tr("পেশা: ", "Occupation: ") + (if (occupation.isBlank()) tr("বাছাই করুন", "choose") else if (occupation == OTHER_CAT) tr("অন্যান্য", "Other") else occupation))
+                }
+                if (occupation == OTHER_CAT || (occupation.isNotBlank() && OCCUPATIONS.none { it.first == occupation })) {
+                    CustomWordField(tr("পেশার নাম লিখুন", "Type the occupation"), if (occupation == OTHER_CAT) "" else occupation) { occupation = it }
+                }
+                CompletenessBar(
+                    profileChecks(name, username, photoUrl, dob, phone, address, district, occupation),
+                    showMissing = true
+                )
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
             }
         },
@@ -557,6 +621,8 @@ private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () ->
                     put("phone", phone.trim())
                     put("address", address.trim())
                     if (photoUrl.trim() != p?.str("avatar_url").orEmpty()) put("avatar_url", photoUrl.trim())
+                    put("district", if (district.isBlank()) JsonNull else JsonPrimitive(district.trim()))
+                    put("occupation", if (occupation.isBlank()) JsonNull else JsonPrimitive(occupation.trim()))
                 }
                 vm.saveProfile(body)
                 onDismiss()
@@ -565,6 +631,18 @@ private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () ->
         dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 
+    if (pickDistrict) {
+        SearchPickerSheet(tr("জেলা বাছাই", "Choose district"), DISTRICTS, district, { pickDistrict = false }) { picked ->
+            district = picked
+            pickDistrict = false
+        }
+    }
+    if (pickOccupation) {
+        SearchPickerSheet(tr("পেশা বাছাই", "Choose occupation"), OCCUPATIONS, occupation, { pickOccupation = false }) { picked ->
+            occupation = picked
+            pickOccupation = false
+        }
+    }
     if (pickingDob) {
         DatePickerSheet(
             initial = runCatching { LocalDate.parse(dob) }.getOrDefault(LocalDate.of(2000, 1, 1)),

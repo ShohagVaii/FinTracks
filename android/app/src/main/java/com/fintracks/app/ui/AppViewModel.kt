@@ -1,5 +1,6 @@
 package com.fintracks.app.ui
 
+import com.fintracks.app.data.AccountInfo
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import android.app.Application
@@ -335,6 +336,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Login email from Auth (profiles has no email column). Used by Settings and account deletion. */
     suspend fun accountEmail(): String = repo.accountEmail()
+    suspend fun accountInfo(): AccountInfo = repo.accountInfo()
+    fun currentUid(): String = repo.currentUid()
+    suspend fun unlinkIdentity(identityId: String) = repo.unlinkIdentity(identityId)
+    suspend fun changePassword(email: String, current: String, new: String) = repo.changePassword(email, current, new)
 
     /** Refreshes every table now. Settings uses this for the manual sync button. */
     fun syncNow() = act {

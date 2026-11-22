@@ -152,3 +152,7 @@ val Tok_FFE879F9 = Color(0xFFE879F9)
 val Tok_FFFACC15 = Color(0xFFFACC15)
 val Tok_FFFB7185 = Color(0xFFFB7185)
 val Tok_FFFB923C = Color(0xFFFB923C)
+
+/** Social-link tiles in Settings. */
+val FacebookBlue = Color(0xFF1877F2)
+val TelegramBlue = Color(0xFF229ED9)

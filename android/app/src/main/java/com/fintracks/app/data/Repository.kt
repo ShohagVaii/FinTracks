@@ -17,6 +17,9 @@ import kotlinx.serialization.json.JsonElement
  * Single entry point for all data. Every request carries the user's access token,
  * so Row Level Security on Supabase enforces ownership.
  */
+/** Login details shown on the "লগইন ও নিরাপত্তা" page. */
+data class AccountInfo(val email: String, val verified: Boolean, val providers: List<Pair<String, String>>)
+
 class Repository(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences("fintracks", Context.MODE_PRIVATE)
     private val api = SupabaseApi()
@@ -149,6 +152,37 @@ class Repository(context: Context) {
             session = fresh
             block(fresh.accessToken)
         }
+    }
+
+    /** Current user id (uid). Empty when there is no session. */
+    fun currentUid(): String = session?.user?.id.orEmpty()
+
+    /** Login details from the auth server: email, whether it is verified, and each linked sign-in method. */
+    suspend fun accountInfo(): AccountInfo {
+        val obj = json.parseToJsonElement(authed("GET", "/auth/v1/user")).jsonObject
+        val email = obj["email"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val verified = obj["email_confirmed_at"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true
+        val providers = (obj["identities"] as? JsonArray).orEmpty().mapNotNull { el ->
+            val o = el.jsonObject
+            val provider = o["provider"]?.jsonPrimitive?.contentOrNull
+            val identityId = o["identity_id"]?.jsonPrimitive?.contentOrNull
+            if (provider != null && identityId != null) provider to identityId else null
+        }
+        return AccountInfo(email, verified, providers)
+    }
+
+    /** Removes one linked sign-in method (e.g. Google). The server refuses when it is the last one. */
+    suspend fun unlinkIdentity(identityId: String) {
+        authed("DELETE", "/auth/v1/user/identities/$identityId")
+    }
+
+    /**
+     * Changes the password. The current password is checked with a fresh sign-in first; those tokens are
+     * discarded and the saved session is left as it is.
+     */
+    suspend fun changePassword(email: String, currentPassword: String, newPassword: String) {
+        api.signIn(email, currentPassword)
+        authed("PUT", "/auth/v1/user", JsonObject(mapOf("password" to JsonPrimitive(newPassword))))
     }
 
     /** Uploads a transaction photo to the user's own folder. Returns the storage path (not a URL). */
