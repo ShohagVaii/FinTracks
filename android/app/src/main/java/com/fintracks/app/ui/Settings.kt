@@ -217,6 +217,10 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
             SwitchRow(tr("প্রাইভেসি মোড (টাকার পরিমাণ লুকানো)", "Privacy mode (hide amounts)"), state.privacy) {
                 vm.saveProfile(row("is_privacy_mode" to it))
             }
+            // Full-screen mode hides the status bar. Off returns the normal edge-to-edge look with the bar visible.
+            SwitchRow(tr("পুরো স্ক্রিন মোড (স্ট্যাটাস বার লুকানো)", "Full-screen mode (status bar hidden)"), Immersive.on) {
+                Immersive.set(ctx, it)
+            }
         }
 
         // ---- ক্যাটাগরি ----

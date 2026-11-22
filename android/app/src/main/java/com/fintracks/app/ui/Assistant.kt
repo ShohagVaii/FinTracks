@@ -1,6 +1,6 @@
 package com.fintracks.app.ui
 
-import androidx.compose.foundation.layout.statusBarsPadding
+import com.fintracks.app.ui.topInsetPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Close
@@ -226,7 +226,7 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
             Modifier
                 .fillMaxWidth()
                 .background(Brush.horizontalGradient(listOf(Tok_FF1E1B4B, Tok_FF3730A3)))
-                .statusBarsPadding()
+                .topInsetPadding()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

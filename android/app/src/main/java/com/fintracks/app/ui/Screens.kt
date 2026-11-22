@@ -25,6 +25,14 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Badge
+import androidx.compose.material3.InputChip
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -352,6 +360,7 @@ fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onLongClick: (() 
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit, openReceipt: (JsonObject) -> Unit, onTxLongPress: (JsonObject) -> Unit) {
     val ctx = LocalContext.current
@@ -393,52 +402,157 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
             (modeFilter.isEmpty() || t.str("payment_mode") == modeFilter) &&
             (q.isEmpty() || t.str("note").contains(q, true) || t.str("category").contains(q, true) || t.strList("tags").any { it.contains(q, true) })
     }.sortedByDescending { dateOf(it, "tx_date") }
-    // Transfers are not income or expense, so they are left out of these totals.
-    val income = inRange.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
-    val expense = inRange.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
+    val filterCount = (if (filter != "all") 1 else 0) + (if (modeFilter.isNotEmpty()) 1 else 0) + (if (segment != "history") 1 else 0)
+    var filterOpen by remember { mutableStateOf(false) }
+    var periodMenu by remember { mutableStateOf(false) }
+    var moreMenu by remember { mutableStateOf(false) }
+
+    // Export actions live in the ⋮ menu (they used to be four large buttons above the list).
+    fun exportList(fmt: Export.Format) {
+        busy = true
+        scope.launch {
+            try {
+                val file = withContext(Dispatchers.IO) { Export.listFile(ctx, fmt, state, filtered, range.label) }
+                Export.share(ctx, file, fmt.mime, "FinTrack - ${range.label}")
+            } catch (e: Exception) {
+                Toast.makeText(ctx, tr("এক্সপোর্ট ব্যর্থ: ${e.message}", "Export failed: ${e.message}"), Toast.LENGTH_LONG).show()
+            } finally { busy = false }
+        }
+    }
+    fun exportVoucher() {
+        busy = true
+        scope.launch {
+            try {
+                val ref = vm.summaryRef(filtered, range)
+                val file = withContext(Dispatchers.IO) { Voucher.summaryPdf(ctx, state, filtered, range.label, ref) }
+                Export.share(ctx, file, "application/pdf", tr("FinTrack সারসংক্ষেপ ভাউচার", "FinTrack summary voucher"))
+            } catch (e: Exception) {
+                Toast.makeText(ctx, tr("ভাউচার ব্যর্থ: ${e.message}", "Voucher failed: ${e.message}"), Toast.LENGTH_LONG).show()
+            } finally { busy = false }
+        }
+    }
+
+    val typeLabel = when (filter) {
+        "income" -> tr("আয়", "Income")
+        "expense" -> tr("ব্যয়", "Expense")
+        "transfer" -> tr("ট্রান্সফার", "Transfer")
+        else -> tr("সব", "All")
+    }
 
     Column(Modifier.fillMaxSize().padding(16.dp).nestedScroll(listScroll)) {
         AnimatedVisibility(visible = !collapsed, enter = expandVertically(), exit = shrinkVertically()) {
-        Column(Modifier.padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        ChoiceChips(listOf("history" to tr("লেনদেনের ইতিহাস", "History"), "auto" to tr("অটো-লেনদেন", "Auto-created")), segment) { segment = it }
-        OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text(tr("খুঁজুন (নোট / ক্যাটাগরি / #ট্যাগ)", "Search (note / category / #tag)")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        PeriodPicker(period, customFrom, customTo, onPeriod = { period = it }, onFrom = { customFrom = it }, onTo = { customTo = it })
-        ChoiceChips(listOf("all" to tr("সব", "All"), "income" to tr("আয়", "Income"), "expense" to tr("ব্যয়", "Expense"), "transfer" to tr("ট্রান্সফার", "Transfer")), filter) { filter = it }
-        ChoiceChips(listOf("" to tr("সব মাধ্যম", "All modes")) + PAYMENT_MODES.map { it to it }, modeFilter) { modeFilter = it }
-        Text(range.label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatPill(tr("আয়", "Income"), taka(income, state.privacy), incomeGreen, Modifier.weight(1f))
-            StatPill(tr("ব্যয়", "Expense"), taka(expense, state.privacy), expenseRed, Modifier.weight(1f))
-            StatPill(tr("নিট", "Net"), taka(income - expense, state.privacy), netTone(income - expense), Modifier.weight(1f))
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf(Export.Format.XLSX to "Excel", Export.Format.PDF to "PDF", Export.Format.CSV to "CSV").forEach { (fmt, label) ->
-                OutlinedButton(modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 4.dp), enabled = !busy && filtered.isNotEmpty(), onClick = {
-                    busy = true
-                    scope.launch {
-                        try {
-                            val file = withContext(Dispatchers.IO) { Export.listFile(ctx, fmt, state, filtered, range.label) }
-                            Export.share(ctx, file, fmt.mime, "FinTrack - ${range.label}")
-                        } catch (e: Exception) {
-                            Toast.makeText(ctx, tr("এক্সপোর্ট ব্যর্থ: ${e.message}", "Export failed: ${e.message}"), Toast.LENGTH_LONG).show()
-                        } finally { busy = false }
+        Column(Modifier.padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            // One thin row: search, period, filter button (with a count badge), and the ⋮ menu.
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    placeholder = { Text(tr("খুঁজুন (নোট / ক্যাটাগরি / #ট্যাগ)", "Search (note / category / #tag)"), fontSize = 13.sp) },
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
+                    modifier = Modifier.weight(1f)
+                )
+                Box {
+                    OutlinedButton(
+                        modifier = Modifier.pressScale(),
+                        onClick = { periodMenu = true },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    ) {
+                        Text(period.label, fontSize = 13.sp, maxLines = 1, softWrap = false)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
                     }
-                }) { Text("$label", maxLines = 1, softWrap = false, fontSize = 13.sp) }
-            }
-            OutlinedButton(modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 4.dp), enabled = !busy && filtered.isNotEmpty(), onClick = {
-                busy = true
-                scope.launch {
-                    try {
-                        val ref = vm.summaryRef(filtered, range)
-                        val file = withContext(Dispatchers.IO) { Voucher.summaryPdf(ctx, state, filtered, range.label, ref) }
-                        Export.share(ctx, file, "application/pdf", tr("FinTrack সারসংক্ষেপ ভাউচার", "FinTrack summary voucher"))
-                    } catch (e: Exception) {
-                        Toast.makeText(ctx, tr("ভাউচার ব্যর্থ: ${e.message}", "Voucher failed: ${e.message}"), Toast.LENGTH_LONG).show()
-                    } finally { busy = false }
+                    DropdownMenu(expanded = periodMenu, onDismissRequest = { periodMenu = false }) {
+                        Period.entries.forEach { p ->
+                            DropdownMenuItem(
+                                text = { Text(p.label, fontWeight = if (p == period) FontWeight.Bold else FontWeight.Normal) },
+                                onClick = {
+                                    period = p
+                                    periodMenu = false
+                                    // A custom range needs its two dates, so the filter sheet opens for them.
+                                    if (p == Period.CUSTOM) filterOpen = true
+                                }
+                            )
+                        }
+                    }
                 }
-            }) { Text(tr("ভাউচার", "Voucher"), maxLines = 1, softWrap = false, fontSize = 13.sp) }
+                BadgedBox(badge = { if (filterCount > 0) Badge { Text("$filterCount") } }) {
+                    IconButton(modifier = Modifier.pressScale(), onClick = { filterOpen = true }) {
+                        Icon(Icons.Default.FilterList, contentDescription = tr("ফিল্টার", "Filter"))
+                    }
+                }
+                Box {
+                    IconButton(modifier = Modifier.pressScale(), onClick = { moreMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = tr("আরও", "More"))
+                    }
+                    DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                        listOf(Export.Format.XLSX to "Excel", Export.Format.PDF to "PDF", Export.Format.CSV to "CSV").forEach { (fmt, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                enabled = !busy && filtered.isNotEmpty(),
+                                onClick = { moreMenu = false; exportList(fmt) }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text(tr("ভাউচার", "Voucher")) },
+                            enabled = !busy && filtered.isNotEmpty(),
+                            onClick = { moreMenu = false; exportVoucher() }
+                        )
+                    }
+                }
+            }
+            // Active filters as small removable chips, in one row. Tap × to clear one.
+            if (filterCount > 0 || period == Period.CUSTOM) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (filter != "all") item {
+                        InputChip(selected = true, onClick = { filter = "all" }, label = { Text(typeLabel, fontSize = 12.sp) },
+                            trailingIcon = { Icon(Icons.Default.Close, contentDescription = tr("সরান", "Remove"), modifier = Modifier.size(16.dp)) })
+                    }
+                    if (modeFilter.isNotEmpty()) item {
+                        InputChip(selected = true, onClick = { modeFilter = "" }, label = { Text(modeFilter, fontSize = 12.sp) },
+                            trailingIcon = { Icon(Icons.Default.Close, contentDescription = tr("সরান", "Remove"), modifier = Modifier.size(16.dp)) })
+                    }
+                    if (segment != "history") item {
+                        InputChip(selected = true, onClick = { segment = "history" }, label = { Text(tr("অটো-লেনদেন", "Auto-created"), fontSize = 12.sp) },
+                            trailingIcon = { Icon(Icons.Default.Close, contentDescription = tr("সরান", "Remove"), modifier = Modifier.size(16.dp)) })
+                    }
+                    if (period == Period.CUSTOM) item {
+                        Text(range.label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
         }
         }
+
+        if (filterOpen) {
+            ModalBottomSheet(onDismissRequest = { filterOpen = false }) {
+                Column(
+                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(tr("ফিল্টার", "Filters"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(tr("ধরন", "Type"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    ChoiceChips(listOf("all" to tr("সব", "All"), "income" to tr("আয়", "Income"), "expense" to tr("ব্যয়", "Expense"), "transfer" to tr("ট্রান্সফার", "Transfer")), filter) { filter = it }
+                    Text(tr("পেমেন্ট মাধ্যম", "Payment mode"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    ChoiceChips(listOf("" to tr("সব মাধ্যম", "All modes")) + PAYMENT_MODES.map { it to it }, modeFilter) { modeFilter = it }
+                    Text(tr("লেনদেনের উৎস", "Source"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    ChoiceChips(listOf("history" to tr("লেনদেনের ইতিহাস", "History"), "auto" to tr("অটো-লেনদেন", "Auto-created")), segment) { segment = it }
+                    if (period == Period.CUSTOM) {
+                        Text(tr("সময়সীমা", "Date range"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            DateField(tr("শুরু", "From"), customFrom, { customFrom = it }, modifier = Modifier.weight(1f))
+                            DateField(tr("শেষ", "To"), customTo, { customTo = it }, modifier = Modifier.weight(1f))
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(modifier = Modifier.weight(1f).pressScale(), onClick = { filter = "all"; modeFilter = ""; segment = "history" }) {
+                            Text(tr("সব মুছুন", "Clear all"))
+                        }
+                        Button(modifier = Modifier.weight(1f).pressScale(), onClick = { filterOpen = false }) {
+                            Text(tr("দেখুন", "Show"))
+                        }
+                    }
+                }
+            }
         }
         if (selecting) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

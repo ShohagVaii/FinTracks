@@ -36,7 +36,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.layout.statusBarsPadding
+import com.fintracks.app.ui.topInsetPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -91,6 +91,8 @@ class Celebrate(val kind: Int)
 
 @Composable
 fun FinTracksApp(vm: AppViewModel = viewModel()) {
+    // Full-screen mode for the whole app, including the PIN lock screen.
+    ImmersiveEffect()
     val state by vm.state.collectAsState()
     val locked by AppLock.locked.collectAsState()
     val ctx = LocalContext.current
@@ -300,7 +302,13 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
     if (smsOpen) SmsParserDialog(state, vm) { smsOpen = false }
     if (showCalc) CalculatorDialog(onUse = { showCalc = false }, onDismiss = { showCalc = false })
 
-    receipt?.let { r -> ReceiptDialog(r, state, onEdit = { receipt = null; openTx(r) }) { receipt = null } }
+    receipt?.let { r ->
+        ReceiptDialog(
+            r, state,
+            onEdit = { receipt = null; openTx(r) },
+            onDelete = { receipt = null; vm.remove("transactions", r.id()) }
+        ) { receipt = null }
+    }
     txAction?.let { a ->
         TxActionDialog(
             a,
@@ -336,7 +344,7 @@ private fun Header(
     Row(
         Modifier
             .fillMaxWidth()
-            .statusBarsPadding()
+            .topInsetPadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -383,7 +391,7 @@ private fun HeaderIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, de
 @Composable
 private fun OverlayHeader(title: String, onBack: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().topInsetPadding().padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(modifier = Modifier.pressScale(), onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("ফিরে যান", "Back")) }

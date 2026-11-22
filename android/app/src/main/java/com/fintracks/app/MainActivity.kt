@@ -14,6 +14,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        com.fintracks.app.ui.Immersive.load(this)
         if (savedInstanceState == null && AppLock.isEnabled(this)) AppLock.lock()
         DailySyncWorker.schedule(this)
         DailyReminder.ensureScheduled(this)
