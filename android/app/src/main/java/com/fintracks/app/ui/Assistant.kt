@@ -49,6 +49,12 @@ import kotlin.math.ceil
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import com.fintracks.app.data.row
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * Offline assistant. It answers from the user's own data with no network and no API key.
@@ -152,41 +158,60 @@ fun aiContext(state: UiState): String {
     }.take(3900)
 }
 
-/** One chat line. kind: "user", "assistant" (AI or local answer), or "error" (AI failed; [question] lets the user retry). */
-private data class ChatMsg(val who: String, val text: String, val question: String = "")
+/**
+ * One chat line. "user", "assistant" (AI) and "local" (answer from device data, not AI) are saved on the account
+ * (ai_chat_messages), with date and time. "error" lines exist only on this screen: they show the real reason,
+ * with Retry and a separate button for a local answer.
+ */
+private data class ChatMsg(val id: String, val who: String, val text: String, val at: String, val question: String = "")
+
+private val CHAT_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a", Locale.US)
+
+private fun chatInstant(iso: String): Instant = runCatching { OffsetDateTime.parse(iso).toInstant() }.getOrDefault(Instant.EPOCH)
+
+private fun chatTime(iso: String): String = runCatching {
+    OffsetDateTime.parse(iso).atZoneSameInstant(ZoneId.systemDefault()).format(CHAT_TIME)
+}.getOrDefault("")
 
 @Composable
 fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
     val greeting = tr("হ্যালো! আমি FinTrack AI। আমি আপনাকে বাজেট, সঞ্চয় বা বিনিয়োগের পরামর্শ দিয়ে সাহায্য করতে পারি। আপনি কী জানতে চান?", "Hello! I'm FinTrack AI. I can help with budgets, savings and investment advice. What would you like to know?")
-    val messages = remember { mutableStateListOf(ChatMsg("assistant", greeting)) }
+    // The account's saved chat, oldest first. It comes from the local copy, so it shows offline too.
+    val saved = state.rows("ai_chat_messages").sortedBy { chatInstant(it.str("created_at")) }
+    val errors = remember { mutableStateListOf<ChatMsg>() }
     var input by remember { mutableStateOf("") }
     var thinking by remember { mutableStateOf(false) }
+    val lines: List<ChatMsg> = saved.map { ChatMsg(it.id(), it.str("role"), it.str("text"), it.str("created_at")) } + errors
 
-    fun send(text: String) {
+    fun saveLine(role: String, text: String) {
+        vm.save("ai_chat_messages", row("role" to role, "text" to text, "created_at" to OffsetDateTime.now().toString()), null)
+    }
+
+    fun send(text: String, saveQuestion: Boolean = true) {
         val q = text.trim().take(1000)
         if (q.isEmpty() || thinking) return
-        messages += ChatMsg("user", q)
         input = ""
         thinking = true
+        if (saveQuestion) saveLine("user", q)
         scope.launch {
             // No silent fallback: a failure shows its real reason, with retry and an explicit local-answer button.
-            val reply = try {
-                ChatMsg("assistant", vm.askAi(q, aiContext(state), if (AppPrefs.english) "en" else "bn"))
+            try {
+                saveLine("assistant", vm.askAi(q, aiContext(state), if (AppPrefs.english) "en" else "bn"))
             } catch (e: Exception) {
                 val reason = if (e is java.io.IOException && e !is com.fintracks.app.data.SupabaseException) {
                     tr("ইন্টারনেট সংযোগ বা সময়সীমা: ${e.message ?: "অজানা"}", "Connection or timeout: ${e.message ?: "unknown"}")
                 } else {
                     e.message ?: tr("অজানা ত্রুটি", "Unknown error")
                 }
-                ChatMsg(
-                    "error",
+                errors += ChatMsg(
+                    "err-${System.nanoTime()}", "error",
                     tr("AI উত্তর দিতে পারেনি।\nকারণ: ", "AI could not answer.\nReason: ") + reason,
-                    q
+                    OffsetDateTime.now().toString(), q
                 )
+            } finally {
+                thinking = false
             }
-            messages += reply
-            thinking = false
         }
     }
 
@@ -226,44 +251,20 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
             Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(messages) { msg ->
-                val who = msg.who
-                val text = msg.text
-                val mine = who == "user"
-                Box(Modifier.fillMaxWidth(), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth(0.82f)
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(if (mine) purple else MaterialTheme.colorScheme.surface)
-                            .border(1.dp, if (mine) Color.Transparent else Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
-                            .padding(14.dp)
-                    ) {
-                        Column {
-                            Text(text, color = if (mine) Color.White else MaterialTheme.colorScheme.onSurface, lineHeight = 22.sp)
-                            if (who == "error") {
-                                Spacer(Modifier.height(10.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                    Text(
-                                        tr("আবার চেষ্টা করুন", "Retry"),
-                                        color = Color(0xFFA78BFA), fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.clickable(enabled = !thinking) { msg.question.takeIf { it.isNotEmpty() }?.let { send(it) } }
-                                    )
-                                    Text(
-                                        tr("লোকাল ডাটা থেকে উত্তর দেখুন", "Show answer from local data"),
-                                        color = Color(0xFFA78BFA), fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.clickable {
-                                            messages += ChatMsg(
-                                                "assistant",
-                                                Assistant.answer(msg.question, state) + tr("\n\n(এটি লোকাল ডাটা থেকে তৈরি, AI উত্তর নয়)", "\n\n(From local data, not AI)")
-                                            )
-                                        }
-                                    )
-                                }
-                            }
-                        }
+            item { ChatBubble(ChatMsg("greeting", "assistant", greeting, ""), thinking, onRetry = {}, onLocal = {}) }
+            items(lines, key = { it.id }) { msg ->
+                ChatBubble(
+                    msg = msg,
+                    thinking = thinking,
+                    onRetry = {
+                        errors.remove(msg)
+                        send(msg.question, saveQuestion = false)
+                    },
+                    onLocal = {
+                        errors.remove(msg)
+                        saveLine("local", Assistant.answer(msg.question, state) + tr("\n\n(এটি লোকাল ডাটা থেকে তৈরি, AI উত্তর নয়)", "\n\n(From local data, not AI)"))
                     }
-                }
+                )
             }
             if (thinking) item { Text(tr("ভাবছি…", "Thinking…"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp) }
         }
@@ -281,6 +282,54 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
                     .clickable(enabled = input.isNotBlank() && !thinking) { send(input) },
                 contentAlignment = Alignment.Center
             ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = tr("পাঠান", "Send"), tint = Color.White) }
+        }
+    }
+}
+
+@Composable
+private fun ChatBubble(msg: ChatMsg, thinking: Boolean, onRetry: () -> Unit, onLocal: () -> Unit) {
+    val mine = msg.who == "user"
+    val isError = msg.who == "error"
+    Box(Modifier.fillMaxWidth(), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
+        Box(
+            Modifier
+                .fillMaxWidth(0.82f)
+                .clip(RoundedCornerShape(20.dp))
+                .background(if (mine) Color(0xFF7C3AED) else MaterialTheme.colorScheme.surface)
+                .border(1.dp, if (mine) Color.Transparent else Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
+                .padding(14.dp)
+        ) {
+            Column {
+                val label = when (msg.who) {
+                    "local" -> tr("লোকাল ডাটা (AI নয়)", "Local data (not AI)")
+                    "assistant" -> "FinTrack AI"
+                    else -> ""
+                }
+                if (label.isNotEmpty()) Text(label, fontSize = 10.sp, color = Color(0xFFA78BFA), letterSpacing = 1.sp)
+                Text(msg.text, color = if (mine) Color.White else MaterialTheme.colorScheme.onSurface, lineHeight = 22.sp)
+                if (msg.at.isNotEmpty()) {
+                    Text(
+                        bnDigits(chatTime(msg.at)),
+                        fontSize = 10.sp,
+                        color = if (mine) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (isError) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text(
+                            tr("আবার চেষ্টা করুন", "Retry"),
+                            color = Color(0xFFA78BFA), fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable(enabled = !thinking) { if (msg.question.isNotEmpty()) onRetry() }
+                        )
+                        Text(
+                            tr("লোকাল ডাটা থেকে উত্তর দেখুন", "Show answer from local data"),
+                            color = Color(0xFFA78BFA), fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable { onLocal() }
+                        )
+                    }
+                }
+            }
         }
     }
 }

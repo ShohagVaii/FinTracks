@@ -25,7 +25,7 @@ object Sync {
     private const val PREFS = "fintrack_sync"
 
     /** Tables that may be missing on the server until their migration is applied. */
-    private val OPTIONAL_TABLES = setOf("debt_payments")
+    private val OPTIONAL_TABLES = setOf("debt_payments", "ai_chat_messages")
 
     /** Remembers when the last successful table fetch finished (shown in Settings). */
     fun markOk(ctx: Context) {

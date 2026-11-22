@@ -54,7 +54,8 @@ val TABLES: List<Pair<String, String>> = listOf(
     "mess_meals" to "select=*&order=meal_date.desc",
     "mess_deposits" to "select=*&order=deposit_date.desc",
     "categories" to "select=*&order=name.asc",
-    "cash_counts" to "select=*&order=counted_at.desc"
+    "cash_counts" to "select=*&order=counted_at.desc",
+    "ai_chat_messages" to "select=*&order=created_at.asc"
 )
 
 /** The last deleted row, kept for a few seconds so the user can undo. */

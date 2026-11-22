@@ -4,15 +4,22 @@ import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardType
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
@@ -21,8 +28,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -30,12 +37,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -212,7 +221,10 @@ private val BD_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy
 private fun bdTime(epochMs: Long): String =
     Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()).format(BD_TIME)
 
-/** Money counter: enter how many of each note/coin, see the total, save it to history (device and server). */
+/**
+ * Money counter, one screen: 10 note cells in a 2 × 5 grid (no scrolling), the grand total and note count fixed at the
+ * bottom, and clear and save on the same screen. History opens on its own screen. Save, delete and sync are unchanged.
+ */
 @Composable
 fun MoneyCounterScreen(vm: AppViewModel) {
     val store = vm.cashCounts
@@ -220,59 +232,60 @@ fun MoneyCounterScreen(vm: AppViewModel) {
     val pending by store.pendingCount.collectAsState()
     val scope = rememberCoroutineScope()
     var inputs by remember { mutableStateOf(DENOMINATIONS.associateWith { "" }) }
-    var expanded by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
+    var showHistory by rememberSaveable { mutableStateOf(false) }
     val counts: Map<Int, Long> = DENOMINATIONS.associateWith { inputs[it]?.toLongOrNull() ?: 0L }
     val total = counts.entries.sumOf { it.key.toLong() * it.value }
     val pieces = counts.values.sum()
 
     LaunchedEffect(Unit) { store.sync() }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(28.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF0F766E), Color(0xFF0EA5E9))))
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(tr("সর্বমোট", "Grand total"), fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f), letterSpacing = 2.sp)
-            Text(bnDigits("৳ ${grouped(total)}"), fontSize = 38.sp, fontWeight = FontWeight.Black, color = Color.White)
-            Text(tr("মোট নোট/কয়েন: ", "Notes/coins: ") + bnDigits(pieces.toString()) + tr("টি", ""), fontSize = 13.sp, color = Color.White.copy(alpha = 0.9f))
+    if (showHistory) {
+        CounterHistory(store = store, history = history, onBack = { showHistory = false })
+        return
+    }
+
+    Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(tr("টাকা গণক", "Money counter"), fontWeight = FontWeight.Black, fontSize = 18.sp, modifier = Modifier.weight(1f))
+            TextButton(onClick = { showHistory = true }) { Text(tr("ইতিহাস ›", "History ›")) }
         }
 
-        DENOMINATIONS.forEach { d ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(bnDigits("৳$d"), fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.width(72.dp))
-                OutlinedTextField(
-                    value = inputs[d] ?: "",
-                    onValueChange = { v -> inputs = inputs + (d to v.filter { it.isDigit() }.take(6)) },
-                    label = { Text(tr("কয়টা", "Count")) },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    bnDigits("= ৳${grouped(d.toLong() * (counts[d] ?: 0L))}"),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.width(110.dp)
-                )
+        DENOMINATIONS.chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                pair.forEach { d ->
+                    NoteCell(
+                        denomination = d,
+                        value = inputs[d].orEmpty(),
+                        subtotal = d.toLong() * (counts[d] ?: 0L),
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        onChange = { v -> inputs = inputs + (d to v) }
+                    )
+                }
             }
         }
 
+        // Fixed bottom: grand total and note count, then clear and save.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF0F766E), Color(0xFF0EA5E9))))
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(tr("সর্বমোট", "Grand total"), fontSize = 11.sp, color = Color.White.copy(alpha = 0.8f), letterSpacing = 2.sp)
+                    Text(bnDigits("৳ ${grouped(total)}"), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Color.White)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(tr("মোট নোট/কয়েন", "Notes/coins"), fontSize = 11.sp, color = Color.White.copy(alpha = 0.8f))
+                    Text(bnDigits(pieces.toString()) + tr(" টি", ""), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(onClick = { inputs = DENOMINATIONS.associateWith { ""}; status = null }, modifier = Modifier.weight(1f)) {
+            OutlinedButton(onClick = { inputs = DENOMINATIONS.associateWith { "" }; status = null }, modifier = Modifier.weight(1f)) {
                 Text(tr("পরিষ্কার করুন", "Clear"))
             }
             Button(
@@ -280,7 +293,7 @@ fun MoneyCounterScreen(vm: AppViewModel) {
                     val toSave = counts
                     scope.launch {
                         val onServer = store.save(toSave)
-                        status = if (onServer) tr("✅ ডিভাইসে ও সার্ভারে সংরক্ষিত", "✅ Saved on device and server") else "💾 শুধু এই ফোনে সংরক্ষিত — সার্ভারে সিঙ্ক বাকি (ইন্টারনেট এলে নিজে যাবে)"
+                        status = if (onServer) tr("✅ ডিভাইসে ও সার্ভারে সংরক্ষিত", "✅ Saved on device and server") else tr("💾 শুধু এই ফোনে সংরক্ষিত — সার্ভারে সিঙ্ক বাকি (ইন্টারনেট এলে নিজে যাবে)", "💾 Saved on this phone only — server sync pending (it will sync when online)")
                     }
                 },
                 enabled = total > 0,
@@ -288,33 +301,97 @@ fun MoneyCounterScreen(vm: AppViewModel) {
                 modifier = Modifier.weight(1f)
             ) { Text(tr("সংরক্ষণ করুন", "Save")) }
         }
-        status?.let { Text(it, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        status?.let { Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2) }
         if (pending > 0) {
             Text(tr("অপেক্ষমাণ সিঙ্ক: ", "Pending sync: ") + bnDigits(pending.toString()) + tr("টি", ""), fontSize = 12.sp, color = Amber500)
         }
+    }
+}
 
-        SectionTitle(tr("গণনার ইতিহাস", "Count history"))
-        if (history.isEmpty()) EmptyHint(tr("এখনো কোনো সংরক্ষিত গণনা নেই", "No saved counts yet"))
-        history.forEach { r ->
-            val open = expanded == r.id
-            AppCard(onClick = { expanded = if (open) null else r.id }) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(bnDigits(bdTime(r.at)), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(bnDigits("৳ ${grouped(r.total)}"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text(bnDigits("${r.pieces}") + tr(" টি নোট/কয়েন", " notes/coins"), fontSize = 12.sp)
+/** One denomination cell: value and subtotal on the left, a compact count field on the right. */
+@Composable
+private fun NoteCell(denomination: Int, value: String, subtotal: Long, modifier: Modifier, onChange: (String) -> Unit) {
+    Row(
+        modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(bnDigits("৳$denomination"), fontWeight = FontWeight.Black, fontSize = 17.sp)
+            Text(bnDigits("= ৳${grouped(subtotal)}"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        }
+        Box(
+            Modifier
+                .width(72.dp)
+                .height(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.White.copy(alpha = 0.08f))
+                .border(1.dp, Color(0xFF14B8A6).copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            BasicTextField(
+                value = value,
+                onValueChange = { v -> onChange(v.filter { it.isDigit() }.take(6)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                cursorBrush = SolidColor(Color(0xFF14B8A6)),
+                decorationBox = { inner ->
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        if (value.isEmpty()) Text(tr("কয়টা", "Count"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        inner()
                     }
-                    IconButton(onClick = {
-                        scope.launch {
-                            val onServer = store.delete(r.id)
-                            status = if (onServer) tr("✅ গণনাটি মুছে ফেলা হয়েছে (ডিভাইস ও সার্ভার)", "✅ Count deleted (device and server)") else tr("💾 এই ফোনে মুছেছে — সার্ভারে সিঙ্ক বাকি", "💾 Deleted on this phone — server sync pending")
-                        }
-                        if (expanded == r.id) expanded = null
-                    }) { Icon(Icons.Default.Delete, contentDescription = tr("মুছুন", "Delete"), tint = Rose500) }
                 }
-                if (open) {
-                    r.counts.filter { it.value > 0 }.forEach { (d, n) ->
-                        KeyValue(bnDigits("৳$d × $n"), bnDigits("৳ ${grouped(d.toLong() * n)}"))
+            )
+        }
+    }
+}
+
+/** Separate screen: every saved count, newest first. Tap a row for its note breakdown; the bin deletes it. */
+@Composable
+private fun CounterHistory(store: CashCountStore, history: List<CountRecord>, onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var expanded by remember { mutableStateOf<String?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onBack) { Text(tr("‹ ফিরে যান", "‹ Back")) }
+            Text(tr("গণনার ইতিহাস", "Count history"), fontWeight = FontWeight.Black, fontSize = 18.sp)
+        }
+        status?.let { Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (history.isEmpty()) EmptyHint(tr("এখনো কোনো সংরক্ষিত গণনা নেই", "No saved counts yet"))
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(history, key = { it.id }) { r ->
+                val open = expanded == r.id
+                AppCard(onClick = { expanded = if (open) null else r.id }) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(bnDigits(bdTime(r.at)), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(bnDigits("৳ ${grouped(r.total)}"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text(bnDigits("${r.pieces}") + tr(" টি নোট/কয়েন", " notes/coins"), fontSize = 12.sp)
+                        }
+                        IconButton(onClick = {
+                            scope.launch {
+                                val onServer = store.delete(r.id)
+                                status = if (onServer) tr("✅ গণনাটি মুছে ফেলা হয়েছে (ডিভাইস ও সার্ভার)", "✅ Count deleted (device and server)") else tr("💾 এই ফোনে মুছেছে — সার্ভারে সিঙ্ক বাকি", "💾 Deleted on this phone — server sync pending")
+                            }
+                            if (expanded == r.id) expanded = null
+                        }) { Icon(Icons.Default.Delete, contentDescription = tr("মুছুন", "Delete"), tint = Rose500) }
+                    }
+                    if (open) {
+                        r.counts.filter { it.value > 0 }.forEach { (d, n) ->
+                            KeyValue(bnDigits("৳$d × $n"), bnDigits("৳ ${grouped(d.toLong() * n)}"))
+                        }
                     }
                 }
             }
