@@ -91,7 +91,11 @@ data class UiState(
     val tables: Map<String, List<JsonObject>> = emptyMap(),
     val pendingSms: List<SmsSuggestion> = emptyList(),
     val undo: UndoEntry? = null,
-    val celebration: GoalCelebration? = null
+    val celebration: GoalCelebration? = null,
+    /** Local changes waiting to be sent (the "সিঙ্ক বাকি" count). Shown by the sync indicator, never as a toast. */
+    val pendingSync: Int = 0,
+    /** Sync problem text (offline, server refused, session renewal). Shown by the sync indicator, never as a toast. */
+    val syncError: String? = null
 ) {
     fun rows(table: String): List<JsonObject> = tables[table].orEmpty()
     val dark: Boolean get() = profile?.str("theme") != "light"
@@ -116,12 +120,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     init {
-        // A saved session opens the app at once; data comes from the saved copy until the server answers.
-        _state.update { it.copy(signedIn = repo.session != null) }
-        viewModelScope.launch {
-            if (repo.session != null) runGuarded { loadAll() }
-            _state.update { it.copy(checking = false) }
-        }
+        // A saved session opens the home screen at once, from the saved copy. The server is asked in the background,
+        // so a slow or missing network never holds the entry screen.
+        val hasSession = repo.session != null
+        _state.update { it.copy(signedIn = hasSession, checking = false) }
+        if (hasSession) publish(outbox.cached())
+        viewModelScope.launch { outbox.pendingCount.collect { n -> _state.update { it.copy(pendingSync = n) } } }
+        if (hasSession) viewModelScope.launch { runGuarded { loadAll() } }
         watchNetwork()
     }
 
@@ -171,18 +176,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         outbox.flush()
         try {
             val profile = repo.list("profiles", "select=*&id=eq.${repo.uid()}").firstOrNull()
-            val fetched = Sync.run(getApplication<Application>(), repo, profile?.bool("is_privacy_mode") == true)
+            val fetched = Sync.run(getApplication<Application>(), repo, profile?.bool("is_privacy_mode") == true, outbox)
+            outbox.flush()
             Sync.markOk(getApplication<Application>())
             serverProfile = profile
             val base = fetched + ("profiles" to listOfNotNull(profile))
             outbox.remember(base)
             publish(base, pendingSms = PendingSmsStore.load(getApplication()))
+            _state.update { it.copy(syncError = null) }
             syncRegistry(profile, fetched["transactions"].orEmpty())
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             // Server not reached: show the saved copy. The session stays, so nothing logs out.
-            publish(outbox.cached(), notice = offlineNotice(e))
+            publish(outbox.cached())
+            _state.update { it.copy(syncError = offlineNotice(e)) }
         }
     }
 
@@ -198,6 +206,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val base = tables + ("profiles" to listOfNotNull(serverProfile))
         outbox.remember(base)
         publish(base)
+        _state.update { it.copy(syncError = null) }
         syncRegistry(state.value.profile, tables["transactions"].orEmpty())
     }
 
@@ -261,7 +270,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: SupabaseException) {
             if (e.code == 401) {
                 // The session could not be renewed. Keep it: the saved copy stays and sync retries when online.
-                _state.update { it.copy(message = offlineNotice(e)) }
+                _state.update { it.copy(syncError = offlineNotice(e)) }
             } else {
                 val text = e.message.orEmpty()
                 val friendly = when {
@@ -322,7 +331,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun accountEmail(): String = repo.accountEmail()
 
     /** Refreshes every table now. Settings uses this for the manual sync button. */
-    fun syncNow() = act { if (outbox.flush().drained) refreshTables() else throw IOException(tr("ইন্টারনেট নেই", "No internet")) }
+    fun syncNow() = act {
+        val r = outbox.flush()
+        if (r.dropped > 0) _state.update { it.copy(syncError = refusedText(r.dropped)) }
+        if (!r.drained) {
+            _state.update { it.copy(syncError = tr("ইন্টারনেট নেই। সংযোগ এলে সিঙ্ক হবে।", "No internet. It will sync when you're back online.")) }
+            return@act
+        }
+        try {
+            refreshTables()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            _state.update { it.copy(syncError = offlineNotice(e)) }
+        }
+    }
 
     /** Uploads a profile photo (needs internet), then saves its URL on the profile through the queue. */
     fun saveAvatar(bytes: ByteArray) = act {
@@ -435,14 +458,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return result
     }
 
-    /** Shows the sync result: refused changes, waiting for internet, or the success text. */
+    private fun refusedText(n: Int): String =
+        tr("সার্ভার $n টি পরিবর্তন গ্রহণ করেনি, সেগুলো বাতিল হয়েছে", "The server refused $n change(s); they were removed.")
+
+    /**
+     * After a local save: the toast ("done") is shown because the change is already saved on the phone.
+     * Sync state (refused, offline, pending count) goes to the sync indicator, never to the toast.
+     */
     private fun reportSync(result: FlushResult, done: String?) {
-        val text = when {
-            result.dropped > 0 -> tr("সার্ভার ${result.dropped}টি পরিবর্তন গ্রহণ করেনি, সেগুলো বাতিল হয়েছে", "The server refused ${result.dropped} change(s); they were removed.")
-            !result.drained -> tr("ইন্টারনেট নেই। সংযোগ এলে সিঙ্ক হবে।", "No internet. It will sync when you're back online.")
-            else -> done
+        _state.update { s ->
+            when {
+                result.dropped > 0 -> s.copy(syncError = refusedText(result.dropped))
+                result.drained -> s.copy(syncError = null, notice = done ?: s.notice)
+                else -> s.copy(notice = done ?: s.notice)
+            }
         }
-        if (text != null) _state.update { it.copy(notice = text) }
     }
 
     /** Every local write runs through here: saved, shown at once, sent (or queued offline). */

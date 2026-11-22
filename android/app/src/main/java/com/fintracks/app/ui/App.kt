@@ -105,6 +105,32 @@ fun FinTracksApp(vm: AppViewModel = viewModel()) {
     }
 }
 
+/**
+ * Sync state, kept apart from the toast: a thin line under the top edge. It shows the count of changes
+ * waiting to be sent, or the sync problem (offline, server refused, session renewal). Nothing when all is sent.
+ */
+@Composable
+private fun SyncIndicator(state: UiState) {
+    val error = state.syncError
+    if (error == null && state.pendingSync == 0) return
+    val text = when {
+        error != null && state.pendingSync > 0 -> error + tr(" · সিঙ্ক বাকি: ", " · Waiting to sync: ") + state.pendingSync
+        error != null -> error
+        else -> tr("সিঙ্ক বাকি: ", "Waiting to sync: ") + state.pendingSync
+    }
+    Surface(
+        color = if (error != null) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            color = if (error != null) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    }
+}
+
 @Composable
 private fun MainScaffold(state: UiState, vm: AppViewModel) {
     var tab by rememberSaveable { mutableStateOf("dashboard") }
@@ -147,6 +173,7 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
+            SyncIndicator(state)
             if (overlay == null) {
                 Header(
                     privacy = state.privacy,

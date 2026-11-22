@@ -52,7 +52,12 @@ object Sync {
      * Each transaction marked is_recurring is copied once per month into the current month
      * (same day, clamped to month length). The copy itself is not recurring.
      */
-    suspend fun materializeRecurring(ctx: Context, repo: Repository, txs: List<JsonObject>): Boolean {
+    /**
+     * Creates this month's copy of each recurring transaction. The copy is queued in the local outbox
+     * (works offline, sent later); the "done" mark is saved after each queued copy, so a failure
+     * never creates the same copy twice.
+     */
+    suspend fun materializeRecurring(ctx: Context, outbox: LocalOutbox, txs: List<JsonObject>): Boolean {
         val prefs = ctx.getSharedPreferences("fintrack_recurring", Context.MODE_PRIVATE)
         val month = monthPrefix()
         val key = "done-$month"
@@ -63,7 +68,9 @@ object Sync {
             if (day.length < 10 || day.take(7) >= month) continue
             if (!done.add(t.id())) continue
             val dd = minOf(day.substring(8).toInt(), YearMonth.parse(month).lengthOfMonth())
-            repo.insert("transactions", row(
+            val nid = java.util.UUID.randomUUID().toString()
+            val copy = row(
+                "id" to nid,
                 "type" to t.str("type"),
                 "amount" to t.num("amount"),
                 "currency" to t.str("currency").ifEmpty { "BDT" },
@@ -75,7 +82,9 @@ object Sync {
                 "account_id" to t.strOrNull("account_id"),
                 "to_account_id" to t.strOrNull("to_account_id"),
                 "is_recurring" to false
-            ))
+            )
+            outbox.enqueue(listOf(LocalOutbox.op("insert", "transactions", nid, copy, copy)))
+            prefs.edit().putStringSet(key, done).apply()
             created = true
         }
         prefs.edit().putStringSet(key, done).apply()
@@ -83,9 +92,12 @@ object Sync {
     }
 
     /** Full sync used by the app after login and by the daily worker. Returns the fresh tables. */
-    suspend fun run(ctx: Context, repo: Repository, privacy: Boolean): Map<String, List<JsonObject>> {
+    suspend fun run(ctx: Context, repo: Repository, privacy: Boolean, outbox: LocalOutbox = LocalOutbox(ctx, repo)): Map<String, List<JsonObject>> {
         var tables = fetchTables(repo)
-        if (materializeRecurring(ctx, repo, tables["transactions"].orEmpty())) tables = fetchTables(repo)
+        if (materializeRecurring(ctx, outbox, tables["transactions"].orEmpty())) {
+            outbox.flush()
+            tables = fetchTables(repo)
+        }
         Reminders.check(ctx, tables)
         FinTrackWidgetProvider.refresh(ctx, tables, privacy)
         return tables
@@ -98,7 +110,9 @@ class DailySyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
         return try {
             val repo = Repository(applicationContext)
             if (repo.session == null) return Result.success()
-            Sync.run(applicationContext, repo, privacy = false)
+            val outbox = LocalOutbox(applicationContext, repo)
+            Sync.run(applicationContext, repo, privacy = false, outbox = outbox)
+            outbox.flush()
             Result.success()
         } catch (e: Exception) {
             Result.retry()
