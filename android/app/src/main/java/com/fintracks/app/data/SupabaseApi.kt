@@ -21,6 +21,9 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /** [body] is the server response text, kept so screens can show the real reason (for example the AI service attempts). */
+/** Where the password-reset email link returns: the reset form on the Pages site (must be in Auth redirect allow-list). */
+const val PASSWORD_RESET_URL = "https://shohagvaii.github.io/FinTracks/reset.html"
+
 class SupabaseException(val code: Int, message: String, val body: String = "") : IOException(message)
 
 @Serializable
@@ -131,7 +134,10 @@ class SupabaseApi {
 
     /** Asks Supabase to email a password-reset link. */
     suspend fun recover(email: String) {
-        call("POST", "/auth/v1/recover", buildJsonObject { put("email", email) })
+        // GoTrue reads the return address from the redirect_to query parameter (a body field is ignored).
+        // The link then opens the reset page, not the landing page.
+        val redirect = java.net.URLEncoder.encode(PASSWORD_RESET_URL, "UTF-8")
+        call("POST", "/auth/v1/recover?redirect_to=$redirect", buildJsonObject { put("email", email) })
     }
 
     suspend fun signIn(email: String, password: String): Session {
