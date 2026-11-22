@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fintracks.app.data.id
 import kotlinx.serialization.json.JsonObject
+import androidx.compose.ui.text.font.FontWeight
 
 /** Full-screen tools opened from the Tools tab or the header. */
 enum class Overlay(private val bnTitle: String, private val enTitle: String) {
@@ -188,7 +189,7 @@ private fun SyncIndicator(state: UiState) {
     }
     Surface(
         color = if (error != null) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().shimmer(error == null)
     ) {
         Text(
             text,

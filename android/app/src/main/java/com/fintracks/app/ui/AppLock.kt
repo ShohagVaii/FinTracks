@@ -164,15 +164,26 @@ fun LockScreen(onSignOut: () -> Unit) {
         BiometricPrompt(activity, ContextCompat.getMainExecutor(activity), callback).authenticate(builder.build())
     }
 
+    var shakes by remember { mutableStateOf(0) }
+    var ripple by remember { mutableStateOf(0) }
+    var unlockPending by remember { mutableStateOf(false) }
+    LaunchedEffect(unlockPending) {
+        if (unlockPending) {
+            kotlinx.coroutines.delay(if (motionReduced(ctx)) 0L else 320L)
+            AppLock.unlock()
+        }
+    }
     fun press(d: String) {
         if (AppLock.lockoutRemaining(ctx) > 0) { error = tr("অনেকবার ভুল PIN। কিছুক্ষণ পর আবার চেষ্টা করুন", "Too many wrong PINs. Try again later"); return }
         if (pin.length >= 6) return
         pin += d
         if (pin.length >= 4 && AppLock.checkPin(ctx, pin)) {
-            AppLock.unlock()
             pin = ""
+            ripple++
+            unlockPending = true
         } else if (pin.length == 6) {
             error = tr("ভুল PIN", "Wrong PIN")
+            shakes++
             pin = ""
         }
     }
@@ -186,7 +197,9 @@ fun LockScreen(onSignOut: () -> Unit) {
     ) {
         Text(tr("FinTrack লক করা আছে", "FinTrack is locked"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
         Text(tr("PIN দিন", "Enter PIN"), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(16.dp)) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(16.dp)) {
+        RippleBurst(ripple, MaterialTheme.colorScheme.primary, Modifier.size(180.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.shakeOn(shakes)) {
             repeat(6) { i ->
                 Box(
                     Modifier.size(14.dp).background(
@@ -195,6 +208,7 @@ fun LockScreen(onSignOut: () -> Unit) {
                     )
                 )
             }
+        }
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         var remaining by remember { mutableStateOf(AppLock.lockoutRemaining(ctx)) }

@@ -29,6 +29,9 @@ import com.fintracks.app.data.str
 import com.fintracks.app.data.strOrNull
 import kotlinx.serialization.json.JsonObject
 import java.time.YearMonth
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.matchParentSize
 
 private val red = Rose500
 private val green = Emerald500
@@ -95,7 +98,7 @@ fun BudgetsScreen(state: UiState, vm: AppViewModel) {
                     Text("${catIcon(cat)} ${catLabel(cat)}", fontWeight = FontWeight.Bold)
                     Text("${taka(spent, p)} / ${taka(limit, p)}", fontSize = 12.sp)
                 }
-                ProgressBar(ratio.toFloat(), color)
+                Box(Modifier.warnPulse(ratio > 0.8, color)) { ProgressBar(ratio.toFloat(), color) }
                 val notes = buildList {
                     if (b.bool("rollover")) add(tr("পরের মাসে নিয়ে যাওয়া চালু", "Carry-over to next month on"))
                     if (carry > 0.005) add(tr("আগের মাস থেকে +${taka(carry, p)}", "Carried from last month +${taka(carry, p)}"))
@@ -161,6 +164,7 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
                 }
                 KeyValue(tr("জমা / লক্ষ্য", "Saved / goal"), "${taka(saved, p)} / ${taka(target, p)}")
                 ProgressBar((pct / 100).toFloat(), green)
+                if (pct >= 100) Box(Modifier.fillMaxWidth().height(120.dp)) { ConfettiBurst(Modifier.matchParentSize()) }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     GOAL_MILESTONES.forEach { m ->
                         val reached = pct >= m

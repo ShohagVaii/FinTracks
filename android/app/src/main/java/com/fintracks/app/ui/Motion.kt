@@ -362,3 +362,33 @@ fun StampText(text: String, color: Color, modifier: Modifier = Modifier, tilt: F
             .graphicsLayer { rotationZ = tilt }
     )
 }
+
+/** Shakes the content sideways once each time [trigger] changes (wrong PIN). Reduce Motion: no shake. Never blocks input. */
+@Composable
+fun Modifier.shakeOn(trigger: Int): Modifier {
+    val reduce = rememberReduceMotion()
+    val x = remember { Animatable(0f) }
+    LaunchedEffect(trigger) {
+        if (trigger == 0 || reduce) return@LaunchedEffect
+        repeat(4) { i -> x.animateTo(if (i % 2 == 0) 10f else -10f, tween(50)) }
+        x.animateTo(0f, tween(50))
+    }
+    return this.graphicsLayer { translationX = x.value }
+}
+
+/** One soft ring that expands and fades from the centre each time [trigger] changes (PIN unlock). Reduce Motion: nothing. */
+@Composable
+fun RippleBurst(trigger: Int, color: Color, modifier: Modifier = Modifier) {
+    val reduce = rememberReduceMotion()
+    val p = remember { Animatable(1f) }
+    LaunchedEffect(trigger) {
+        if (trigger == 0 || reduce) return@LaunchedEffect
+        p.snapTo(0f)
+        p.animateTo(1f, tween(400, easing = LinearOutSlowInEasing))
+    }
+    Canvas(modifier) {
+        val t = p.value
+        if (t >= 1f) return@Canvas
+        drawCircle(color.copy(alpha = 0.35f * (1f - t)), radius = size.minDimension * 0.5f * t, center = center)
+    }
+}

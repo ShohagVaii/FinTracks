@@ -141,7 +141,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
     // Sub-pages replace this page; their own BackHandler returns here.
     var page by rememberSaveable { mutableStateOf("") }
     if (page == "login") {
-        LoginSecurityPage(vm, lockOn, hasPin, bioOn, bioHardware) { page = "" }
+        LoginSecurityPage(vm, lockOn, hasPin, bioOn, bioHardware, onBack = { page = "" }, onOpenSecurity = { page = "" })
         return
     }
     if (page == "faq") {
@@ -228,6 +228,8 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
         // ---- নিরাপত্তা ----
         AppCard {
             SectionTitle(tr("নিরাপত্তা", "Security"))
+            // Link to the device-security block (PIN and fingerprint/face status) on the login & security page.
+            SettingLink(tr("PIN ও ফিঙ্গারপ্রিন্ট/ফেস স্ট্যাটাস", "PIN and fingerprint/face status"), tr("লগইন ও নিরাপত্তা পেজে দেখুন", "Shown on Login & security")) { page = "login" }
             Text(
                 tr("PIN, ফিঙ্গারপ্রিন্ট বা ফেস দিয়ে অ্যাপ লক করা যায়। ফোনে ফেস/ফিঙ্গারপ্রিন্ট না থাকলে PIN ব্যবহার হবে।",
                     "Lock the app with a PIN, fingerprint or face. Without a fingerprint or face on the phone, the PIN is used."),

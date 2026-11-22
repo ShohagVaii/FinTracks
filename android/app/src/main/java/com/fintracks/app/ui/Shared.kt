@@ -46,6 +46,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.time.YearMonth
+import androidx.compose.foundation.layout.Box
 
 /** Shared tab: bill splitter, mess manager, and shopping list. Money math lives in the functions below, not in the screens. */
 @Composable
@@ -137,7 +138,7 @@ private fun BillSplitSection(state: UiState, vm: AppViewModel) {
             if (overallPayouts.isEmpty()) {
                 Text(tr("কারও কাছে কিছু পাওনা বা দেনা নেই।", "Nobody owes or is owed anything."), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
-                overallPayouts.forEach { Text(tr("${it.from} দেবেন ${it.to}-কে: ${taka(it.amount, p)}", "${it.from} owes ${it.to}: ${taka(it.amount, p)}"), fontSize = 14.sp) }
+                overallPayouts.forEachIndexed { i, it -> Box(Modifier.staggerIn(i)) { Text(tr("${it.from} দেবেন ${it.to}-কে: ${taka(it.amount, p)}", "${it.from} owes ${it.to}: ${taka(it.amount, p)}"), fontSize = 14.sp) }}
             }
         }
     }

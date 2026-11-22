@@ -285,7 +285,7 @@ fun LogoutRow(onClick: () -> Unit) {
 
 /** Login and security page: email, Google, password, and this phone's lock status. */
 @Composable
-fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn: Boolean, bioHardware: Boolean, onBack: () -> Unit) {
+fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn: Boolean, bioHardware: Boolean, onBack: () -> Unit, onOpenSecurity: () -> Unit = {}) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var info by remember { mutableStateOf<AccountInfo?>(null) }
@@ -366,7 +366,7 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
                 }),
                 fontSize = 13.sp
             )
-            Text(tr("PIN ও লক বদলাতে সেটিংসের নিরাপত্তা অংশে যান।", "Change the PIN and lock in the Security section of Settings."), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SettingLink(tr("PIN ও লক বদলান", "Change PIN and lock"), tr("সেটিংসের নিরাপত্তা অংশে যান", "Go to the Security section of Settings")) { onOpenSecurity() }
         }
     }
 

@@ -275,7 +275,7 @@ fun MoneyCounterScreen(vm: AppViewModel, showHistory: Boolean, onHistory: (Boole
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(tr("সর্বমোট", "Grand total"), fontSize = 11.sp, color = Color.White.copy(alpha = 0.8f), letterSpacing = 2.sp)
-                    Text(bnDigits("${AppPrefs.symbol} ${grouped(total)}"), fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    CountUpText(total.toDouble(), { bnDigits("${AppPrefs.symbol} ${grouped(it.toLong())}") }, fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(tr("মোট নোট/কয়েন", "Notes/coins"), fontSize = 11.sp, color = Color.White.copy(alpha = 0.8f))

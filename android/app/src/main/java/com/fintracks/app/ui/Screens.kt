@@ -205,7 +205,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
                     Text(tr("নিট লাভ (PROFIT)", "Net profit (PROFIT)"), fontSize = 12.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(taka(net, p), fontSize = 36.sp, fontWeight = FontWeight.Bold, color = netTone(net))
+                    CountUpText(net, { taka(it, p) }, fontSize = 36.sp, fontWeight = FontWeight.Bold, color = netTone(net))
                 }
                 Box(Modifier.size(64.dp).clip(CircleShape).background(netTone(net).copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
                     Icon(if (net >= 0) Icons.Default.TrendingUp else Icons.Default.TrendingDown, contentDescription = null, tint = netTone(net), modifier = Modifier.size(30.dp))
@@ -214,8 +214,8 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             if (income > 0) Text(tr("সঞ্চয়ের হার", "Savings rate") + ": ${bnDigits("%.0f".format(savingsRate))}%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatPill(tr("মোট আয়", "Total income"), taka(income, p), incomeGreen, Modifier.weight(1f))
-            StatPill(tr("মোট ব্যয়", "Total expense"), taka(expense, p), expenseRed, Modifier.weight(1f))
+            StatPill(tr("মোট আয়", "Total income"), taka(income, p), incomeGreen, Modifier.weight(1f), countTo = income, countFmt = { taka(it, p) })
+            StatPill(tr("মোট ব্যয়", "Total expense"), taka(expense, p), expenseRed, Modifier.weight(1f), countTo = expense, countFmt = { taka(it, p) })
         }
         // Wallet card — all-time balance.
         Row(
@@ -234,12 +234,12 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             }
             Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Sky400.copy(alpha = 0.6f), modifier = Modifier.size(32.dp))
         }
-        CreditDueCard(state) { openOverlay(Overlay.CREDIT) }
+        Box(Modifier.staggerIn(1)) { CreditDueCard(state) { openOverlay(Overlay.CREDIT) } }
         // Heatmap follows the timeline month; its ‹ › buttons move the timeline too (one shared state).
         val heatMonth = heatmapMonthOf(span, offset, period)
         val nextMonth: (() -> Unit)? = if (heatMonth < java.time.YearMonth.now()) ({ jumpToMonth(heatMonth.plusMonths(1)) }) else null
-        HeatmapCard(txs, p, heatMonth, onPrev = { jumpToMonth(heatMonth.minusMonths(1)) }, onNext = nextMonth)
-        SmsParserCard(state, vm)
+        Box(Modifier.popIn()) { HeatmapCard(txs, p, heatMonth, onPrev = { jumpToMonth(heatMonth.minusMonths(1)) }, onNext = nextMonth) }
+        Box(Modifier.staggerIn(3)) { SmsParserCard(state, vm) }
 
         if (state.pendingSms.isNotEmpty()) {
             SectionTitle(tr("SMS থেকে নতুন লেনদেন", "New transactions from SMS"))
@@ -784,7 +784,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
 }
 
 @Composable
-internal fun StatPill(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
+internal fun StatPill(label: String, value: String, color: Color, modifier: Modifier = Modifier, countTo: Double? = null, countFmt: ((Double) -> String)? = null) {
     Column(
         modifier
             .clip(RoundedCornerShape(40.dp))
@@ -793,7 +793,8 @@ internal fun StatPill(label: String, value: String, color: Color, modifier: Modi
             .padding(horizontal = 20.dp, vertical = 18.dp)
     ) {
         Text(label, fontSize = 12.sp, color = readableOn(color))
-        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = readableOn(color))
+        if (countTo != null && countFmt != null) CountUpText(countTo, countFmt, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = readableOn(color))
+        else Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = readableOn(color))
     }
 }
 
