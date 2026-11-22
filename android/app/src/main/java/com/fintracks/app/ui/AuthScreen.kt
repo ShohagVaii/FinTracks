@@ -641,10 +641,11 @@ internal fun AuLogoMark(modifier: Modifier) {
         val s = size.minDimension / 100f
         val white = Color.White
         val arrow = Color(0xFF1E90FF)
+        // Thick white F: stem and top bar only. The F's middle stroke is the blue arrow shaft, which
+        // starts at the stem and rises to the upper right; no separate shaft and no coin in the mark.
         drawRoundRect(white, Offset(28f * s, 30f * s), Size(14f * s, 54f * s), CornerRadius(3f * s))
         drawRoundRect(white, Offset(28f * s, 30f * s), Size(44f * s, 12f * s), CornerRadius(4f * s))
-        drawRoundRect(white, Offset(28f * s, 52f * s), Size(30f * s, 10f * s), CornerRadius(4f * s))
-        drawLine(arrow, Offset(44f * s, 56f * s), Offset(70f * s, 28f * s), strokeWidth = 9f * s, cap = StrokeCap.Round)
+        drawLine(arrow, Offset(38f * s, 58f * s), Offset(70f * s, 28f * s), strokeWidth = 9f * s, cap = StrokeCap.Round)
         val head = Path().apply {
             moveTo(84f * s, 14f * s)
             lineTo(56f * s, 18f * s)
@@ -862,9 +863,8 @@ fun SplashScreen(onSkip: () -> Unit) {
                 Canvas(Modifier.size(120.dp)) {
                     val s = size.minDimension
                     val c = Offset(s * 0.84f, s * 0.18f)
+                    // Transient sparkle only: rays pulse once while the coin lands, then vanish (the still logo has none).
                     val k = coin.value
-                    drawCircle(Color(0xFFFBBF24).copy(alpha = k), radius = s * 0.09f * k, center = c)
-                    // Sparkle: four short rays that pulse once as the coin lands.
                     val pulse = (k * (1f - k) * 4f).coerceIn(0f, 1f)
                     val len = s * 0.14f * pulse
                     listOf(Offset(len, 0f), Offset(-len, 0f), Offset(0f, len), Offset(0f, -len)).forEach { d ->
