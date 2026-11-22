@@ -69,8 +69,9 @@ object Assistant {
         val month = monthPrefix()
         val txs = state.rows("transactions")
         val monthTx = txs.filter { dateOf(it, "tx_date").startsWith(month) }
-        val income = monthTx.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
-        val expense = monthTx.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
+        val flow = flowTotalsForMonth(txs, month)
+        val income = flow.income
+        val expense = flow.expense
         val topCat = monthTx.filter { it.str("type") == "Expense" }
             .groupBy { it.str("category") }.maxByOrNull { e -> e.value.sumOf { it.num("amount") } }
 
@@ -137,8 +138,10 @@ fun aiContext(state: UiState): String {
     fun m(v: Double) = if (p) "***" else fmtNum(v)
     val month = monthPrefix()
     val txs = state.rows("transactions").filter { dateOf(it, "tx_date").startsWith(month) }
-    val income = txs.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
-    val expense = txs.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
+    // Same calculation as the Dashboard (flowTotals). Debts are listed separately below and are never added to income or expense.
+    val flow = flowTotalsForMonth(state.rows("transactions"), month)
+    val income = flow.income
+    val expense = flow.expense
     val cats = txs.filter { it.str("type") == "Expense" }.groupBy { it.str("category") }
         .map { (k, v) -> k to v.sumOf { it.num("amount") } }.sortedByDescending { it.second }.take(5)
     val owe = debtsRemaining(state, "owe")
@@ -148,11 +151,12 @@ fun aiContext(state: UiState): String {
         append(tr("মুদ্রা: ", "Currency: ")).append(state.currency)
         append(tr(". মাস: ", ". Month: ")).append(month)
         append(tr(". মোট আয়: ", ". Total income: ")).append(m(income))
-        append(tr(". মোট ব্যয়: ", ". Total expense: ")).append(m(expense)).append(".\n")
+        append(tr(". মোট ব্যয়: ", ". Total expense: ")).append(m(expense))
+        append(tr(". নিট (আয় - ব্যয়): ", ". Net (income - expense): ")).append(m(flow.net)).append(".\n")
         append(tr("শীর্ষ ব্যয়ের ক্যাটাগরি: ", "Top expense categories: "))
         append(cats.joinToString(", ") { "${catLabel(it.first)} ${m(it.second)}" }.ifEmpty { none })
-        append(tr(".\nআপনার ধার: ", ".\nYou owe: ")).append(m(owe))
-        append(tr(". আপনার পাওনা: ", ". Owed to you: ")).append(m(owed)).append(".\n")
+        append(tr(".\nধার ও পাওনা (আয়-ব্যয়ের হিসাবের বাইরে, আলাদা তালিকা): আপনার ধার ", ".\nDebts and dues (separate from income and expense): you owe ")).append(m(owe))
+        append(tr(", আপনার পাওনা ", ", owed to you ")).append(m(owed)).append(".\n")
         append(tr("বাজেট সংখ্যা: ", "Budgets: ")).append(state.rows("budgets").size)
         append(tr(", লক্ষ্য সংখ্যা: ", ", goals: ")).append(state.rows("goals").size).append(".")
     }.take(3900)

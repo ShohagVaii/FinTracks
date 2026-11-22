@@ -2,7 +2,9 @@
 // verify_jwt=true only rejects requests without any JWT, and the public anon key is itself a JWT,
 // so this function also checks that the bearer token belongs to a signed-in user (GoTrue /auth/v1/user).
 // The Gemini key lives only in the GEMINI_API_KEY secret.
+// Primary model first (unchanged). Each attempt has its own time limit, so a slow primary hands over to the fallback quickly.
 const MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
+const ATTEMPT_TIMEOUT_MS = 20_000;
 
 const SYSTEM_BN =
   'তুমি FinTrack-এর আর্থিক সহকারী। বাংলায় সংক্ষেপে ও পরিষ্কারভাবে উত্তর দাও। ' +
@@ -45,6 +47,7 @@ async function callGemini(key: string, model: string, prompt: string, system: st
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 700, temperature: 0.4 },
     }),
+    signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
   });
 }
 
@@ -74,17 +77,26 @@ Deno.serve(async (req: Request) => {
     ? `Financial summary:\n${context}\n\nQuestion: ${question}`
     : `আর্থিক সারসংক্ষেপ:\n${context}\n\nপ্রশ্ন: ${question}`;
 
-  const attempts: { model: string; status: number; message: string }[] = [];
+  const attempts: { model: string; status: number; message: string; ms: number }[] = [];
   for (const model of MODELS) {
-    const res = await callGemini(key, model, prompt, system);
+    const started = Date.now();
+    let res: Response;
+    try {
+      res = await callGemini(key, model, prompt, system);
+    } catch (e: any) {
+      // The attempt ran out of time (or the network failed): record it and try the next model.
+      const timedOut = e?.name === 'TimeoutError' || e?.name === 'AbortError';
+      attempts.push({ model, status: timedOut ? 504 : 502, message: timedOut ? `timeout after ${ATTEMPT_TIMEOUT_MS} ms` : String(e?.message ?? e).slice(0, 300), ms: Date.now() - started });
+      continue;
+    }
     if (res.ok) {
       const data: any = await res.json();
       const text = (data?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? '').join('');
-      return json({ answer: text || (lang === 'en' ? 'No answer was returned.' : 'উত্তর পাওয়া যায়নি'), model });
+      return json({ answer: text || (lang === 'en' ? 'No answer was returned.' : 'উত্তর পাওয়া যায়নি'), model, ms: Date.now() - started });
     }
     // Keep the provider's message (it never contains the key) so failures can be diagnosed.
     const message = (await res.text()).slice(0, 300);
-    attempts.push({ model, status: res.status, message });
+    attempts.push({ model, status: res.status, message, ms: Date.now() - started });
     if (![400, 404, 429, 503].includes(res.status)) break;
   }
   return json({ error: 'AI service error', status: attempts.at(-1)?.status ?? 0, attempts }, 502);

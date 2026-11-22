@@ -226,14 +226,13 @@ private fun bdTime(epochMs: Long): String =
  * bottom, and clear and save on the same screen. History opens on its own screen. Save, delete and sync are unchanged.
  */
 @Composable
-fun MoneyCounterScreen(vm: AppViewModel) {
+fun MoneyCounterScreen(vm: AppViewModel, showHistory: Boolean, onHistory: (Boolean) -> Unit) {
     val store = vm.cashCounts
     val history by store.records.collectAsState()
     val pending by store.pendingCount.collectAsState()
     val scope = rememberCoroutineScope()
     var inputs by remember { mutableStateOf(DENOMINATIONS.associateWith { "" }) }
     var status by remember { mutableStateOf<String?>(null) }
-    var showHistory by rememberSaveable { mutableStateOf(false) }
     val counts: Map<Int, Long> = DENOMINATIONS.associateWith { inputs[it]?.toLongOrNull() ?: 0L }
     val total = counts.entries.sumOf { it.key.toLong() * it.value }
     val pieces = counts.values.sum()
@@ -241,14 +240,14 @@ fun MoneyCounterScreen(vm: AppViewModel) {
     LaunchedEffect(Unit) { store.sync() }
 
     if (showHistory) {
-        CounterHistory(store = store, history = history, onBack = { showHistory = false })
+        CounterHistory(store = store, history = history, onBack = { onHistory(false) })
         return
     }
 
     Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(tr("টাকা গণক", "Money counter"), fontWeight = FontWeight.Black, fontSize = 18.sp, modifier = Modifier.weight(1f))
-            TextButton(onClick = { showHistory = true }) { Text(tr("ইতিহাস ›", "History ›")) }
+            TextButton(onClick = { onHistory(true) }) { Text(tr("ইতিহাস ›", "History ›")) }
         }
 
         DENOMINATIONS.chunked(2).forEach { pair ->

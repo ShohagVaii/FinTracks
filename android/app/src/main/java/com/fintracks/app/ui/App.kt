@@ -135,6 +135,8 @@ private fun SyncIndicator(state: UiState) {
 private fun MainScaffold(state: UiState, vm: AppViewModel) {
     var tab by rememberSaveable { mutableStateOf("dashboard") }
     var overlayName by rememberSaveable { mutableStateOf<String?>(null) }
+    // Money counter: true while its history page is open (that page has its own back link, so the header's back arrow is hidden).
+    var counterHistory by rememberSaveable { mutableStateOf(false) }
     var txEditor by remember { mutableStateOf<TxEditor?>(null) }
     val overlay = overlayName?.let { runCatching { Overlay.valueOf(it) }.getOrNull() }
     val snackbar = remember { SnackbarHostState() }
@@ -161,7 +163,9 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
         if (result == SnackbarResult.ActionPerformed) vm.undoRemove() else vm.clearUndo()
     }
 
-    BackHandler(enabled = overlay != null) { overlayName = null }
+    BackHandler(enabled = overlay != null) {
+        if (overlay == Overlay.COUNTER && counterHistory) counterHistory = false else overlayName = null
+    }
 
     val openTx: (JsonObject?) -> Unit = { txEditor = TxEditor(it) }
 
@@ -183,14 +187,17 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
                     onTogglePrivacy = { vm.saveProfile(row("is_privacy_mode" to !state.privacy)) },
                     onSettings = { overlayName = Overlay.SETTINGS.name }
                 )
-            } else if (overlay != Overlay.CHAT && overlay != Overlay.DEBTS) {
+            } else if (overlay != Overlay.CHAT && overlay != Overlay.DEBTS && !(overlay == Overlay.COUNTER && counterHistory)) {
                 // ধার screen draws its own header (it shows the person's name on the detail page).
                 OverlayHeader(overlay.title) { overlayName = null }
             }
 
             Box(Modifier.fillMaxSize()) {
                 if (overlay != null) {
-                    OverlayContent(overlay, state, vm, openTx) { overlayName = null }
+                    OverlayContent(overlay, state, vm, openTx, counterHistory, { counterHistory = it }) {
+                        counterHistory = false
+                        overlayName = null
+                    }
                 } else when (tab) {
                     "dashboard" -> DashboardScreen(state, vm, openTx, { receipt = it }, { txAction = it }) { overlayName = it.name }
                     "transactions" -> TransactionsScreen(state, vm, openTx, { receipt = it }, { txAction = it })
@@ -288,7 +295,15 @@ private fun OverlayHeader(title: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun OverlayContent(overlay: Overlay, state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit, onClose: () -> Unit) {
+private fun OverlayContent(
+    overlay: Overlay,
+    state: UiState,
+    vm: AppViewModel,
+    openTx: (JsonObject?) -> Unit,
+    counterHistory: Boolean,
+    onCounterHistory: (Boolean) -> Unit,
+    onClose: () -> Unit
+) {
     when (overlay) {
         Overlay.CHAT -> ChatScreen(state, vm, onClose)
         Overlay.ZAKAT -> ZakatScreen(state)
@@ -304,7 +319,7 @@ private fun OverlayContent(overlay: Overlay, state: UiState, vm: AppViewModel, o
         Overlay.ACCOUNTS -> AccountsScreen(state, vm)
         Overlay.REPORTS -> ReportsScreen(state)
         Overlay.SETTINGS -> SettingsScreen(state, vm)
-        Overlay.COUNTER -> MoneyCounterScreen(vm)
+        Overlay.COUNTER -> MoneyCounterScreen(vm, counterHistory, onCounterHistory)
         Overlay.AGE -> AgeCalcScreen()
         Overlay.NOTES -> NotesScreen(vm)
     }

@@ -150,9 +150,9 @@ class Repository(context: Context) {
             // "en" makes the server answer in English; anything else gets the Bengali answer.
             put("language", language)
         }
-        // The server may try two models in turn, so this call waits longer than ordinary requests.
+        // The server gives each model attempt 20 s and tries two models, so 60 s covers both plus the request overhead.
         val text = try {
-            authed("POST", "/functions/v1/ai-chat", body, readTimeoutSec = 90)
+            authed("POST", "/functions/v1/ai-chat", body, readTimeoutSec = 60)
         } catch (e: SupabaseException) {
             throw SupabaseException(e.code, aiReason(e), e.body)
         }

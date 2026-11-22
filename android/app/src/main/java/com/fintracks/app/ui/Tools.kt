@@ -1,5 +1,23 @@
 package com.fintracks.app.ui
 
+import android.content.Context
+import androidx.compose.animation.core.animateIntOffsetAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.zIndex
+import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.addPathNodes
@@ -7,14 +25,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -59,7 +74,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.size
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -112,57 +126,158 @@ private fun toolEnglishName(bn: String): String = when (bn) {
     else -> bn
 }
 
+private const val TOOLS_ORDER_KEY = "tools_order"
+private const val TOOLS_PER_ROW = 3
+
+private fun defaultTools(): List<ToolTile> = listOf(
+    ToolTile(Overlay.CHAT, "AI সহকারী", Icons.Default.Info, Color(0xFF818CF8)),
+    ToolTile(Overlay.REPORTS, "রিপোর্ট", Icons.Default.Star, Color(0xFF38BDF8)),
+    ToolTile(Overlay.LOAN, "লোন", Icons.Default.CreditCard, Color(0xFFF59E0B)),
+    ToolTile(Overlay.ZAKAT, "যাকাত", Icons.Default.AccountBalance, Color(0xFF10B981)),
+    ToolTile(Overlay.DEBTS, "ধার ও পাওনা", Icons.Default.Work, Color(0xFFF43F5E)),
+    ToolTile(Overlay.INVESTMENTS, "সম্পদ", Icons.Default.Landscape, Color(0xFF34D399)),
+    ToolTile(Overlay.TAX, "ট্যাক্স", Icons.Default.Receipt, Color(0xFFFB7185)),
+    ToolTile(Overlay.CURRENCY, "কনভার্টার", Icons.Default.Refresh, Color(0xFF60A5FA)),
+    ToolTile(Overlay.SUBSCRIPTIONS, "সাবস্ক্রিপশন", Icons.Default.Repeat, Color(0xFFA78BFA)),
+    ToolTile(Overlay.CREDIT, "বাকি খাতা", Icons.Default.Receipt, Color(0xFFFBBF24)),
+    ToolTile(Overlay.BUDGETS, "বাজেট", Icons.Default.Check, Color(0xFF2DD4BF)),
+    ToolTile(Overlay.GOALS, "লক্ষ্য", Icons.Default.Star, Color(0xFFFB923C)),
+    ToolTile(Overlay.ACCOUNTS, "অ্যাকাউন্ট", Icons.Default.Add, Color(0xFF94A3B8)),
+    ToolTile(Overlay.COUNTER, "টাকা গণক", Icons.Default.Payments, Color(0xFF84CC16)),
+    ToolTile(Overlay.AGE, "বয়স ক্যালকুলেটর", Icons.Default.Cake, Color(0xFFE879F9)),
+    ToolTile(Overlay.NOTES, "নোটপ্যাড", Icons.Default.Description, Color(0xFFFACC15))
+)
+
+/** Saved order is stored by tile label on this device. Unknown labels are dropped; new tiles go to the end. */
+private fun loadToolOrder(saved: String?, defaults: List<ToolTile>): List<ToolTile> {
+    if (saved.isNullOrBlank()) return defaults
+    val byLabel = defaults.associateBy { it.label }
+    val picked = saved.split("|").mapNotNull { byLabel[it] }.distinct()
+    return picked + defaults.filter { d -> picked.none { it.label == d.label } }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ToolsScreen(onOpen: (Overlay) -> Unit) {
     // Each tool has its own colour, like the web app's tool grid.
-    val tools = listOf(
-        ToolTile(Overlay.CHAT, "AI সহকারী", Icons.Default.Info, Color(0xFF818CF8)),
-        ToolTile(Overlay.REPORTS, "রিপোর্ট", Icons.Default.Star, Color(0xFF38BDF8)),
-        ToolTile(Overlay.LOAN, "লোন", Icons.Default.CreditCard, Color(0xFFF59E0B)),
-        ToolTile(Overlay.ZAKAT, "যাকাত", Icons.Default.AccountBalance, Color(0xFF10B981)),
-        ToolTile(Overlay.DEBTS, "ধার ও পাওনা", Icons.Default.Work, Color(0xFFF43F5E)),
-        ToolTile(Overlay.INVESTMENTS, "সম্পদ", Icons.Default.Landscape, Color(0xFF34D399)),
-        ToolTile(Overlay.TAX, "ট্যাক্স", Icons.Default.Receipt, Color(0xFFFB7185)),
-        ToolTile(Overlay.CURRENCY, "কনভার্টার", Icons.Default.Refresh, Color(0xFF60A5FA)),
-        ToolTile(Overlay.SUBSCRIPTIONS, "সাবস্ক্রিপশন", Icons.Default.Repeat, Color(0xFFA78BFA)),
-        ToolTile(Overlay.CREDIT, "বাকি খাতা", Icons.Default.Receipt, Color(0xFFFBBF24)),
-        ToolTile(Overlay.BUDGETS, "বাজেট", Icons.Default.Check, Color(0xFF2DD4BF)),
-        ToolTile(Overlay.GOALS, "লক্ষ্য", Icons.Default.Star, Color(0xFFFB923C)),
-        ToolTile(Overlay.ACCOUNTS, "অ্যাকাউন্ট", Icons.Default.Add, Color(0xFF94A3B8)),
-        ToolTile(Overlay.COUNTER, "টাকা গণক", Icons.Default.Payments, Color(0xFF84CC16)),
-        ToolTile(Overlay.AGE, "বয়স ক্যালকুলেটর", Icons.Default.Cake, Color(0xFFE879F9)),
-        ToolTile(Overlay.NOTES, "নোটপ্যাড", Icons.Default.Description, Color(0xFFFACC15))
-    )
+    val context = LocalContext.current
+    val prefs = remember { context.applicationContext.getSharedPreferences("fintracks", Context.MODE_PRIVATE) }
+    val defaults = remember { defaultTools() }
+    var order by remember { mutableStateOf(loadToolOrder(prefs.getString(TOOLS_ORDER_KEY, null), defaults)) }
+    var dragLabel by remember { mutableStateOf<String?>(null) }
+    var dragStart by remember { mutableStateOf(0) }
+    var dragAcc by remember { mutableStateOf(Offset.Zero) }
+    val density = LocalDensity.current
+    val isDefault = order.map { it.label } == defaults.map { it.label }
+
+    fun save(list: List<ToolTile>) {
+        order = list
+        prefs.edit().putString(TOOLS_ORDER_KEY, list.joinToString("|") { it.label }).apply()
+    }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Financial Hub", fontSize = 24.sp, fontWeight = FontWeight.Black)
         Text("FINTRACK PREMIUM TOOLS GRID", fontSize = 10.sp, letterSpacing = 2.sp, color = Slate500)
-        tools.chunked(3).forEach { rowItems ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                rowItems.forEach { tile ->
+        Text(
+            tr("ধরে টেনে ক্রম বদলান", "Press and hold, then drag to reorder"),
+            fontSize = 11.sp,
+            color = Slate500
+        )
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val gap = 12.dp
+            val tile = (maxWidth - gap * (TOOLS_PER_ROW - 1)) / TOOLS_PER_ROW
+            val cellPx = with(density) { (tile + gap).toPx() }
+            val rows = (order.size + TOOLS_PER_ROW - 1) / TOOLS_PER_ROW
+            val gridHeight = tile * rows + gap * (rows - 1)
+
+            fun slotPx(index: Int): Offset = Offset((index % TOOLS_PER_ROW) * cellPx, (index / TOOLS_PER_ROW) * cellPx)
+
+            Box(Modifier.fillMaxWidth().height(gridHeight)) {
+                order.forEachIndexed { index, t ->
+                    val dragging = dragLabel == t.label
+                    val slot = slotPx(index)
+                    val target = if (dragging) {
+                        val base = slotPx(dragStart)
+                        IntOffset((base.x + dragAcc.x).roundToInt(), (base.y + dragAcc.y).roundToInt())
+                    } else {
+                        IntOffset(slot.x.roundToInt(), slot.y.roundToInt())
+                    }
+                    val animated by animateIntOffsetAsState(target, animationSpec = tween(180), label = "tool-slot")
+                    val shown = if (dragging) target else animated
                     Column(
                         Modifier
-                            .weight(1f)
-                            .aspectRatio(1f)
+                            .offset { shown }
+                            .size(tile)
+                            .zIndex(if (dragging) 1f else 0f)
+                            .graphicsLayer {
+                                if (dragging) {
+                                    scaleX = 1.06f
+                                    scaleY = 1.06f
+                                    shadowElevation = 24f
+                                    alpha = 0.97f
+                                }
+                            }
                             .clip(RoundedCornerShape(32.dp))
                             .background(MaterialTheme.colorScheme.surface)
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(32.dp))
-                            .clickable { onOpen(tile.overlay) }
+                            .border(1.dp, if (dragging) t.color.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.08f), RoundedCornerShape(32.dp))
+                            .pointerInput(t.label, cellPx) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        dragLabel = t.label
+                                        dragStart = order.indexOfFirst { it.label == t.label }
+                                        dragAcc = Offset.Zero
+                                    },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        dragAcc += amount
+                                        val base = slotPx(dragStart)
+                                        val x = base.x + dragAcc.x
+                                        val y = base.y + dragAcc.y
+                                        val col = (x / cellPx).roundToInt().coerceIn(0, TOOLS_PER_ROW - 1)
+                                        val row = (y / cellPx).roundToInt().coerceIn(0, rows - 1)
+                                        val to = (row * TOOLS_PER_ROW + col).coerceIn(0, order.size - 1)
+                                        val from = order.indexOfFirst { it.label == t.label }
+                                        if (to != from && from >= 0) {
+                                            val list = order.toMutableList()
+                                            list.add(to, list.removeAt(from))
+                                            order = list
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        dragLabel = null
+                                        save(order)
+                                    },
+                                    onDragCancel = {
+                                        dragLabel = null
+                                        save(order)
+                                    }
+                                )
+                            }
+                            .clickable { if (dragLabel == null) onOpen(t.overlay) }
                             .padding(10.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
                         Box(
-                            Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(tile.color.copy(alpha = 0.15f)),
+                            Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(t.color.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(tile.icon, contentDescription = tr(tile.label, toolEnglishName(tile.label)), tint = tile.color, modifier = Modifier.size(24.dp))
+                            Icon(t.icon, contentDescription = tr(t.label, toolEnglishName(t.label)), tint = t.color, modifier = Modifier.size(24.dp))
                         }
                         Spacer(Modifier.height(8.dp))
-                        Text(tr(tile.label, toolEnglishName(tile.label)), fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text(tr(t.label, toolEnglishName(t.label)), fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
-                repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
             }
+        }
+        if (!isDefault) {
+            OutlinedButton(
+                onClick = {
+                    prefs.edit().remove(TOOLS_ORDER_KEY).apply()
+                    order = defaults
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text(tr("ডিফল্ট ক্রমে ফেরত", "Reset to default order")) }
         }
         IntelligenceCard { onOpen(Overlay.REPORTS) }
         ToolsFooter()

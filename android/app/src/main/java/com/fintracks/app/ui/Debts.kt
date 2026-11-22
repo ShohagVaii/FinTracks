@@ -1,5 +1,24 @@
 package com.fintracks.app.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -552,7 +571,7 @@ private fun PersonCard(
     }
 }
 
-/** One person's page: দেনা | পাওনা tabs, the entries with their payment history, and the add button. */
+/** One person's page: দেনা | পাওনা tabs (animated), a total card, one card per entry. Tap an entry for its details. */
 @Composable
 private fun PersonDetail(
     person: JsonObject,
@@ -561,47 +580,62 @@ private fun PersonDetail(
     onContact: (Boolean, String) -> Unit
 ) {
     val p = state.privacy
-    var tab by remember { mutableStateOf("owe") }
+    var tab by rememberSaveable { mutableStateOf("owe") }
     var addingEntry by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<JsonObject?>(null) }
     var deletingEntry by remember { mutableStateOf<JsonObject?>(null) }
     var paying by remember { mutableStateOf<JsonObject?>(null) }
-    val owe = tab == "owe"
-    val entries = personEntries(state, person.id(), tab)
+    var openEntryId by remember { mutableStateOf<String?>(null) }
     val payments = state.rows("debt_payments")
+    val owe = tab == "owe"
+    val accent = if (owe) Rose500 else Emerald500
     val total = personRemaining(state, person.id(), tab)
+    // Read from the live rows, so the detail view shows payments as soon as they change.
+    val openEntry = openEntryId?.let { id -> state.rows("debts").firstOrNull { it.id() == id } }
 
     Box(Modifier.fillMaxSize()) {
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(Modifier.fillMaxWidth()) {
                 TabItem(tr("দেনা", "I owe"), owe, Modifier.weight(1f)) { tab = "owe" }
                 TabItem(tr("পাওনা", "Owed to me"), !owe, Modifier.weight(1f)) { tab = "owed" }
             }
-            Text(
-                if (owe) tr("সর্বমোট আমার দেনা", "Total I owe") else tr("সর্বমোট আমার পাওনা", "Total owed to me"),
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(taka(total, p), fontSize = 26.sp, fontWeight = FontWeight.Black)
-            if (entries.isEmpty()) {
-                Spacer(Modifier.height(16.dp))
-                Text(tr("কোনো এন্ট্রি নেই", "No entries"), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            entries.forEach { entry ->
-                EntryRow(
-                    entry = entry,
-                    payments = payments,
-                    privacy = p,
-                    onCall = { onContact(false, person.str("phone")) },
-                    onSms = { onContact(true, person.str("phone")) },
-                    onEdit = { editingEntry = entry },
-                    onPay = { paying = entry },
-                    onDelete = { deletingEntry = entry },
-                    onDeletePayment = { vm.remove("debt_payments", it) }
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.85f), DebtViolet.copy(alpha = 0.9f))))
+                    .padding(18.dp)
+            ) {
+                Text(
+                    if (owe) tr("সর্বমোট আমার দেনা", "Total I owe") else tr("সর্বমোট আমার পাওনা", "Total owed to me"),
+                    fontSize = 12.sp,
+                    color = Color.White.copy(alpha = 0.85f)
                 )
+                Text(taka(total, p), fontSize = 28.sp, fontWeight = FontWeight.Black, color = Color.White)
+            }
+            AnimatedContent(
+                targetState = tab,
+                transitionSpec = {
+                    val forward = targetState == "owed"
+                    (slideInHorizontally(animationSpec = tween(260)) { if (forward) it / 5 else -it / 5 } + fadeIn(tween(220))) togetherWith
+                        (slideOutHorizontally(animationSpec = tween(200)) { if (forward) -it / 5 else it / 5 } + fadeOut(tween(160)))
+                },
+                label = "debt-tab"
+            ) { t ->
+                val list = personEntries(state, person.id(), t)
+                val cardAccent = if (t == "owe") Rose500 else Emerald500
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (list.isEmpty()) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(tr("কোনো এন্ট্রি নেই", "No entries"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    list.forEachIndexed { i, entry ->
+                        EntryCard(entry, payments, p, cardAccent, i) { openEntryId = entry.id() }
+                    }
+                }
             }
             Spacer(Modifier.height(80.dp))
         }
@@ -611,6 +645,21 @@ private fun PersonDetail(
         ) { addingEntry = true }
     }
 
+    openEntry?.let { entry ->
+        EntryDetail(
+            entry = entry,
+            payments = payments,
+            privacy = p,
+            accent = accent,
+            onDismiss = { openEntryId = null },
+            onCall = { onContact(false, person.str("phone")) },
+            onSms = { onContact(true, person.str("phone")) },
+            onEdit = { editingEntry = entry },
+            onPay = { paying = entry },
+            onDelete = { deletingEntry = entry },
+            onDeletePayment = { vm.remove("debt_payments", it) }
+        )
+    }
     if (addingEntry) EntryDialog(person, tab, null, state, vm) { addingEntry = false }
     editingEntry?.let { EntryDialog(person, tab, it, state, vm) { editingEntry = null } }
     paying?.let { entry -> PaymentDialog(entry, debtRemaining(entry, payments), vm) { paying = null } }
@@ -625,18 +674,86 @@ private fun PersonDetail(
             onConfirm = {
                 vm.remove("debts", entry.id())
                 deletingEntry = null
+                openEntryId = null
             },
             onDismiss = { deletingEntry = null }
         )
     }
 }
 
-/** One entry row: reason, amount, date with seconds, payment totals, history, and the ⋮ menu. */
+/** Progress of the remaining part of an entry: a thin bar that animates when it changes. */
 @Composable
-private fun EntryRow(
+private fun DebtProgress(fraction: Float, accent: Color, modifier: Modifier = Modifier) {
+    val shown by animateFloatAsState(fraction.coerceIn(0f, 1f), animationSpec = tween(500), label = "debt-progress")
+    Box(modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(accent.copy(alpha = 0.18f))) {
+        Box(
+            Modifier
+                .fillMaxWidth(shown)
+                .fillMaxHeight()
+                .clip(CircleShape)
+                .background(Brush.horizontalGradient(listOf(accent, DebtViolet)))
+        )
+    }
+}
+
+/** A compact entry card: reason, remaining amount, date, and the remaining-share bar. Tap opens the details. */
+@Composable
+private fun EntryCard(
     entry: JsonObject,
     payments: List<JsonObject>,
     privacy: Boolean,
+    accent: Color,
+    index: Int,
+    onOpen: () -> Unit
+) {
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val press by animateFloatAsState(if (pressed) 0.97f else 1f, label = "debt-press")
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+    val enter by animateFloatAsState(
+        if (appeared) 1f else 0f,
+        animationSpec = tween(280, delayMillis = minOf(index, 6) * 45),
+        label = "debt-enter"
+    )
+    val amount = entry.num("amount")
+    val remaining = debtRemaining(entry, payments)
+    val fraction = if (amount > 0) (remaining / amount).toFloat() else 0f
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                alpha = enter
+                translationY = (1f - enter) * 18f
+                scaleX = press
+                scaleY = press
+            }
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, accent.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+            .clickable(interactionSource = source, indication = null, onClick = onOpen)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(entry.str("note"), fontWeight = FontWeight.Black, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(debtStamp(entry.str("created_at")), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(taka(remaining, privacy), fontWeight = FontWeight.Black, fontSize = 17.sp, color = accent)
+        }
+        DebtProgress(fraction, accent)
+    }
+}
+
+/** Full details of one entry: totals, progress, the whole payment history (with delete), and the entry actions. */
+@Composable
+private fun EntryDetail(
+    entry: JsonObject,
+    payments: List<JsonObject>,
+    privacy: Boolean,
+    accent: Color,
+    onDismiss: () -> Unit,
     onCall: () -> Unit,
     onSms: () -> Unit,
     onEdit: () -> Unit,
@@ -644,75 +761,73 @@ private fun EntryRow(
     onDelete: () -> Unit,
     onDeletePayment: (String) -> Unit
 ) {
-    var menu by remember { mutableStateOf(false) }
     val amount = entry.num("amount")
     val paid = debtPaid(entry, payments)
     val remaining = debtRemaining(entry, payments)
     val settled = remaining <= 0.005
+    val fraction = if (amount > 0) (remaining / amount).toFloat() else 0f
     val history = payments.filter { it.str("debt_id") == entry.id() }.sortedByDescending { it.str("paid_on") }
-    Column(Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.Top) {
-            Icon(
-                Icons.Default.Payments,
-                contentDescription = null,
-                tint = DebtViolet,
-                modifier = Modifier.size(36.dp).padding(top = 2.dp)
-            )
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(tr("কারণ - ", "Reason - ") + entry.str("note"), fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text(tr("টাকা - ", "Amount - ") + taka(amount, privacy), fontSize = 14.sp)
-                Text(
-                    tr("তারিখ - ", "Date - ") + debtStamp(entry.str("created_at")),
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (history.isNotEmpty()) {
-                    Text(
-                        tr("মোট: ", "Total: ") + taka(amount, privacy) +
-                            tr(" · পরিশোধিত: ", " · Paid: ") + taka(paid, privacy) +
-                            tr(" · বাকি: ", " · Left: ") + taka(remaining, privacy),
-                        fontSize = 12.sp
-                    )
-                }
-                if (settled) {
-                    Text(tr("পরিশোধিত", "Settled"), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
-                }
-                history.forEach { pay ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            tr("পরিশোধ ", "Paid ") + displayDate(pay.str("paid_on")) + " · " + taka(pay.num("amount"), privacy),
-                            fontSize = 12.sp,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(onClick = { onDeletePayment(pay.id()) }, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.Delete, contentDescription = tr("পরিশোধ মুছুন", "Delete payment"), modifier = Modifier.size(16.dp))
-                        }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            Modifier
+                .fillMaxWidth(0.94f)
+                .clip(RoundedCornerShape(28.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(28.dp))
+                .padding(18.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(entry.str("note"), fontWeight = FontWeight.Black, fontSize = 18.sp)
+            Text(tr("তারিখ - ", "Date - ") + debtStamp(entry.str("created_at")), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DetailStat(tr("মোট", "Total"), taka(amount, privacy), MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
+                DetailStat(tr("পরিশোধিত", "Paid"), taka(paid, privacy), Emerald500, Modifier.weight(1f))
+                DetailStat(tr("বাকি", "Left"), taka(remaining, privacy), accent, Modifier.weight(1f))
+            }
+            DebtProgress(fraction, accent)
+            if (settled) Text(tr("পরিশোধিত", "Settled"), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Emerald500)
+            Text(tr("পরিশোধের ইতিহাস", "Payment history"), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            if (history.isEmpty()) {
+                Text(tr("এখনো কোনো পরিশোধ নেই", "No payments yet"), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            history.forEach { pay ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(displayDate(pay.str("paid_on")), fontSize = 13.sp, modifier = Modifier.weight(1f))
+                    Text(taka(pay.num("amount"), privacy), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    IconButton(onClick = { onDeletePayment(pay.id()) }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = tr("পরিশোধ মুছুন", "Delete payment"), tint = Rose500, modifier = Modifier.size(18.dp))
                     }
                 }
             }
-            Box {
-                IconButton(onClick = { menu = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = tr("মেনু", "Menu"))
-                }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(
-                        text = { Text(tr("এখনই কল করুন", "Call now")) },
-                        onClick = { menu = false; onCall() }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(tr("এসএমএস পাঠান", "Send SMS")) },
-                        onClick = { menu = false; onSms() }
-                    )
-                    DropdownMenuItem(text = { Text(tr("এডিট করুন", "Edit")) }, onClick = { menu = false; onEdit() })
-                    if (!settled) {
-                        DropdownMenuItem(text = { Text(tr("আংশিক পরিশোধ", "Partial payment")) }, onClick = { menu = false; onPay() })
-                    }
-                    DropdownMenuItem(text = { Text(tr("মুছে ফেলুন", "Delete")) }, onClick = { menu = false; onDelete() })
-                }
+            if (!settled) DebtGradientButton(tr("পরিশোধ যোগ করুন", "Add payment"), true, onPay)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                TextButton(onClick = onCall) { Text(tr("কল", "Call")) }
+                TextButton(onClick = onSms) { Text(tr("এসএমএস", "SMS")) }
+                TextButton(onClick = onEdit) { Text(tr("এডিট", "Edit")) }
+                TextButton(onClick = onDelete) { Text(tr("মুছুন", "Delete"), color = Rose500) }
             }
+            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text(tr("বন্ধ করুন", "Close")) }
         }
-        Spacer(Modifier.height(8.dp))
-        DashedDivider()
+    }
+}
+
+@Composable
+private fun DetailStat(label: String, value: String, color: Color, modifier: Modifier) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.05f))
+            .padding(10.dp)
+    ) {
+        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

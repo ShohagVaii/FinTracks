@@ -133,12 +133,10 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
     }
     // Computed once per data change, not on every recomposition (this was a main cause of lag).
     val monthTx = remember(state.tables) { txs.filter { dateOf(it, "tx_date").startsWith(month) } }
-    val rangeTx = remember(state.tables, period.from, period.to) {
-        txs.filter { val d = dateOf(it, "tx_date"); d >= period.from && d <= period.to }
-    }
     val stats = remember(state.tables, period.from, period.to) {
-        val income = rangeTx.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
-        val expense = rangeTx.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
+        val flow = flowTotals(txs, period.from, period.to)
+        val income = flow.income
+        val expense = flow.expense
         val total = accounts.sumOf { accountBalance(it, txs) } +
             (if (accounts.isEmpty()) txs.sumOf { if (it.str("type") == "Income") it.num("amount") else if (it.str("type") == "Expense") -it.num("amount") else 0.0 } else 0.0)
         DashStats(income, expense, total, if (income > 0) ((income - expense) / income * 100) else 0.0)
