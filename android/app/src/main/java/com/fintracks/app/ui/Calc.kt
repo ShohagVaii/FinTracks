@@ -86,18 +86,24 @@ object CalcParser {
             CalcResult.Invalid -> return Shown(null, false, true)
             CalcResult.Incomplete -> Unit
         }
+        // The text is unfinished: find the last complete value. Brackets still open are closed first ("(3" shows 3).
+        // Errors from these made-up candidates are ignored; only the typed text itself can be invalid.
         val src = normalize(input)
-        for (k in src.length - 1 downTo 1) {
-            var candidate = src.take(k)
-            val open = candidate.count { it == '(' } - candidate.count { it == ')' }
-            if (open > 0) candidate += ")".repeat(open)
-            when (val r = evaluate(candidate)) {
-                is CalcResult.Ok -> return Shown(r.value, true, false)
-                CalcResult.Invalid -> return Shown(null, false, true)
-                CalcResult.Incomplete -> Unit
-            }
+        val candidates = mutableListOf<String>()
+        candidates += closeOpen(src)
+        for (k in src.length - 1 downTo 1) candidates += closeOpen(src.take(k))
+        for (c in candidates) {
+            if (c.isEmpty()) continue
+            val r = evaluate(c)
+            if (r is CalcResult.Ok) return Shown(r.value, true, false)
         }
         return Shown(null, false, false)
+    }
+
+    /** Adds the closing brackets that are still missing, so "(3" becomes "(3)". */
+    private fun closeOpen(s: String): String {
+        val open = s.count { it == '(' } - s.count { it == ')' }
+        return if (open > 0) s + ")".repeat(open) else s
     }
 
     private fun normalize(input: String): String =
