@@ -6,8 +6,9 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.Image as FoundationImage
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.ui.graphics.asImageBitmap
@@ -634,7 +635,7 @@ private fun NotePhoto(path: String, onRemove: (() -> Unit)?) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         val shown = bmp
         if (shown != null) {
-            Image(
+            FoundationImage(
                 bitmap = shown.asImageBitmap(),
                 contentDescription = tr("নোটের ছবি", "Note photo"),
                 contentScale = ContentScale.Fit,
