@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- FinTrack logo navy (from site/assets/logo.png) -->
+    <color name="ic_launcher_background">#0D112E</color>
+</resources>
