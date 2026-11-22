@@ -7,6 +7,8 @@ import org.junit.Test
 
 /**
  * Real-format sample messages (bKash, Nagad, bank; English and Bengali digits).
+ * The provider comes from the brand name in the text. The English bKash samples start with "bKash:" (the sender
+ * header, as pasted). A message with no brand name is saved with the provider "Cash".
  * Each one checks amount, type (Income/Expense), provider and the date read from the text.
  */
 class SmsParserTest {
@@ -22,12 +24,12 @@ class SmsParserTest {
     }
 
     @Test fun bkashSendEnglish() = check(
-        "You have sent Tk 500.00 to 017XXXXXXXX. Fee Tk 5.00. Balance Tk 1,234.56. TrxID 8N7A1B2C3D at 19/11/2026 10:45.",
+        "bKash: You have sent Tk 500.00 to 017XXXXXXXX. Fee Tk 5.00. Balance Tk 1,234.56. TrxID 8N7A1B2C3D at 19/11/2026 10:45.",
         500.0, "Expense", "Bkash", "2026-11-19"
     )
 
     @Test fun bkashReceivedEnglish() = check(
-        "You have received Tk 1,200.00 from 01812345678. Fee Tk 0.00. Balance Tk 3,000.00. TrxID 9K2L3M4N5P on 18/11/2026 at 09:12.",
+        "bKash: You have received Tk 1,200.00 from 01812345678. Fee Tk 0.00. Balance Tk 3,000.00. TrxID 9K2L3M4N5P on 18/11/2026 at 09:12.",
         1200.0, "Income", "Bkash", "2026-11-18"
     )
 
