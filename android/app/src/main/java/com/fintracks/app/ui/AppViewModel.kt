@@ -315,8 +315,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun resetPassword(email: String) = act {
-        repo.sendPasswordReset(email)
-        _state.update { it.copy(notice = tr("পাসওয়ার্ড রিসেট লিংক ইমেইলে পাঠানো হয়েছে।", "A password reset link was sent to your email.")) }
+        try {
+            repo.sendPasswordReset(email)
+        } catch (e: SupabaseException) {
+            // Show the real failure (HTTP code and server reason), never the success notice.
+            _state.update {
+                it.copy(message = tr("পাসওয়ার্ড রিসেট মেইল পাঠানো যায়নি (HTTP ${e.code}): ", "Could not send the reset email (HTTP ${e.code}): ") + e.message.orEmpty())
+            }
+            return@act
+        }
+        _state.update {
+            it.copy(notice = tr(
+                "পাসওয়ার্ড রিসেট লিংক ইমেইলে পাঠানো হয়েছে। মেইল না পেলে Spam বা Junk ফোল্ডার দেখুন।",
+                "A password reset link was sent to your email. If it is not in your inbox, check your Spam or Junk folder."
+            ))
+        }
     }
 
     fun signIn(email: String, password: String) = act {
