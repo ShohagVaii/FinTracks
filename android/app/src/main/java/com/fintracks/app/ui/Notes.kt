@@ -80,6 +80,11 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.rememberCoroutineScope
 
 /**
  * Notes live on the server (RLS: own rows only) and in a local cache for offline use.
@@ -226,6 +231,8 @@ fun NotesScreen(vm: AppViewModel, onClose: () -> Unit) {
     var query by remember { mutableStateOf("") }
     var route by remember { mutableStateOf<NoteRoute?>(null) }
     var confirmDelete by remember { mutableStateOf<String?>(null) }
+    var removingNote by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { vm.notes.sync() }
 
@@ -268,6 +275,7 @@ fun NotesScreen(vm: AppViewModel, onClose: () -> Unit) {
                 contentPadding = PaddingValues(bottom = 88.dp)
             ) {
                 items(shown, key = { it.id() }) { n ->
+                    AnimatedVisibility(visible = removingNote != n.id(), exit = fadeOut(tween(250)) + slideOutHorizontally(tween(250)) { -it / 3 }) {
                     NoteCard(
                         n = n,
                         onOpen = { route = NoteRoute(n.id(), false) },
@@ -275,6 +283,7 @@ fun NotesScreen(vm: AppViewModel, onClose: () -> Unit) {
                         onEdit = { route = NoteRoute(n.id(), true) },
                         onDelete = { confirmDelete = n.id() }
                     )
+                    }
                 }
             }
         }
@@ -284,7 +293,7 @@ fun NotesScreen(vm: AppViewModel, onClose: () -> Unit) {
             text = { Text(tr("নোট যোগ করুন", "Add note"), fontWeight = FontWeight.Bold) },
             containerColor = Tok_FFFACC15,
             contentColor = Tok_FF1F2937,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).pressScale()
         )
     }
 
@@ -293,7 +302,16 @@ fun NotesScreen(vm: AppViewModel, onClose: () -> Unit) {
             text = tr("এই নোটটি মুছবেন?", "Delete this note?"),
             confirmText = tr("মুছে ফেলুন", "Delete"),
             cancelText = tr("বাতিল", "Cancel"),
-            onConfirm = { vm.notes.delete(id); confirmDelete = null },
+            onConfirm = {
+                // Fade the card out first, then delete it.
+                confirmDelete = null
+                removingNote = id
+                scope.launch {
+                    kotlinx.coroutines.delay(if (motionReduced(ctx)) 0L else 260L)
+                    vm.notes.delete(id)
+                    removingNote = null
+                }
+            },
             onDismiss = { confirmDelete = null }
         )
     }

@@ -45,6 +45,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
 
 /** Receipt view for one transaction (opened by a normal tap): the voucher, then share as image or PDF. */
 @Composable
@@ -122,16 +126,30 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onEdit: () -> Unit, onDismiss: 
 /** Long-press menu on a transaction row: the only place where edit and delete are offered. */
 @Composable
 fun TxActionDialog(t: JsonObject, onEdit: () -> Unit, onDelete: () -> Unit, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var gone by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(tr("লেনদেন", "Transaction"), fontWeight = FontWeight.Bold) },
         text = {
+            AnimatedVisibility(visible = !gone, exit = fadeOut(tween(250)) + slideOutHorizontally(tween(250)) { -it / 3 }) {
             Column {
                 Text(t.str("category").ifEmpty { tr("লেনদেন", "Transaction") }.let { catLabel(it) }, fontSize = 14.sp)
                 TextButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) { Text(tr("এডিট করুন", "Edit")) }
-                TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) {
+                TextButton(onClick = {
+                    // Slide and fade the dialog content out, then delete.
+                    if (!gone) {
+                        gone = true
+                        scope.launch {
+                            kotlinx.coroutines.delay(if (motionReduced(ctx)) 0L else 260L)
+                            onDelete()
+                        }
+                    }
+                }, modifier = Modifier.fillMaxWidth()) {
                     Text(tr("মুছে ফেলুন", "Delete"), color = readableOn(Rose500))
                 }
+            }
             }
         },
         confirmButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
