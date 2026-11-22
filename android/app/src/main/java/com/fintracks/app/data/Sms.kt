@@ -177,7 +177,8 @@ object Notifier {
             ctx, 0, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(NotifyStyle.SMALL)
+            .setLargeIcon(NotifyStyle.large(ctx))
             .setContentTitle("নতুন লেনদেনের সাজেশন")
             .setContentText("${s.provider} · ${s.amount} টাকা (${if (s.type == "Income") "আয়" else "ব্যয়"}) — অ্যাপে নিশ্চিত করুন")
             .setContentIntent(pending)

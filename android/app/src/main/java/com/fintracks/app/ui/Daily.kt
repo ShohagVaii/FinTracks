@@ -17,6 +17,7 @@ import androidx.work.WorkerParameters
 import java.time.LocalDate
 import java.time.LocalTime
 import java.util.concurrent.TimeUnit
+import com.fintracks.app.data.NotifyStyle
 
 /**
  * Daily "add today's transactions" reminder. A background job checks every 15 minutes (the shortest
@@ -76,7 +77,8 @@ object DailyReminder {
         val launch = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName) ?: return
         val pending = PendingIntent.getActivity(ctx, 0, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(ctx, CHANNEL)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(NotifyStyle.SMALL)
+            .setLargeIcon(NotifyStyle.large(ctx))
             .setContentTitle(tr("FinTrack রিমাইন্ডার", "FinTrack reminder"))
             .setContentText(tr("আজকের আয় ও ব্যয় লিখে ফেলেছেন? এখনই যোগ করুন।", "Have you logged today's income and expenses? Add them now."))
             .setContentIntent(pending)

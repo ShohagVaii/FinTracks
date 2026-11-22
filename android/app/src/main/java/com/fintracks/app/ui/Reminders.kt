@@ -16,6 +16,7 @@ import com.fintracks.app.data.bool
 import com.fintracks.app.data.num
 import kotlinx.serialization.json.JsonObject
 import java.time.LocalDate
+import com.fintracks.app.data.NotifyStyle
 
 /**
  * Bill and due-date reminders: subscriptions renewing, debts and credit items due within 3 days.
@@ -65,7 +66,8 @@ object Reminders {
         val launch = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName) ?: return
         val pending = PendingIntent.getActivity(ctx, 0, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(ctx, CHANNEL)
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setSmallIcon(NotifyStyle.SMALL)
+            .setLargeIcon(NotifyStyle.large(ctx))
             .setContentTitle(tr("FinTrack রিমাইন্ডার", "FinTrack reminder"))
             .setContentText(text)
             .setContentIntent(pending)
