@@ -17,6 +17,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -151,28 +152,40 @@ fun aiContext(state: UiState): String {
     }.take(3900)
 }
 
+/** One chat line. kind: "user", "assistant" (AI or local answer), or "error" (AI failed; [question] lets the user retry). */
+private data class ChatMsg(val who: String, val text: String, val question: String = "")
+
 @Composable
 fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
     val greeting = tr("হ্যালো! আমি FinTrack AI। আমি আপনাকে বাজেট, সঞ্চয় বা বিনিয়োগের পরামর্শ দিয়ে সাহায্য করতে পারি। আপনি কী জানতে চান?", "Hello! I'm FinTrack AI. I can help with budgets, savings and investment advice. What would you like to know?")
-    val messages = remember { mutableStateListOf("assistant" to greeting) }
+    val messages = remember { mutableStateListOf(ChatMsg("assistant", greeting)) }
     var input by remember { mutableStateOf("") }
     var thinking by remember { mutableStateOf(false) }
 
     fun send(text: String) {
         val q = text.trim().take(1000)
         if (q.isEmpty() || thinking) return
-        messages += "user" to q
+        messages += ChatMsg("user", q)
         input = ""
         thinking = true
         scope.launch {
+            // No silent fallback: a failure shows its real reason, with retry and an explicit local-answer button.
             val reply = try {
-                vm.askAi(q, aiContext(state), if (AppPrefs.english) "en" else "bn")
+                ChatMsg("assistant", vm.askAi(q, aiContext(state), if (AppPrefs.english) "en" else "bn"))
             } catch (e: Exception) {
-                // Offline or AI not available: answer from local data, and say so.
-                Assistant.answer(q, state) + "\n\n(No AI connection; answered from local data)"
+                val reason = if (e is java.io.IOException && e !is com.fintracks.app.data.SupabaseException) {
+                    tr("ইন্টারনেট সংযোগ বা সময়সীমা: ${e.message ?: "অজানা"}", "Connection or timeout: ${e.message ?: "unknown"}")
+                } else {
+                    e.message ?: tr("অজানা ত্রুটি", "Unknown error")
+                }
+                ChatMsg(
+                    "error",
+                    tr("AI উত্তর দিতে পারেনি।\nকারণ: ", "AI could not answer.\nReason: ") + reason,
+                    q
+                )
             }
-            messages += "assistant" to reply
+            messages += reply
             thinking = false
         }
     }
@@ -213,7 +226,9 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
             Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(messages) { (who, text) ->
+            items(messages) { msg ->
+                val who = msg.who
+                val text = msg.text
                 val mine = who == "user"
                 Box(Modifier.fillMaxWidth(), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
                     Box(
@@ -224,7 +239,29 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
                             .border(1.dp, if (mine) Color.Transparent else Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
                             .padding(14.dp)
                     ) {
-                        Text(text, color = if (mine) Color.White else MaterialTheme.colorScheme.onSurface, lineHeight = 22.sp)
+                        Column {
+                            Text(text, color = if (mine) Color.White else MaterialTheme.colorScheme.onSurface, lineHeight = 22.sp)
+                            if (who == "error") {
+                                Spacer(Modifier.height(10.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                    Text(
+                                        tr("আবার চেষ্টা করুন", "Retry"),
+                                        color = Color(0xFFA78BFA), fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.clickable(enabled = !thinking) { msg.question.takeIf { it.isNotEmpty() }?.let { send(it) } }
+                                    )
+                                    Text(
+                                        tr("লোকাল ডাটা থেকে উত্তর দেখুন", "Show answer from local data"),
+                                        color = Color(0xFFA78BFA), fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.clickable {
+                                            messages += ChatMsg(
+                                                "assistant",
+                                                Assistant.answer(msg.question, state) + tr("\n\n(এটি লোকাল ডাটা থেকে তৈরি, AI উত্তর নয়)", "\n\n(From local data, not AI)")
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

@@ -402,7 +402,7 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit) {
     var contact by remember { mutableStateOf<ContactAction?>(null) }
     val open = people.firstOrNull { it.id() == openId }
     val ctx = LocalContext.current
-    val pendingCount by vm.debtOutbox.pendingCount.collectAsState()
+    val pendingCount by vm.outbox.pendingCount.collectAsState()
 
     // Back inside a person's page returns to the list; back on the list closes the screen.
     BackHandler(enabled = openId != null) { openId = null }
@@ -564,6 +564,7 @@ private fun PersonDetail(
     var tab by remember { mutableStateOf("owe") }
     var addingEntry by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<JsonObject?>(null) }
+    var deletingEntry by remember { mutableStateOf<JsonObject?>(null) }
     var paying by remember { mutableStateOf<JsonObject?>(null) }
     val owe = tab == "owe"
     val entries = personEntries(state, person.id(), tab)
@@ -598,7 +599,7 @@ private fun PersonDetail(
                     onSms = { onContact(true, person.str("phone")) },
                     onEdit = { editingEntry = entry },
                     onPay = { paying = entry },
-                    onDelete = { vm.remove("debts", entry.id()) },
+                    onDelete = { deletingEntry = entry },
                     onDeletePayment = { vm.remove("debt_payments", it) }
                 )
             }
@@ -613,6 +614,21 @@ private fun PersonDetail(
     if (addingEntry) EntryDialog(person, tab, null, state, vm) { addingEntry = false }
     editingEntry?.let { EntryDialog(person, tab, it, state, vm) { editingEntry = null } }
     paying?.let { entry -> PaymentDialog(entry, debtRemaining(entry, payments), vm) { paying = null } }
+    deletingEntry?.let { entry ->
+        ConfirmDialog(
+            text = tr(
+                "এই এন্ট্রি মুছে যাবে। এর সব পরিশোধ এবং সংশ্লিষ্ট লেনদেনও মুছে যাবে। নিশ্চিত?",
+                "This entry will be deleted. Its payments and linked transactions will also be deleted. Continue?"
+            ),
+            confirmText = tr("মুছে ফেলুন", "Delete"),
+            cancelText = tr("বাতিল", "Cancel"),
+            onConfirm = {
+                vm.remove("debts", entry.id())
+                deletingEntry = null
+            },
+            onDismiss = { deletingEntry = null }
+        )
+    }
 }
 
 /** One entry row: reason, amount, date with seconds, payment totals, history, and the ⋮ menu. */

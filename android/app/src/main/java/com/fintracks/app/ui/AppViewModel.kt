@@ -21,6 +21,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import android.net.ConnectivityManager
+import android.net.Network
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -103,59 +107,97 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val notes = NotesStore(app, repo, viewModelScope)
     /** Cash counter history: device first, then the cash_counts table (see Counter.kt). */
     val cashCounts = CashCountStore(app, repo, viewModelScope)
-    /** Debt writes and the last debt tables, kept on the phone so the debt screen works offline (see DebtOutbox.kt). */
-    val debtOutbox = DebtOutbox(app, repo)
+    /** Local-first store for every table: saved copy, queued writes and sync (see LocalOutbox.kt). */
+    val outbox = LocalOutbox(app, repo)
+    /** Profile as last read from the server; queued profile changes are applied on top of it. */
+    private var serverProfile: JsonObject? = null
+    private var netCallback: ConnectivityManager.NetworkCallback? = null
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     init {
+        // A saved session opens the app at once; data comes from the saved copy until the server answers.
+        _state.update { it.copy(signedIn = repo.session != null) }
         viewModelScope.launch {
             if (repo.session != null) runGuarded { loadAll() }
             _state.update { it.copy(checking = false) }
         }
+        watchNetwork()
     }
 
+    /** Back online: sends queued changes and refreshes the screen, without any tap. */
+    private fun watchNetwork() {
+        val cm = getApplication<Application>().getSystemService(ConnectivityManager::class.java) ?: return
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                viewModelScope.launch {
+                    if (repo.session == null) return@launch
+                    if (outbox.flush().drained) runCatching { refreshTables() }
+                }
+            }
+        }
+        netCallback = cb
+        runCatching { cm.registerDefaultNetworkCallback(cb) }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        val cb = netCallback ?: return
+        runCatching { getApplication<Application>().getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(cb) }
+    }
+
+    /** Puts tables on screen with queued changes applied; the profile comes from the same overlay. */
+    private fun publish(base: Map<String, List<JsonObject>>, pendingSms: List<SmsSuggestion>? = null, notice: String? = null) {
+        val merged = outbox.overlay(base)
+        _state.update {
+            it.copy(
+                signedIn = true,
+                tables = merged,
+                profile = merged["profiles"]?.firstOrNull() ?: it.profile,
+                pendingSms = pendingSms ?: it.pendingSms,
+                notice = notice ?: it.notice
+            )
+        }
+    }
+
+    private fun offlineNotice(e: Exception): String =
+        if (e is SupabaseException && e.code == 401) {
+            tr("সেশন নবায়ন হয়নি। অনলাইনে এলে আবার চেষ্টা হবে।", "Your session could not be renewed. Sync will retry when online.")
+        } else {
+            tr("সার্ভারে যোগ হওয়া যাচ্ছে না। ফোনে সেভ করা ডেটা দেখানো হচ্ছে।", "Cannot reach the server. Showing data saved on this phone.")
+        }
+
     private suspend fun loadAll() {
-        debtOutbox.flush()
+        outbox.flush()
         try {
             val profile = repo.list("profiles", "select=*&id=eq.${repo.uid()}").firstOrNull()
-            val tables = Sync.run(getApplication<Application>(), repo, profile?.bool("is_privacy_mode") == true)
+            val fetched = Sync.run(getApplication<Application>(), repo, profile?.bool("is_privacy_mode") == true)
             Sync.markOk(getApplication<Application>())
-            debtOutbox.remember(tables)
-            _state.update {
-                it.copy(
-                    signedIn = true,
-                    profile = profile,
-                    tables = debtOutbox.overlay(tables),
-                    pendingSms = PendingSmsStore.load(getApplication())
-                )
-            }
-            syncRegistry(profile, tables["transactions"].orEmpty())
-        } catch (e: SupabaseException) {
+            serverProfile = profile
+            val base = fetched + ("profiles" to listOfNotNull(profile))
+            outbox.remember(base)
+            publish(base, pendingSms = PendingSmsStore.load(getApplication()))
+            syncRegistry(profile, fetched["transactions"].orEmpty())
+        } catch (e: CancellationException) {
             throw e
-        } catch (e: IOException) {
-            // Offline: the signed-in session stays; debts come from the saved copy and queued changes.
-            _state.update {
-                it.copy(
-                    signedIn = true,
-                    tables = debtOutbox.overlay(debtOutbox.cached()),
-                    notice = tr("ইন্টারনেট নেই। ধার ডেটা ফোনে সেভ করা কপি থেকে দেখানো হচ্ছে।",
-                        "No internet. Debt data is shown from the saved copy on this phone.")
-                )
-            }
+        } catch (e: Exception) {
+            // Server not reached: show the saved copy. The session stays, so nothing logs out.
+            publish(outbox.cached(), notice = offlineNotice(e))
         }
     }
 
     /** After a write: refetch the 16 tables only. Full sync (recurring, reminders, widget) runs on login and daily. */
     private suspend fun refreshTables() {
-        debtOutbox.flush()
+        outbox.flush()
         val fetched = Sync.fetchTables(repo)
         // debt_payments is optional until its migration is applied; keep the last known rows if it could not be read.
         val tables = if ("debt_payments" in fetched) fetched
-            else fetched + ("debt_payments" to state.value.rows("debt_payments"))
+            else fetched + ("debt_payments" to outbox.cached()["debt_payments"].orEmpty())
         Sync.markOk(getApplication<Application>())
-        debtOutbox.remember(tables)
-        _state.update { it.copy(tables = debtOutbox.overlay(tables)) }
+        serverProfile = repo.list("profiles", "select=*&id=eq.${repo.uid()}").firstOrNull() ?: serverProfile
+        val base = tables + ("profiles" to listOfNotNull(serverProfile))
+        outbox.remember(base)
+        publish(base)
         syncRegistry(state.value.profile, tables["transactions"].orEmpty())
     }
 
@@ -218,8 +260,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             block()
         } catch (e: SupabaseException) {
             if (e.code == 401) {
-                repo.session = null
-                _state.value = UiState(checking = false)
+                // The session could not be renewed. Keep it: the saved copy stays and sync retries when online.
+                _state.update { it.copy(message = offlineNotice(e)) }
             } else {
                 val text = e.message.orEmpty()
                 val friendly = when {
@@ -280,14 +322,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun accountEmail(): String = repo.accountEmail()
 
     /** Refreshes every table now. Settings uses this for the manual sync button. */
-    fun syncNow() = act { refreshTables(); Sync.markOk(getApplication<Application>()) }
+    fun syncNow() = act { if (outbox.flush().drained) refreshTables() else throw IOException(tr("ইন্টারনেট নেই", "No internet")) }
 
-    /** Uploads a profile photo and saves its URL on the profile. */
+    /** Uploads a profile photo (needs internet), then saves its URL on the profile through the queue. */
     fun saveAvatar(bytes: ByteArray) = act {
         val url = repo.uploadAvatar(bytes)
-        repo.updateProfile(row("avatar_url" to url))
-        _state.update { it.copy(profile = JsonObject(state.value.profile.orEmpty() + row("avatar_url" to url))) }
-        _state.update { it.copy(notice = tr("প্রোফাইল ছবি সেভ হয়েছে", "Profile photo saved")) }
+        val uid = repo.uid()
+        val b = row("avatar_url" to url)
+        val existing = state.value.profile ?: JsonObject(emptyMap())
+        reportSync(saveAndSend(listOf(LocalOutbox.op("update", "profiles", uid, b, JsonObject(existing + b)))), tr("প্রোফাইল ছবি সেভ হয়েছে", "Profile photo saved"))
     }
 
     /**
@@ -298,7 +341,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val app = getApplication<Application>()
         notes.reset()
         cashCounts.reset()
-        debtOutbox.reset()
+        outbox.reset(deleteFile = true)
         repo.session = null
         AppLock.disable(app)
         DailyReminder.cancel(app)
@@ -312,6 +355,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun clearLocalData() {
+        outbox.reset(deleteFile = true)
         val app = getApplication<Application>()
         AppLock.disable(app)
         listOf("fintrack_lock", "fintrack_recurring", "fintrack_reminders", "fintrack_notes", "fintrack_counter", "fintrack_debts", "fintrack_sync", "fintrack_daily").forEach {
@@ -327,15 +371,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- Generic CRUD (RLS enforces ownership) ----------
 
-    /** Insert when id is null, otherwise update the row. */
+    /** Insert when id is null, otherwise update the row. Saved on the phone first, then sent. */
     fun save(table: String, body: JsonObject, id: String?) {
-        if (table == "debts") debtChange(saveDebtOps(body, id)) else saveOther(table, body, id)
+        localChange(saveOps(table, body, id))
     }
 
-    private fun saveOther(table: String, body: JsonObject, id: String?) = act {
-        if (id == null) repo.insert(table, body) else repo.update(table, id, body)
-        refreshTables()
-    }
 
     /**
      * Records a বাকি payment and the expense that goes with it, in one batch.
@@ -368,30 +408,46 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (id == null) {
             val nid = newId()
             val full = withFields(body, "id" to nid, "created_at" to nowIso())
-            debtChange(listOf(DebtOutbox.op("insert", "debt_people", nid, full, full)))
+            localChange(listOf(LocalOutbox.op("insert", "debt_people", nid, full, full)))
             return
         }
         val existing = state.value.rows("debt_people").firstOrNull { it.id() == id } ?: JsonObject(emptyMap())
-        val ops = mutableListOf(DebtOutbox.op("update", "debt_people", id, body, JsonObject(existing + body)))
+        val ops = mutableListOf(LocalOutbox.op("update", "debt_people", id, body, JsonObject(existing + body)))
         state.value.rows("debts")
             .filter { it.str("person_id") == id && it.str("person") != name }
             .forEach { d ->
                 val b = row("person" to name)
-                ops += DebtOutbox.op("update", "debts", d.id(), b, JsonObject(d + b))
+                ops += LocalOutbox.op("update", "debts", d.id(), b, JsonObject(d + b))
             }
-        debtChange(ops)
+        localChange(ops)
     }
 
-    /** Debt writes: queued, shown at once, then sent. Offline they wait in the queue. */
-    private fun debtChange(ops: List<JsonObject>) = act {
-        debtOutbox.enqueue(ops)
-        _state.update { it.copy(tables = debtOutbox.overlay(it.tables)) }
-        val result = debtOutbox.flush()
-        if (result.drained) refreshTables()
-        else _state.update { it.copy(notice = tr("ইন্টারনেট নেই, সংযোগ এলে সিঙ্ক হবে", "No internet. It will sync when you're back online.")) }
-        if (result.dropped > 0) _state.update {
-            it.copy(notice = tr("সার্ভার ${result.dropped}টি পরিবর্তন গ্রহণ করেনি, সেগুলো বাতিল হয়েছে", "The server rejected ${result.dropped} change(s); they were removed."))
+    /** Saves changes on the phone, shows them at once, then sends them. Offline they wait in the queue. */
+    private suspend fun saveAndSend(ops: List<JsonObject>): FlushResult {
+        outbox.enqueue(ops)
+        publish(state.value.tables)
+        val result = outbox.flush()
+        if (result.drained) {
+            try { refreshTables() } catch (e: CancellationException) { throw e } catch (e: Exception) {
+                // Saved on the phone; the next refresh shows the server copy.
+            }
         }
+        return result
+    }
+
+    /** Shows the sync result: refused changes, waiting for internet, or the success text. */
+    private fun reportSync(result: FlushResult, done: String?) {
+        val text = when {
+            result.dropped > 0 -> tr("সার্ভার ${result.dropped}টি পরিবর্তন গ্রহণ করেনি, সেগুলো বাতিল হয়েছে", "The server refused ${result.dropped} change(s); they were removed.")
+            !result.drained -> tr("ইন্টারনেট নেই। সংযোগ এলে সিঙ্ক হবে।", "No internet. It will sync when you're back online.")
+            else -> done
+        }
+        if (text != null) _state.update { it.copy(notice = text) }
+    }
+
+    /** Every local write runs through here: saved, shown at once, sent (or queued offline). */
+    private fun localChange(ops: List<JsonObject>, done: String? = null) = act {
+        reportSync(saveAndSend(ops), done)
     }
 
     private fun newId(): String = java.util.UUID.randomUUID().toString()
@@ -401,39 +457,64 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun withFields(base: JsonObject, vararg extra: Pair<String, String>): JsonObject =
         JsonObject(base + extra.associate { (k, v) -> k to (JsonPrimitive(v) as JsonElement) })
 
-    /** Insert (new entry) or update (changed fields) of one debt entry. */
-    private fun saveDebtOps(body: JsonObject, id: String?): List<JsonObject> {
+    /** Insert (id null, or a row with its own id) or update of one row. Debt entries also get created_at and settled. */
+    private fun saveOps(table: String, body: JsonObject, id: String?): List<JsonObject> {
         if (id == null) {
-            val nid = newId()
-            val full = JsonObject(body + mapOf<String, JsonElement>(
-                "id" to JsonPrimitive(nid), "created_at" to JsonPrimitive(nowIso()), "settled" to JsonPrimitive(false)
-            ))
-            return listOf(DebtOutbox.op("insert", "debts", nid, full, full))
+            val nid = body.str("id").ifEmpty { newId() }
+            val extra: Map<String, JsonElement> = if (table == "debts")
+                mapOf("created_at" to JsonPrimitive(nowIso()), "settled" to JsonPrimitive(false)) else emptyMap()
+            val full = JsonObject(body + mapOf<String, JsonElement>("id" to JsonPrimitive(nid)) + extra)
+            return listOf(LocalOutbox.op("insert", table, nid, full, full))
         }
-        val existing = state.value.rows("debts").firstOrNull { it.id() == id } ?: JsonObject(emptyMap())
-        return listOf(DebtOutbox.op("update", "debts", id, body, JsonObject(existing + body)))
+        val existing = state.value.rows(table).firstOrNull { it.id() == id } ?: JsonObject(emptyMap())
+        return listOf(LocalOutbox.op("update", table, id, body, JsonObject(existing + body)))
     }
 
+    /** Child tables that are deleted with their parent (same rules as the server's foreign keys). */
+    private val CHILDREN: Map<String, List<Pair<String, String>>> = mapOf(
+        "credit_shops" to listOf("credit_entries" to "shop_id", "credit_payments" to "shop_id"),
+        "mess_members" to listOf("mess_bazaars" to "member_id", "mess_meals" to "member_id", "mess_deposits" to "member_id"),
+        "debts" to listOf("debt_payments" to "debt_id"),
+        "debt_people" to listOf("debts" to "person_id")
+    )
+
     /**
-     * Delete of a person, an entry or a payment, with everything that depends on it:
-     * a payment takes its transaction, an entry takes its payments, a person takes its entries.
+     * Delete of one row with everything that depends on it, children first: a payment takes its
+     * transaction, an entry takes its payments, a person takes its entries, an account is cleared
+     * from its transactions (the server keeps those transactions and empties the account link).
      */
-    private fun deleteDebtOps(table: String, id: String): List<JsonObject> {
+    private fun deleteOps(table: String, id: String): List<JsonObject> {
         val s = state.value
-        val entries: List<String> = when (table) {
-            "debt_people" -> s.rows("debts").filter { it.str("person_id") == id }.map { it.id() }
-            "debts" -> listOf(id)
-            else -> emptyList()
+        val out = mutableListOf<JsonObject>()
+        CHILDREN[table].orEmpty().forEach { (child, fk) ->
+            s.rows(child).filter { it.str(fk) == id }.forEach { out += deleteOps(child, it.id()) }
         }
-        val payments: List<String> = if (table == "debt_payments") listOf(id)
-            else s.rows("debt_payments").filter { it.str("debt_id") in entries }.map { it.id() }
-        val txs = s.rows("transactions")
-            .filter { it.str("source") == "personal_debt_payment" && it.str("source_ref") in payments }
-            .map { it.id() }
-        return txs.map { DebtOutbox.op("delete", "transactions", it) } +
-            payments.map { DebtOutbox.op("delete", "debt_payments", it) } +
-            entries.map { DebtOutbox.op("delete", "debts", it) } +
-            (if (table == "debt_people") listOf(DebtOutbox.op("delete", "debt_people", id)) else emptyList())
+        when (table) {
+            "credit_payments" -> s.rows("transactions")
+                .filter { it.str("source") == "debt_payment" && it.str("source_ref") == id }
+                .forEach { out += LocalOutbox.op("delete", "transactions", it.id()) }
+            "debt_payments" -> s.rows("transactions")
+                .filter { it.str("source") == "personal_debt_payment" && it.str("source_ref") == id }
+                .forEach { out += LocalOutbox.op("delete", "transactions", it.id()) }
+            "transactions" -> {
+                val t = s.rows("transactions").firstOrNull { it.id() == id }
+                val ref = t?.str("source_ref").orEmpty()
+                if (ref.isNotEmpty() && t?.str("source") == "debt_payment") out += LocalOutbox.op("delete", "credit_payments", ref)
+                if (ref.isNotEmpty() && t?.str("source") == "personal_debt_payment") out += LocalOutbox.op("delete", "debt_payments", ref)
+            }
+            "accounts" -> s.rows("transactions").forEach { t ->
+                val clearFrom = t.str("account_id") == id
+                val clearTo = t.str("to_account_id") == id
+                if (clearFrom || clearTo) {
+                    val b = mutableMapOf<String, JsonElement>()
+                    if (clearFrom) b["account_id"] = JsonNull
+                    if (clearTo) b["to_account_id"] = JsonNull
+                    out += LocalOutbox.op("update", "transactions", t.id(), JsonObject(b), JsonObject(t + b))
+                }
+            }
+        }
+        out += LocalOutbox.op("delete", table, id)
+        return out
     }
 
     /**
@@ -460,49 +541,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             "note" to label, "tx_date" to date, "payment_mode" to "Cash", "mood" to "", "is_recurring" to false,
             "source" to "personal_debt_payment", "source_ref" to paymentId
         )
-        debtChange(
+        localChange(
             listOf(
-                DebtOutbox.op("insert", "debt_payments", paymentId, payment, payment, group),
-                DebtOutbox.op("insert", "transactions", txId, tx, tx, group)
+                LocalOutbox.op("insert", "debt_payments", paymentId, payment, payment, group),
+                LocalOutbox.op("insert", "transactions", txId, tx, tx, group)
             )
         )
     }
 
-    /** Deletes a row and keeps a copy so it can be restored from the undo snackbar. */
+    /** Deletes a row with everything that depends on it. Only a plain single row can be undone. */
     fun remove(table: String, id: String) {
-        if (table in DEBT_TABLES) debtChange(deleteDebtOps(table, id)) else removeOther(table, id)
-    }
-
-    private fun removeOther(table: String, id: String) = act {
         val row = state.value.rows(table).firstOrNull { it.id() == id }
-        // A বাকি payment and the expense it created are removed together, so the two never disagree.
-        val linked: List<Pair<String, String>> = when {
-            table == "credit_payments" -> state.value.rows("transactions")
-                .filter { it.str("source") == "debt_payment" && it.str("source_ref") == id }
-                .map { "transactions" to it.id() }
-            table == "transactions" && row?.str("source") == "debt_payment" -> listOfNotNull(
-                row?.str("source_ref")?.takeIf { it.isNotEmpty() }?.let { "credit_payments" to it }
-            )
-            else -> emptyList()
-        }
-        repo.delete(table, id)
-        linked.forEach { (t, i) -> repo.delete(t, i) }
-        refreshTables()
-        // Shops delete their purchases and payments too, so they are not undoable. Linked rows are not undoable either.
-        // Shops and members delete their children too (purchases, bazaar and meal rows), so they are not undoable.
-        // Entries, people and payments take their linked rows with them, so an undo would leave them out of step.
-        val undoable = table !in setOf("debts", "debt_people", "debt_payments") &&
-            row?.str("source") != "personal_debt_payment"
-        if (row != null && table != "credit_shops" && table != "mess_members" && linked.isEmpty() && undoable) {
-            _state.update { it.copy(undo = UndoEntry(table, row, System.nanoTime())) }
-        }
+        val ops = deleteOps(table, id)
+        localChange(ops)
+        val plain = ops.size == 1 && table !in setOf("credit_shops", "mess_members", "debts", "debt_people", "debt_payments")
+        if (row != null && plain) _state.update { it.copy(undo = UndoEntry(table, row, System.nanoTime())) }
     }
 
-    fun undoRemove() = act {
-        val u = state.value.undo ?: return@act
+
+    fun undoRemove() {
+        val u = state.value.undo ?: return
         _state.update { it.copy(undo = null) }
-        repo.upsert(u.table, listOf(u.row))
-        refreshTables()
+        localChange(listOf(LocalOutbox.op("insert", u.table, u.row.id(), u.row, u.row)))
     }
 
     fun clearUndo() {
@@ -524,8 +584,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (after > target + 0.005) throw IllegalArgumentException(tr("লক্ষ্যের বেশি জমা করা যাবে না", "Cannot save more than the goal"))
         if (after < -0.005) throw IllegalArgumentException(tr("জমার বেশি তোলা যাবে না", "Cannot withdraw more than saved"))
         val newSaved = after.coerceIn(0.0, target)
-        repo.update("goals", goal.id(), row("saved" to newSaved))
-        refreshTables()
+        reportSync(saveAndSend(listOf(LocalOutbox.op("update", "goals", goal.id(), row("saved" to newSaved), JsonObject(goal + row("saved" to newSaved))))), null)
         val oldPct = if (target > 0) (before / target * 100).toInt() else 0
         val newPct = if (target > 0) (newSaved / target * 100).toInt() else 0
         val crossed = listOf(100, 75, 50, 25).firstOrNull { oldPct < it && newPct >= it }
@@ -538,28 +597,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Saves profile fields and applies them locally at once (theme, privacy, accent), so the UI changes without a reload. */
     fun saveProfile(body: JsonObject) = act {
-        repo.updateProfile(body)
-        val merged = JsonObject(state.value.profile.orEmpty() + body)
-        _state.update { it.copy(profile = merged) }
-        refreshTables()
+        val uid = repo.uid()
+        val existing = state.value.profile ?: JsonObject(emptyMap())
+        reportSync(saveAndSend(listOf(LocalOutbox.op("update", "profiles", uid, body, JsonObject(existing + body)))), null)
     }
 
-    /** Several writes in order, then one reload (used for things like shop + entry). */
-    fun batch(writes: List<Triple<String, JsonObject, String?>>) = act {
-        writes.forEach { (table, body, id) ->
-            if (id == null) repo.insert(table, body) else repo.update(table, id, body)
+    /** Several writes in order, saved and sent together. Within a batch, a refused write also drops the rest. */
+    fun batch(writes: List<Triple<String, JsonObject, String?>>) {
+        val group = newId()
+        val ops = writes.flatMap { (t, b, i) -> saveOps(t, b, i) }.map {
+            if (writes.size > 1) JsonObject(it + ("group" to JsonPrimitive(group))) else it
         }
-        refreshTables()
+        localChange(ops)
     }
 
-    /** Restores a validated backup. Existing rows stay; rows with the same id are updated. */
+    /** Restores a validated backup: rows are saved on the phone and sent (inserts are sent in batches). */
     fun restoreBackup(plan: BackupPlan) = act {
-        RESTORE_ORDER.forEach { table ->
-            val rows = plan.tables[table].orEmpty()
-            if (rows.isNotEmpty()) repo.upsert(table, rows)
+        val ops = RESTORE_ORDER.flatMap { table ->
+            plan.tables[table].orEmpty().filter { it.id().isNotEmpty() }.map { r -> LocalOutbox.op("insert", table, r.id(), r, r) }
         }
-        refreshTables()
-        _state.update { it.copy(notice = tr("ব্যাকআপ থেকে ${plan.total}টি সারি ফিরিয়ে আনা হয়েছে", "Restored ${plan.total} rows from the backup")) }
+        reportSync(saveAndSend(ops), tr("ব্যাকআপ থেকে ${plan.total}টি সারি ফিরিয়ে আনা হয়েছে", "Restored ${plan.total} rows from the backup"))
     }
 
     // ---------- SMS suggestions ----------

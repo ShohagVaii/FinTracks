@@ -20,7 +20,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-class SupabaseException(val code: Int, message: String) : IOException(message)
+/** [body] is the server response text, kept so screens can show the real reason (for example the AI service attempts). */
+class SupabaseException(val code: Int, message: String, val body: String = "") : IOException(message)
 
 @Serializable
 data class AuthUser(val id: String, val email: String? = null)
@@ -63,7 +64,8 @@ class SupabaseApi {
         path: String,
         body: JsonElement? = null,
         token: String? = null,
-        prefer: String? = null
+        prefer: String? = null,
+        readTimeoutSec: Long? = null
     ): String = withContext(Dispatchers.IO) {
         val reqBody: RequestBody? = when {
             body != null -> body.toString().toRequestBody(jsonMedia)
@@ -77,9 +79,10 @@ class SupabaseApi {
             .method(method, reqBody)
         if (prefer != null) builder.header("Prefer", prefer)
 
-        http.newCall(builder.build()).execute().use { resp ->
+        val client = if (readTimeoutSec != null) http.newBuilder().readTimeout(readTimeoutSec, TimeUnit.SECONDS).build() else http
+        client.newCall(builder.build()).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) throw SupabaseException(resp.code, parseError(text, resp.code))
+            if (!resp.isSuccessful) throw SupabaseException(resp.code, parseError(text, resp.code), text)
             text
         }
     }

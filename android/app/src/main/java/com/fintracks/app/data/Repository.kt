@@ -3,12 +3,12 @@ package com.fintracks.app.data
 import android.content.Context
 import com.fintracks.app.BuildConfig
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.JsonElement
@@ -64,15 +64,21 @@ class Repository(context: Context) {
 
     // ---------- Request helper with one refresh-and-retry on 401 ----------
 
-    private suspend fun authed(method: String, path: String, body: JsonElement? = null, prefer: String? = null): String {
+    private suspend fun authed(
+        method: String,
+        path: String,
+        body: JsonElement? = null,
+        prefer: String? = null,
+        readTimeoutSec: Long? = null
+    ): String {
         val current = session ?: throw SupabaseException(401, "লগইন করা নেই")
         return try {
-            api.call(method, path, body, current.accessToken, prefer)
+            api.call(method, path, body, current.accessToken, prefer, readTimeoutSec)
         } catch (e: SupabaseException) {
             if (e.code != 401) throw e
             val fresh = api.refresh(current.refreshToken)
             session = fresh
-            api.call(method, path, body, fresh.accessToken, prefer)
+            api.call(method, path, body, fresh.accessToken, prefer, readTimeoutSec)
         }
     }
 
@@ -144,9 +150,30 @@ class Repository(context: Context) {
             // "en" makes the server answer in English; anything else gets the Bengali answer.
             put("language", language)
         }
-        val text = authed("POST", "/functions/v1/ai-chat", body)
+        // The server may try two models in turn, so this call waits longer than ordinary requests.
+        val text = try {
+            authed("POST", "/functions/v1/ai-chat", body, readTimeoutSec = 90)
+        } catch (e: SupabaseException) {
+            throw SupabaseException(e.code, aiReason(e), e.body)
+        }
         return json.parseToJsonElement(text).jsonObject["answer"]?.jsonPrimitive?.content
             ?: throw SupabaseException(500, "AI উত্তর পাওয়া যায়নি")
+    }
+
+    /** A short, factual reason from the AI function's error body: HTTP code, server error, and each model tried. */
+    private fun aiReason(e: SupabaseException): String {
+        val obj = runCatching { json.parseToJsonElement(e.body).jsonObject }.getOrNull()
+        val serverError = obj?.get("error")?.jsonPrimitive?.contentOrNull
+        val tried = (obj?.get("attempts") as? JsonArray).orEmpty().mapNotNull { a ->
+            val o = a as? JsonObject ?: return@mapNotNull null
+            "${o["model"]?.jsonPrimitive?.contentOrNull} HTTP ${o["status"]?.jsonPrimitive?.contentOrNull}"
+        }
+        return buildString {
+            append("HTTP ${e.code}")
+            if (!serverError.isNullOrBlank()) append(": $serverError")
+            if (tried.isNotEmpty()) append(" (${tried.joinToString("; ")})")
+            if (serverError.isNullOrBlank() && tried.isEmpty()) append(": ${e.message}")
+        }
     }
 
     companion object {
