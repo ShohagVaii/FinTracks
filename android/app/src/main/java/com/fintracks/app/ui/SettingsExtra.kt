@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -221,8 +222,6 @@ const val WEBSITE_URL = "https://shohagvaii.github.io/FinTracks/"
 const val PRIVACY_URL = "https://shohagvaii.github.io/FinTracks/privacy.html"
 const val TERMS_URL = "https://shohagvaii.github.io/FinTracks/terms.html"
 const val SUPPORT_EMAIL = "shohagvaiiofc@gmail.com"
-const val FACEBOOK_URL = "https://facebook.com/shohag.vai.ofc"
-const val TELEGRAM_URL = "https://t.me/shohag_vaii"
 
 // ---------- Rows ----------
 

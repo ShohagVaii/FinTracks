@@ -652,7 +652,7 @@ internal fun ToolsFooter() {
 }
 
 // Profile links for the footer buttons.
-internal const val FACEBOOK_URL = "https://www.facebook.com/shohag.vai.ofc"
+internal const val FACEBOOK_URL = "https://facebook.com/shohag.vai.ofc"
 internal const val TELEGRAM_URL = "https://t.me/shohag_vaii"
 
 private val FacebookGlyph: ImageVector by lazy {
