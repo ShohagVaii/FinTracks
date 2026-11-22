@@ -207,6 +207,17 @@ class Repository(context: Context) {
         withAuth { token -> api.deleteObject("/storage/v1/object/tx-attachments/$path", token) }
     }
 
+    /** Saves this device's FCM token for the signed-in user. The server function uses auth.uid(), never a client id. */
+    suspend fun registerDeviceToken(token: String) {
+        val body = buildJsonObject { put("p_token", token); put("p_platform", "android") }
+        authed("POST", "/rest/v1/rpc/register_device_token", body, "return=minimal")
+    }
+
+    /** Removes this device's token for the signed-in user (called on sign-out). */
+    suspend fun unregisterDeviceToken(token: String) {
+        authed("POST", "/rest/v1/rpc/unregister_device_token", buildJsonObject { put("p_token", token) }, "return=minimal")
+    }
+
     suspend fun updateProfile(fields: JsonObject) {
         authed("PATCH", "/rest/v1/profiles?id=eq.${uid()}", fields, "return=minimal")
     }
