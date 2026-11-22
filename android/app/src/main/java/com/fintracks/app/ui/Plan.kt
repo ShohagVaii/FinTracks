@@ -167,12 +167,12 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     GOAL_MILESTONES.forEach { m ->
                         val reached = pct >= m
-                        Text(
+                        Box(Modifier.popIn()) { Text(
                             "$m%",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (reached) green else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        ) }
                     }
                 }
                 g.strOrNull("deadline")?.let { Text(tr("শেষ তারিখ: ${it.take(10)}", "Due: ${it.take(10)}"), fontSize = 11.sp) }

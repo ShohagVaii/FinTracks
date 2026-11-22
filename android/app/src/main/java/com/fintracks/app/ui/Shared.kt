@@ -401,8 +401,8 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
 
     MonthNav(ym) { ym = it }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        StatPill(tr("মোট বাজার", "Total bazaar"), taka(totalBazaar, p), Emerald500, Modifier.weight(1f))
-        StatPill(tr("মোট মিল", "Total meals"), fmtNum(totalMeals), Sky400, Modifier.weight(1f))
+        StatPill(tr("মোট বাজার", "Total bazaar"), taka(totalBazaar, p), Emerald500, Modifier.weight(1f), countTo = totalBazaar, countFmt = { taka(it, p) })
+        StatPill(tr("মোট মিল", "Total meals"), fmtNum(totalMeals), Sky400, Modifier.weight(1f), countTo = totalMeals, countFmt = { fmtNum(it) })
         StatPill(tr("মিল রেট", "Meal rate"), taka(rate, p), Amber500, Modifier.weight(1f))
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
