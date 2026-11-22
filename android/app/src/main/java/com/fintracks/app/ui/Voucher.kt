@@ -341,7 +341,7 @@ object Voucher {
 
     // ---------------- Single-entry voucher ----------------
 
-    fun drawSingle(c: Canvas, ctx: Context, t: JsonObject, state: UiState, now: ZonedDateTime = ZonedDateTime.now()) {
+    fun drawSingle(c: Canvas, ctx: Context, t: JsonObject, state: UiState, now: ZonedDateTime = ZonedDateTime.now(), withStamp: Boolean = true) {
         val rec = storedFor(ctx, state.profile, t)
         val type = t.str("type")
         val amt = t.num("amount")
@@ -402,7 +402,7 @@ object Voucher {
         val tx = 297f - subP.measureText(subText) / 2 - 12f
         val tick = line(accent, 1.6f).apply { strokeCap = Paint.Cap.ROUND }
         c.drawPath(Path().apply { moveTo(tx, 293f); lineTo(tx + 3f, 296.5f); lineTo(tx + 8f, 289f) }, tick)
-        stamp(c, ctx, 482f, 253f)
+        if (withStamp) stamp(c, ctx, 482f, 253f)
 
         // Detail table
         val rows = listOf(
@@ -552,8 +552,9 @@ object Voucher {
         return bmp
     }
 
-    fun renderSingle(ctx: Context, state: UiState, t: JsonObject): Bitmap =
-        bitmap2x { drawSingle(it, ctx, t, state) }
+    /** Saved and shared vouchers keep the stamp (default). The receipt preview passes withStamp = false and draws its own animated stamp. */
+    fun renderSingle(ctx: Context, state: UiState, t: JsonObject, withStamp: Boolean = true): Bitmap =
+        bitmap2x { drawSingle(it, ctx, t, state, withStamp = withStamp) }
 
     private fun newFile(ctx: Context, ext: String, prefix: String): File {
         val dir = File(ctx.cacheDir, "exports").apply { mkdirs() }

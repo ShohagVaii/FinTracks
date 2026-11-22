@@ -49,6 +49,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 
 /** Receipt view for one transaction (opened by a normal tap): the voucher, then share as image or PDF. */
 @Composable
@@ -59,7 +64,7 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onEdit: () -> Unit, onDismiss: 
     var busy by remember { mutableStateOf(false) }
 
     LaunchedEffect(t, state.name) {
-        preview = withContext(Dispatchers.IO) { Voucher.renderSingle(ctx, state, t) }
+        preview = withContext(Dispatchers.IO) { Voucher.renderSingle(ctx, state, t, withStamp = false) }
     }
 
     // Shares are rendered again so the issue time is the moment of sharing.
@@ -96,12 +101,18 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onEdit: () -> Unit, onDismiss: 
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val bmp = preview
                     if (bmp != null) {
-                        Image(
-                            bitmap = bmp.asImageBitmap(),
-                            contentDescription = tr("ভাউচার", "Voucher"),
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize().slamIn()
-                        )
+                        // The preview has no stamp baked in: the voucher fades in, then the VERIFIED stamp slams on top.
+                        Box(Modifier.fillMaxSize().popIn(), contentAlignment = Alignment.Center) {
+                            Box(Modifier.aspectRatio(Voucher.PAGE_W / Voucher.PAGE_H)) {
+                                Image(
+                                    bitmap = bmp.asImageBitmap(),
+                                    contentDescription = tr("ভাউচার", "Voucher"),
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                VerifiedStampLayer(Modifier.fillMaxSize())
+                            }
+                        }
                     } else {
                         CircularProgressIndicator()
                     }
@@ -154,4 +165,58 @@ fun TxActionDialog(t: JsonObject, onEdit: () -> Unit, onDelete: () -> Unit, onDi
         },
         confirmButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
+}
+
+/**
+ * On-screen VERIFIED stamp for the receipt preview. It slams down from 1.6x while tilting into place (about 420 ms).
+ * It is drawn in voucher page units, so it sits where the stamp of the saved voucher sits. Reduce Motion: shown at once.
+ * Saved and shared vouchers do not use this layer; they keep the stamp inside the bitmap.
+ */
+@Composable
+fun VerifiedStampLayer(modifier: Modifier = Modifier) {
+    val reduce = rememberReduceMotion()
+    val p = remember { Animatable(if (reduce) 1f else 0f) }
+    LaunchedEffect(Unit) { if (!reduce) p.animateTo(1f, tween(420, easing = FastOutSlowInEasing)) }
+    androidx.compose.foundation.Canvas(modifier) {
+        val t = p.value
+        if (t <= 0f) return@Canvas
+        val k = size.width / Voucher.PAGE_W
+        drawIntoCanvas { canvas ->
+            val n = canvas.nativeCanvas
+            val red = android.graphics.Color.parseColor("#C8102E")
+            val a = (255f * t).toInt().coerceIn(0, 255)
+            val sc = 1.6f - 0.6f * t
+            n.save()
+            n.translate(482f * k, 253f * k)
+            n.rotate(-30f + 18f * t)
+            n.scale(sc, sc)
+            val ring = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                style = android.graphics.Paint.Style.STROKE
+                strokeWidth = 3f * k
+                color = red
+                alpha = a
+            }
+            n.drawCircle(0f, 0f, 50f * k, ring)
+            ring.strokeWidth = 1f * k
+            n.drawCircle(0f, 0f, 43f * k, ring)
+            val tick = android.graphics.Paint(ring).apply {
+                strokeWidth = 3f * k
+                strokeCap = android.graphics.Paint.Cap.ROUND
+            }
+            n.drawPath(android.graphics.Path().apply {
+                moveTo(-11f * k, -14f * k); lineTo(-3f * k, -6f * k); lineTo(11f * k, -24f * k)
+            }, tick)
+            val txt = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                color = red
+                alpha = a
+                textAlign = android.graphics.Paint.Align.CENTER
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                textSize = 14f * k
+            }
+            n.drawText("VERIFIED", 0f, 8f * k, txt)
+            txt.textSize = 9f * k
+            n.drawText("FINTRACK", 0f, 22f * k, txt)
+            n.restore()
+        }
+    }
 }
