@@ -195,6 +195,11 @@ class Repository(context: Context) {
         return path
     }
 
+    /** Uploads a note photo to an exact storage path (<uid>/notes/<noteId>/<name>.jpg). */
+    suspend fun uploadNotePhoto(path: String, bytes: ByteArray) {
+        withAuth { token -> api.upload("/storage/v1/object/tx-attachments/$path", bytes, "image/jpeg", token) }
+    }
+
     suspend fun downloadAttachment(path: String): ByteArray =
         withAuth { token -> api.download("/storage/v1/object/authenticated/tx-attachments/$path", token) }
 

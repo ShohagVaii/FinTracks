@@ -1,9 +1,23 @@
 package com.fintracks.app.ui
 
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.core.content.FileProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 import android.content.Intent
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,6 +110,8 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
     private val lock = Mutex()
     private var cache: List<JsonObject> = emptyList()
     private var pending: List<JsonObject> = emptyList() // {op, id, note?}
+    private var photoUploads: List<String> = emptyList() // storage paths of photos taken on the device, not uploaded yet
+    private var photoDeletes: List<String> = emptyList() // storage paths to remove from Storage
     private var loadedKey: String? = null
 
     private val _notes = MutableStateFlow<List<JsonObject>>(emptyList())
@@ -107,7 +123,7 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
 
     /** Clears the in-memory copy (used by the app reset). */
     fun reset() = synchronized(this) {
-        cache = emptyList(); pending = emptyList(); loadedKey = null
+        cache = emptyList(); pending = emptyList(); photoUploads = emptyList(); photoDeletes = emptyList(); loadedKey = null
         _notes.value = emptyList(); _pendingCount.value = 0
     }
 
@@ -120,29 +136,35 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
         val root = runCatching { Json.parseToJsonElement(raw ?: "{}") as JsonObject }.getOrDefault(JsonObject(emptyMap()))
         cache = (root["notes"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
         pending = (root["pending"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+        photoUploads = (root["photo_uploads"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content }
+        photoDeletes = (root["photo_deletes"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content }
         publish()
     }
 
     private fun persist() {
-        val root = JsonObject(mapOf("notes" to JsonArray(cache), "pending" to JsonArray(pending)))
+        val root = JsonObject(mapOf(
+            "notes" to JsonArray(cache),
+            "pending" to JsonArray(pending),
+            "photo_uploads" to JsonArray(photoUploads.map { JsonPrimitive(it) }),
+            "photo_deletes" to JsonArray(photoDeletes.map { JsonPrimitive(it) })
+        ))
         prefs.edit().putString(key(), root.toString()).apply()
     }
 
     private fun publish() {
         _notes.value = cache.sortedByDescending { timestamp(it) }
-        _pendingCount.value = pending.size
+        _pendingCount.value = pending.size + photoUploads.size + photoDeletes.size
     }
 
-    /** Creates or updates a note. Returns the note id. */
-    fun save(id: String?, title: String, body: String): String = synchronized(this) {
-        ensureLoaded()
-        val nid = id ?: UUID.randomUUID().toString()
+    /** Writes a note to the cache and the pending queue (attachments are the storage paths of its photos). */
+    private fun writeNote(nid: String, title: String, body: String, attachments: List<String>): String {
         val now = java.time.Instant.now().toString()
         val old = cache.firstOrNull { it.id() == nid }
         val note = row(
             "id" to nid,
             "title" to title,
             "body" to body,
+            "attachments" to JsonArray(attachments.map { JsonPrimitive(it) }),
             "created_at" to (old?.str("created_at")?.ifEmpty { null } ?: now),
             "updated_at" to now
         )
@@ -151,11 +173,53 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
         persist()
         publish()
         scope.launch { sync() }
-        nid
+        return nid
+    }
+
+    private fun photosOf(nid: String): List<String> =
+        (cache.firstOrNull { it.id() == nid }?.get("attachments") as? JsonArray).orEmpty()
+            .mapNotNull { (it as? JsonPrimitive)?.content }
+
+    /** Creates or updates a note. Returns the note id. */
+    fun save(id: String?, title: String, body: String): String = synchronized(this) {
+        ensureLoaded()
+        writeNote(id ?: UUID.randomUUID().toString(), title, body, photosOf(id ?: ""))
+    }
+
+    /** Stores a photo on the device, adds it to the note and queues the upload. */
+    fun addPhoto(noteId: String, bytes: ByteArray) {
+        synchronized(this) {
+            ensureLoaded()
+            val note = cache.firstOrNull { it.id() == noteId } ?: return
+            val uid = runCatching { repo.uid() }.getOrNull() ?: return
+            val path = "$uid/notes/$noteId/${UUID.randomUUID()}.jpg"
+            notePhotoFile(ctx, path).writeBytes(bytes)
+            photoUploads = photoUploads + path
+            writeNote(noteId, note.str("title"), note.str("body"), photosOf(noteId) + path)
+        }
+    }
+
+    /** Removes a photo from the note. A photo not yet uploaded is dropped; otherwise it is deleted from Storage on sync. */
+    fun removePhoto(noteId: String, path: String) {
+        synchronized(this) {
+            ensureLoaded()
+            val note = cache.firstOrNull { it.id() == noteId } ?: return
+            if (path in photoUploads) {
+                photoUploads = photoUploads - path
+                notePhotoFile(ctx, path).delete()
+            } else {
+                photoDeletes = photoDeletes + path
+            }
+            writeNote(noteId, note.str("title"), note.str("body"), photosOf(noteId) - path)
+        }
     }
 
     fun delete(id: String) = synchronized(this) {
         ensureLoaded()
+        for (path in photosOf(id)) {
+            if (path in photoUploads) { photoUploads = photoUploads - path; notePhotoFile(ctx, path).delete() }
+            else photoDeletes = photoDeletes + path
+        }
         cache = cache.filterNot { it.id() == id }
         pending = pending.filterNot { it.str("id") == id } + row("op" to "delete", "id" to id)
         persist()
@@ -163,9 +227,25 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
         scope.launch { sync() }
     }
 
-    /** Pushes pending changes, then refreshes the cache from the server. Offline: keeps the queue, does nothing else. */
+    /**
+     * Pushes pending changes, then refreshes the cache from the server. Offline: keeps the queue, does nothing else.
+     * Order: photo uploads first (so a note never points at a missing photo), then note rows, then Storage deletes.
+     */
     suspend fun sync() = lock.withLock {
         synchronized(this) { ensureLoaded() }
+        val uploads = synchronized(this) { photoUploads }
+        for (path in uploads) {
+            val bytes = runCatching { notePhotoFile(ctx, path).readBytes() }.getOrNull()
+            if (bytes == null) { // local copy is gone: nothing left to upload
+                synchronized(this) { photoUploads = photoUploads - path; persist(); publish() }
+                continue
+            }
+            if (runCatching { repo.uploadNotePhoto(path, bytes) }.isFailure) {
+                synchronized(this) { publish() }
+                return@withLock
+            }
+            synchronized(this) { photoUploads = photoUploads - path; persist(); publish() }
+        }
         val queue = synchronized(this) { pending }
         val done = HashSet<String>()
         for (op in queue) {
@@ -182,6 +262,16 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
         synchronized(this) {
             pending = pending.filterNot { (it.str("id") + "|" + it.str("op")) in done }
             persist()
+        }
+        // Storage deletes run after the note rows no longer reference the photos.
+        for (path in synchronized(this) { photoDeletes }) {
+            if (runCatching { repo.deleteAttachment(path) }.isFailure) continue
+            synchronized(this) {
+                photoDeletes = photoDeletes - path
+                notePhotoFile(ctx, path).delete()
+                persist()
+                publish()
+            }
         }
         val server = runCatching { repo.list("notes", "select=*&order=updated_at.desc") }.getOrNull() ?: run {
             synchronized(this) { publish() }
@@ -201,6 +291,14 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
             runCatching { OffsetDateTime.parse(note.str("updated_at")).toInstant().toEpochMilli() }.getOrDefault(0L)
     }
 }
+
+/** Local copy of a note photo (cache folder per storage path, so each photo has one file). */
+fun notePhotoFile(ctx: Context, path: String): File =
+    File(File(ctx.applicationContext.filesDir, "note-photos").apply { mkdirs() }, path.substringAfterLast('/'))
+
+/** Photo storage paths of a note, in the order they were added. */
+fun JsonObject.photoPaths(): List<String> =
+    (this["attachments"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content }
 
 /** Timestamp shown on cards and in the note: date, time with seconds, AM/PM (e.g. 2026-11-21 02:47:10 AM). */
 private val NOTE_STAMP: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd hh:mm:ss a", Locale.ENGLISH)
@@ -364,8 +462,9 @@ private fun NoteCard(n: JsonObject, onOpen: () -> Unit, onShare: () -> Unit, onE
 }
 
 /**
- * One note. Opens as a read view: copy and share at the top, big title, grey timestamp, full text.
- * Tapping the text (or choosing Edit in the list) switches to editing. Changes are saved when leaving.
+ * One note. Opens as a read view: copy, share and edit at the top, big title, grey timestamp, photos, full text.
+ * Editing starts only from the Edit button (or Edit in the list), never from tapping the text.
+ * Changes are saved when leaving. Photos can be added (camera or gallery) and removed while editing.
  */
 @Composable
 private fun NoteView(initial: JsonObject?, vm: AppViewModel, startEditing: Boolean, onClose: () -> Unit) {
@@ -377,8 +476,33 @@ private fun NoteView(initial: JsonObject?, vm: AppViewModel, startEditing: Boole
     var body by remember { mutableStateOf(originalBody) }
     var editing by remember { mutableStateOf(startEditing || initial == null) }
     var handled by remember { mutableStateOf(false) }
+    var cameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    // Photos come from the live list, so a photo appears as soon as it is added or removed.
+    val live by vm.notes.notes.collectAsState()
+    val photos = live.firstOrNull { it.id() == id }?.photoPaths().orEmpty()
 
     fun changed() = title != originalTitle || body != originalBody
+
+    fun addPhotoBytes(bytes: ByteArray?) {
+        if (bytes == null) return
+        // A photo needs a saved note: a new note is created here with whatever has been typed so far.
+        val nid = id ?: vm.notes.save(null, title, body).also { id = it }
+        vm.notes.addPhoto(nid, bytes)
+    }
+    val galleryPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) addPhotoBytes(AttachmentStore.readImage(ctx, uri))
+    }
+    val cameraPicker = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val uri = cameraUri
+        if (ok && uri != null) addPhotoBytes(AttachmentStore.readImage(ctx, uri))
+    }
+    fun launchCamera() {
+        val file = File(File(ctx.cacheDir, "exports").apply { mkdirs() }, "note-${System.currentTimeMillis()}.jpg")
+        val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
+        cameraUri = uri
+        cameraPicker.launch(uri)
+    }
 
     // Leaving the note by any route (back, arrow, save) keeps the text, unless save or delete already did it.
     DisposableEffect(Unit) {
@@ -396,6 +520,11 @@ private fun NoteView(initial: JsonObject?, vm: AppViewModel, startEditing: Boole
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(modifier = Modifier.pressScale(), onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("ফিরে যান", "Back")) }
             Spacer(Modifier.weight(1f))
+            if (!editing) {
+                IconButton(modifier = Modifier.pressScale(), onClick = { editing = true }) {
+                    Icon(Icons.Default.Edit, contentDescription = tr("এডিট করুন", "Edit"))
+                }
+            }
             IconButton(modifier = Modifier.pressScale(), onClick = { copyText(ctx, "FinTrack note", noteText(title, body)) }) {
                 Icon(Icons.Default.ContentCopy, contentDescription = tr("কপি", "Copy"))
             }
@@ -406,7 +535,7 @@ private fun NoteView(initial: JsonObject?, vm: AppViewModel, startEditing: Boole
 
         if (!editing) {
             Column(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).clickable { editing = true }.padding(horizontal = 8.dp),
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
@@ -414,6 +543,7 @@ private fun NoteView(initial: JsonObject?, vm: AppViewModel, startEditing: Boole
                     fontSize = 26.sp, fontWeight = FontWeight.Bold
                 )
                 Text(initial?.let { noteStamp(it) }.orEmpty(), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                photos.forEach { NotePhoto(path = it, onRemove = null) }
                 Spacer(Modifier.height(8.dp))
                 Text(
                     body.ifBlank { tr("লেখা নেই", "No text") },
@@ -439,6 +569,23 @@ private fun NoteView(initial: JsonObject?, vm: AppViewModel, startEditing: Boole
                     label = { Text(tr("লেখা", "Text")) },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 320.dp)
                 )
+                photos.forEach { path ->
+                    NotePhoto(path = path, onRemove = { id?.let { vm.notes.removePhoto(it, path) } })
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(modifier = Modifier.weight(1f).pressScale(), onClick = { launchCamera() }) {
+                        Icon(Icons.Default.PhotoCamera, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(tr("ছবি তুলুন", "Camera"))
+                    }
+                    OutlinedButton(modifier = Modifier.weight(1f).pressScale(), onClick = {
+                        galleryPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }) {
+                        Icon(Icons.Default.Image, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(tr("গ্যালারি", "Gallery"))
+                    }
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (id != null) {
                         TextButton(modifier = Modifier.pressScale(), onClick = {
@@ -460,6 +607,49 @@ private fun NoteView(initial: JsonObject?, vm: AppViewModel, startEditing: Boole
                         colors = ButtonDefaults.buttonColors(containerColor = Tok_FFFACC15, contentColor = Tok_FF1F2937)
                     ) { Text(tr("সংরক্ষণ", "Save"), fontWeight = FontWeight.Bold) }
                 }
+            }
+        }
+    }
+}
+
+/** One note photo. Loads from the device copy, or downloads it once and keeps it on the device. */
+@Composable
+private fun NotePhoto(path: String, onRemove: (() -> Unit)?) {
+    val ctx = LocalContext.current
+    val repo = remember { Repository(ctx) }
+    var bmp by remember(path) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var failed by remember(path) { mutableStateOf(false) }
+    LaunchedEffect(path) {
+        failed = false
+        try {
+            bmp = withContext(Dispatchers.IO) {
+                val f = notePhotoFile(ctx, path)
+                if (!f.exists()) f.writeBytes(repo.downloadAttachment(path))
+                BitmapFactory.decodeFile(f.path)
+            }
+        } catch (e: Exception) {
+            failed = true
+        }
+    }
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        val shown = bmp
+        if (shown != null) {
+            Image(
+                bitmap = shown.asImageBitmap(),
+                contentDescription = tr("নোটের ছবি", "Note photo"),
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).clip(RoundedCornerShape(16.dp))
+            )
+        } else {
+            Text(
+                if (failed) tr("ছবি লোড হয়নি (ইন্টারনেট লাগবে)", "Photo could not load (internet needed)") else tr("ছবি লোড হচ্ছে…", "Loading photo…"),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (onRemove != null) {
+            IconButton(modifier = Modifier.align(Alignment.TopEnd), onClick = onRemove) {
+                Icon(Icons.Default.Close, contentDescription = tr("ছবি সরান", "Remove photo"))
             }
         }
     }
