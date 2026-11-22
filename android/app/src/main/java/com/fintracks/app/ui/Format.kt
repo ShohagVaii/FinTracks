@@ -28,7 +28,7 @@ val ALL_CATS = (EXPENSE_CATS + INCOME_CATS).distinctBy { it.name }
  */
 private val DEFAULT_CAT_EN = mapOf(
     "খাদ্য" to "Food", "যাতায়াত" to "Transport", "শপিং" to "Shopping", "বিল" to "Bills",
-    "অন্যান্য" to "Other", "বেতন" to "Salary", "ট্রান্সফার" to "Transfer", "বাকি পরিশোধ" to "Credit payment"
+    "অন্যান্য" to "Other", "বেতন" to "Salary", "ট্রান্সফার" to "Transfer", "বাকি পরিশোধ" to "Credit payment", "ধার পরিশোধ" to "Debt payment", "ধার আদায়" to "Debt received"
 )
 
 /** Display name for a category. Custom (user-typed) names are returned unchanged. */

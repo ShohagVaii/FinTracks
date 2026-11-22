@@ -39,6 +39,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -401,6 +402,7 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit) {
     var contact by remember { mutableStateOf<ContactAction?>(null) }
     val open = people.firstOrNull { it.id() == openId }
     val ctx = LocalContext.current
+    val pendingCount by vm.debtOutbox.pendingCount.collectAsState()
 
     // Back inside a person's page returns to the list; back on the list closes the screen.
     BackHandler(enabled = openId != null) { openId = null }
@@ -408,6 +410,14 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         DebtHeader(open?.str("name") ?: tr("দেনা ও পাওনা", "Debts & dues")) {
             if (open != null) openId = null else onClose()
+        }
+        if (pendingCount > 0) {
+            Text(
+                tr("সিঙ্ক বাকি: $pendingCount টি পরিবর্তন (ইন্টারনেট এলে যাবে)", "Waiting to sync: $pendingCount change(s) (sent when online)"),
+                fontSize = 12.sp,
+                color = DebtViolet,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
         }
         Box(Modifier.fillMaxWidth().weight(1f)) {
             if (open == null) {
