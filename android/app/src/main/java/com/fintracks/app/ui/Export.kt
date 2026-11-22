@@ -23,7 +23,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-import androidx.compose.ui.graphics.Color
 
 /** Exports: list as CSV / Excel (.xlsx) / PDF in Bengali, and a single-transaction voucher PDF with QR. */
 object Export {

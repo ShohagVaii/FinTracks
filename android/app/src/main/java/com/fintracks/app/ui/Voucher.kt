@@ -25,7 +25,6 @@ import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.util.Locale
 import kotlin.math.abs
-import androidx.compose.ui.graphics.Color
 
 /**
  * FinTrack voucher: TRX ID, checksum, QR payload, the server registry record, and the A4 renderer
