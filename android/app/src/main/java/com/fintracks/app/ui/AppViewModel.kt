@@ -755,7 +755,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 "amount" to s.amount,
                 "category" to "অন্যান্য",
                 "note" to s.note,
-                "tx_date" to todayIso(),
+                "tx_date" to s.date.ifEmpty { todayIso() },
                 "payment_mode" to s.provider,
                 "currency" to "BDT"
             ),

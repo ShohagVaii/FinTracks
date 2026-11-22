@@ -65,6 +65,7 @@ fun SharedScreen(state: UiState, vm: AppViewModel) {
                 "shop" -> ShoppingSection(state, vm)
                 else -> MessSection(state, vm)
             }
+            AppFooter()
             Spacer(Modifier.height(90.dp))
         }
     }

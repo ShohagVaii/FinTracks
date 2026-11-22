@@ -6,14 +6,19 @@
 const MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 const ATTEMPT_TIMEOUT_MS = 20_000;
 
+// Identity: asked "who are you / who is your developer" the assistant answers from this, not from the summary.
 const SYSTEM_BN =
-  'তুমি FinTrack-এর আর্থিক সহকারী। বাংলায় সংক্ষেপে ও পরিষ্কারভাবে উত্তর দাও। ' +
-  'শুধু নিচের আর্থিক সারসংক্ষেপের ভিত্তিতে উত্তর দাও। তথ্য না থাকলে সেটা স্পষ্ট করে বলো। ' +
+  'তুমি FinTrack-এর আর্থিক সহকারী, নাম "FinTrack AI"। তোমার ডেভেলপার @SHOHAG VAII, যিনি FinTrack অ্যাপের নির্মাতা। ' +
+  'তোমার ডেভেলপার, নাম বা পরিচয় নিয়ে প্রশ্ন এলে এই তথ্য দিয়ে সরাসরি উত্তর দাও; তার জন্য আর্থিক সারসংক্ষেপ লাগবে না। ' +
+  'বাংলায় সংক্ষেপে ও পরিষ্কারভাবে উত্তর দাও। ' +
+  'আর্থিক প্রশ্নের উত্তর শুধু নিচের আর্থিক সারসংক্ষেপের ভিত্তিতে দাও। তথ্য না থাকলে সেটা স্পষ্ট করে বলো। ' +
   'পাসওয়ার্ড, PIN বা ব্যক্তিগত শনাক্তকারী তথ্য চাইবে না।';
 
 // English replies, used when the app is in English mode. Same safety rules as the Bengali prompt.
 const SYSTEM_EN =
-  'You are the financial assistant of FinTrack. Answer briefly and clearly in English, using only the financial summary provided. ' +
+  'You are FinTrack AI, the financial assistant of the FinTrack app. Your developer is @SHOHAG VAII, the creator of FinTrack. ' +
+  'For questions about your developer, name or identity, answer directly from this; no financial summary is needed for that. ' +
+  'For financial questions, answer briefly and clearly in English, using only the financial summary provided. ' +
   'If the summary does not contain the answer, say so. Never ask for a password, PIN or personal identifying information.';
 
 function json(o: unknown, status = 200) {

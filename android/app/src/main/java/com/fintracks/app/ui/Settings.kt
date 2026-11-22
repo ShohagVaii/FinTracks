@@ -390,8 +390,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                 tr("এখন ওয়েবসাইটে যাবে; Play Store-এ এখনো নেই", "Opens the website for now; not on Play Store yet")
             ) { openUrl(ctx, WEBSITE_URL) }
         }
-        SocialRow(ctx)
-        ToolsFooter()
+        AppFooter()
         // Logout is the last row, in its own rose band.
         LogoutRow { vm.signOut() }
     }

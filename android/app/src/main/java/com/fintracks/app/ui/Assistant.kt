@@ -55,6 +55,13 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 
 /**
  * Offline assistant. It answers from the user's own data with no network and no API key.
@@ -62,6 +69,12 @@ import java.util.Locale
  */
 object Assistant {
     private fun has(q: String, vararg words: String) = words.any { q.contains(it) }
+
+    /** Who the assistant is. Used by the local answer and sent to the AI as context (see aiContext). */
+    fun identity(): String = tr(
+        "আমি FinTrack AI, FinTrack অ্যাপের আর্থিক সহকারী। আমার ডেভেলপার @SHOHAG VAII, যিনি FinTrack-এর নির্মাতা।",
+        "I'm FinTrack AI, the financial assistant of the FinTrack app. My developer is @SHOHAG VAII, the creator of FinTrack."
+    )
 
     fun answer(question: String, state: UiState): String {
         val q = question.lowercase()
@@ -76,6 +89,7 @@ object Assistant {
             .groupBy { it.str("category") }.maxByOrNull { e -> e.value.sumOf { it.num("amount") } }
 
         return when {
+            has(q, "ডেভেলপার", "developer", "তুমি কে", "তুমি কি", "আপনি কে", "তোমার নাম", "আপনার নাম", "নাম কি", "নাম কী", "your name", "who are you", "who made", "who created", "কে বানিয়েছে", "কে তৈরি") -> identity()
             has(q, tr("বাকি", "Due"), "credit", "দোকান") -> {
                 val due = state.rows("credit_shops").sumOf { shopBalance(it.id(), state) }
                 tr("মোট বাকি আছে ${taka(due, p)}। দোকানভিত্তিক হিসাব বাকি মেনুতে দেখতে পারবেন।", "Total due is ${taka(due, p)}. You can see the shop-wise breakdown in the Due menu.")
@@ -148,6 +162,7 @@ fun aiContext(state: UiState): String {
     val owed = debtsRemaining(state, "owed")
     val none = tr("নেই", "none")
     return buildString {
+        append(Assistant.identity()).append(' ')
         append(tr("মুদ্রা: ", "Currency: ")).append(state.currency)
         append(tr(". মাস: ", ". Month: ")).append(month)
         append(tr(". মোট আয়: ", ". Total income: ")).append(m(income))
@@ -186,10 +201,20 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
     val errors = remember { mutableStateListOf<ChatMsg>() }
     var input by remember { mutableStateOf("") }
     var thinking by remember { mutableStateOf(false) }
+    // The running request. Tapping the send button while it runs cancels it; a cancelled request never saves an answer.
+    var running by remember { mutableStateOf<Job?>(null) }
+    val listState = rememberLazyListState()
+    var shownItems by remember { mutableStateOf(0) }
     val lines: List<ChatMsg> = saved.map { ChatMsg(it.id(), it.str("role"), it.str("text"), it.str("created_at")) } + errors
 
     fun saveLine(role: String, text: String) {
         vm.save("ai_chat_messages", row("role" to role, "text" to text, "created_at" to OffsetDateTime.now().toString()), null)
+    }
+
+    fun cancelSend() {
+        running?.cancel()
+        running = null
+        thinking = false
     }
 
     fun send(text: String, saveQuestion: Boolean = true) {
@@ -198,10 +223,13 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
         input = ""
         thinking = true
         if (saveQuestion) saveLine("user", q)
-        scope.launch {
+        val self = arrayOfNulls<Job>(1)
+        val job = scope.launch {
             // No silent fallback: a failure shows its real reason, with retry and an explicit local-answer button.
             try {
                 saveLine("assistant", vm.askAi(q, aiContext(state), if (AppPrefs.english) "en" else "bn"))
+            } catch (e: CancellationException) {
+                throw e // cancelled by the user: no error line, no answer
             } catch (e: Exception) {
                 val reason = if (e is java.io.IOException && e !is com.fintracks.app.data.SupabaseException) {
                     tr("ইন্টারনেট সংযোগ বা সময়সীমা: ${e.message ?: "অজানা"}", "Connection or timeout: ${e.message ?: "unknown"}")
@@ -214,9 +242,26 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
                     OffsetDateTime.now().toString(), q
                 )
             } finally {
-                thinking = false
+                if (running === self[0]) {
+                    running = null
+                    thinking = false
+                }
             }
         }
+        self[0] = job
+        running = job
+    }
+
+    // Open at the newest message. While the user is at the bottom, new messages keep the list at the bottom.
+    val total = lines.size + 1 + (if (thinking) 1 else 0)
+    LaunchedEffect(total) {
+        val last = total - 1
+        if (shownItems == 0) {
+            listState.scrollToItem(last)
+        } else if ((listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) >= shownItems - 1) {
+            listState.animateScrollToItem(last)
+        }
+        shownItems = total
     }
 
     val purple = Violet600
@@ -252,7 +297,8 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
             ""
         ) { send(it) }
         LazyColumn(
-            Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp),
+            state = listState,
+            modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item { ChatBubble(ChatMsg("greeting", "assistant", greeting, ""), thinking, onRetry = {}, onLocal = {}) }
@@ -283,9 +329,15 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
                     .size(54.dp)
                     .clip(CircleShape)
                     .background(Brush.linearGradient(listOf(Violet600, Indigo600)))
-                    .clickable(enabled = input.isNotBlank() && !thinking) { send(input) },
+                    .clickable(enabled = thinking || input.isNotBlank()) { if (thinking) cancelSend() else send(input) },
                 contentAlignment = Alignment.Center
-            ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = tr("পাঠান", "Send"), tint = Color.White) }
+            ) {
+                if (thinking) {
+                    CircularProgressIndicator(Modifier.size(26.dp), color = Color.White, strokeWidth = 2.5.dp)
+                } else {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = tr("পাঠান", "Send"), tint = Color.White)
+                }
+            }
         }
     }
 }
@@ -335,5 +387,62 @@ private fun ChatBubble(msg: ChatMsg, thinking: Boolean, onRetry: () -> Unit, onL
                 }
             }
         }
+    }
+}
+
+/** Tips shown on the home AI ASSISTANT card: a few from this month's own data, then general money tips. */
+private fun assistantTips(state: UiState): List<String> {
+    val p = state.privacy
+    val month = monthPrefix()
+    val txs = state.rows("transactions")
+    val monthTx = txs.filter { dateOf(it, "tx_date").startsWith(month) }
+    val flow = flowTotalsForMonth(txs, month)
+    val out = mutableListOf<String>()
+    val topCat = monthTx.filter { it.str("type") == "Expense" }
+        .groupBy { it.str("category") }
+        .maxByOrNull { e -> e.value.sumOf { it.num("amount") } }
+    if (topCat != null) {
+        val amount = taka(topCat.value.sumOf { it.num("amount") }, p)
+        out += tr("এই মাসে সবচেয়ে বেশি খরচ '${catLabel(topCat.key)}' খাতে (${amount})।", "This month the most spending is in '${catLabel(topCat.key)}' (${amount}).")
+    }
+    if (flow.income > 0 && flow.expense > flow.income * 0.8) {
+        out += tr("এই মাসের খরচ আয়ের ৮০%-এর বেশি, কিছু খরচ কমান।", "Spending is over 80% of income this month, so cut a few costs.")
+    }
+    if (state.rows("budgets").isEmpty()) out += tr("মাসিক বাজেট সেট করলে খরচ নিয়ন্ত্রণে থাকে।", "A monthly budget keeps spending under control.")
+    out += listOf(
+        tr("৫০/৩০/২০ নিয়ম: আয়ের ৫০% প্রয়োজনে, ৩০% চাহিদায়, ২০% সঞ্চয়ে।", "50/30/20 rule: 50% needs, 30% wants, 20% savings."),
+        tr("জরুরি তহবিল হিসেবে ৩–৬ মাসের খরচ আলাদা রাখুন।", "Keep 3 to 6 months of expenses as an emergency fund."),
+        tr("আয় আসার সাথেই সঞ্চয়ের অংশ আগে সরিয়ে রাখুন।", "Move your savings share out as soon as income arrives."),
+        tr("ক্রেডিট কার্ডের পুরো বিল সময়মতো দিন, নইলে সুদ বাড়ে।", "Pay the full credit card bill on time to avoid interest."),
+        tr("সাবস্ক্রিপশন নিয়মিত যাচাই করুন, যেটা লাগে না বাদ দিন।", "Review subscriptions and cancel the ones you don't use."),
+        tr("কেনাকাটার আগে ২৪ ঘণ্টা অপেক্ষা করলে অপ্রয়োজনীয় খরচ কমে।", "Waiting 24 hours before a purchase cuts impulse spending.")
+    )
+    return out
+}
+
+/**
+ * Home card that replaces the SMS parser card. Same card style; one short tip line that rotates.
+ * Tapping it opens the AI chat.
+ */
+@Composable
+fun AiAssistantCard(state: UiState, onOpen: () -> Unit) {
+    val tips = remember(state.tables, state.privacy) { assistantTips(state) }
+    var index by remember { mutableStateOf(0) }
+    LaunchedEffect(tips.size) {
+        while (tips.size > 1) {
+            delay(6_000)
+            index = (index + 1) % tips.size
+        }
+    }
+    val current = tips.getOrNull(index % maxOf(tips.size, 1)).orEmpty()
+    AppCard(onClick = onOpen) {
+        Text("AI ASSISTANT", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        Text(
+            current,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }

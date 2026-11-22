@@ -28,7 +28,9 @@ data class SmsSuggestion(
     val type: String,
     val provider: String,
     val note: String,
-    val raw: String
+    val raw: String,
+    /** Date found in the SMS as yyyy-MM-dd; empty when the SMS has no readable date (then today is used). */
+    val date: String = ""
 )
 
 /** Helper to build a JsonObject from pairs, skipping nulls. */

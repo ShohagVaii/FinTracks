@@ -1,5 +1,6 @@
 package com.fintracks.app.ui
 
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.material3.MaterialTheme
@@ -117,7 +118,7 @@ fun FinTracksTheme(dark: Boolean, accent: AccentColor, content: @Composable () -
             onPrimary = Color.White,
             background = Slate50,
             onBackground = Slate900,
-            surface = Color.White.copy(alpha = 0.85f),
+            surface = Color.White,
             onSurface = Slate900,
             surfaceVariant = Slate200,
             onSurfaceVariant = Slate600,
@@ -172,6 +173,29 @@ fun isDarkTheme(): Boolean = MaterialTheme.colorScheme.background.luminance() < 
 @Composable
 fun readableOn(c: Color): Color =
     if (c == Color.Unspecified || isDarkTheme()) c else lerp(c, Color.Black, 0.4f)
+
+/**
+ * Light-mode tokens for the home cards. Dark mode keeps the glass look (the values below are used only in dark).
+ * Light cards are solid white on the pale background, with deeper income/expense tones so text stays readable.
+ */
+@Composable
+fun cardSurface(darkAlpha: Float = 0.55f): Color = if (isDarkTheme()) VideoCardLift.copy(alpha = darkAlpha) else Color.White
+
+@Composable
+fun cardOutline(): Color = if (isDarkTheme()) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)
+
+/** Hero card gradient: dark keeps the deep green-navy glow; light uses a soft sky-to-mint wash. */
+@Composable
+fun heroBrush(): Brush =
+    if (isDarkTheme()) Brush.linearGradient(listOf(Tok_FF0B1F1C, VideoCardLift.copy(alpha = 0.6f)))
+    else Brush.linearGradient(listOf(Color(0xFFE0F2FE), Color(0xFFECFDF5)))
+
+/** Income and expense text/line colour. Dark: the bright chart tones. Light: deeper emerald and rose. */
+@Composable
+fun incomeTone(): Color = if (isDarkTheme()) ChartIncome else Color(0xFF047857)
+
+@Composable
+fun expenseTone(): Color = if (isDarkTheme()) ChartExpense else Rose700
 
 /** Net (income − expense) or any balance difference: zero or positive uses the income green, negative the expense red. */
 @Composable

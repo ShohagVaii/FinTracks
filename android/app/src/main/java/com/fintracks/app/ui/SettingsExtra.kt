@@ -241,30 +241,6 @@ fun SettingLink(title: String, subtitle: String? = null, onClick: () -> Unit) {
     }
 }
 
-/** Facebook and Telegram tiles for the footer. */
-@Composable
-fun SocialRow(ctx: Context) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        SocialTile("Facebook", FacebookBlue, Modifier.weight(1f)) { openUrl(ctx, FACEBOOK_URL) }
-        SocialTile("Telegram", TelegramBlue, Modifier.weight(1f)) { openUrl(ctx, TELEGRAM_URL) }
-    }
-}
-
-@Composable
-private fun SocialTile(label: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier, onClick: () -> Unit) {
-    Box(
-        modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(color.copy(alpha = 0.15f))
-            .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 14.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(label, color = color, fontWeight = FontWeight.Bold)
-    }
-}
-
 /** Log-out row: its own soft rose band, placed at the very bottom of Settings. */
 @Composable
 fun LogoutRow(onClick: () -> Unit) {

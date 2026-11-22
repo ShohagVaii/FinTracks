@@ -187,6 +187,41 @@ fun LineChart(values: List<Double>, color: Color, modifier: Modifier = Modifier)
     }
 }
 
+/**
+ * Two series on one canvas with one shared scale (income green, expense red in the home trend).
+ * Both lists must have the same length; each point is placed by its index.
+ */
+@Composable
+fun DualLineChart(first: List<Double>, firstColor: Color, second: List<Double>, secondColor: Color, modifier: Modifier = Modifier) {
+    androidx.compose.foundation.Canvas(modifier.fillMaxWidth().height(160.dp)) {
+        val n = maxOf(first.size, second.size)
+        if (n == 0) return@Canvas
+        val max = (maxOf(first.maxOrNull() ?: 0.0, second.maxOrNull() ?: 0.0)).coerceAtLeast(1.0)
+        val stepX = if (n > 1) size.width / (n - 1) else size.width
+        fun drawSeries(values: List<Double>, color: Color, withFill: Boolean) {
+            if (values.isEmpty()) return
+            val points = values.mapIndexed { i, v ->
+                Offset(i * stepX, size.height - (v / max * size.height * 0.9f).toFloat() - 4f)
+            }
+            val line = Path().apply {
+                points.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }
+            }
+            if (withFill) {
+                val fill = Path().apply {
+                    addPath(line)
+                    lineTo(points.last().x, size.height)
+                    lineTo(points.first().x, size.height)
+                    close()
+                }
+                drawPath(fill, Brush.verticalGradient(listOf(color.copy(alpha = 0.22f), Color.Transparent)))
+            }
+            drawPath(line, color, style = Stroke(width = 4f, cap = StrokeCap.Round))
+        }
+        drawSeries(second, secondColor, withFill = false)
+        drawSeries(first, firstColor, withFill = true)
+    }
+}
+
 @Composable
 fun FormDialog(
     title: String,

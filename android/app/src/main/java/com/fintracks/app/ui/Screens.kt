@@ -171,6 +171,30 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
     val (income, expense, total, savingsRate) = stats
     val net = income - expense
 
+    // Trend for the selected period: months for the year view, otherwise one point per day.
+    val trend = remember(state.tables, span, offset) {
+        val incomeOf: (List<JsonObject>) -> Double = { rows -> rows.filter { it.str("type") == "Income" }.sumOf { it.num("amount") } }
+        val expenseOf: (List<JsonObject>) -> Double = { rows -> rows.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") } }
+        val keys: List<String> = if (span == HomeSpan.YEAR) {
+            val y = period.from.substring(0, 4)
+            (1..12).map { m -> y + "-" + m.toString().padStart(2, '0') }
+        } else {
+            val end = java.time.LocalDate.parse(period.to)
+            generateSequence(java.time.LocalDate.parse(period.from)) { it.plusDays(1) }
+                .takeWhile { !it.isAfter(end) }.map { it.toString() }.toList()
+        }
+        val inc = keys.map { k ->
+            val rows = if (span == HomeSpan.YEAR) txs.filter { dateOf(it, "tx_date").startsWith(k) } else txs.filter { dateOf(it, "tx_date") == k }
+            incomeOf(rows)
+        }
+        val exp = keys.map { k ->
+            val rows = if (span == HomeSpan.YEAR) txs.filter { dateOf(it, "tx_date").startsWith(k) } else txs.filter { dateOf(it, "tx_date") == k }
+            expenseOf(rows)
+        }
+        val last = maxOf(lastIndexWithData(inc), lastIndexWithData(exp))
+        inc.take(last + 1) to exp.take(last + 1)
+    }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         // Period tabs + timeline navigator, like the video's দৈনিক / মাসিক / বাৎসরিক pill.
         Box(Modifier.staggerIn(0)) {
@@ -178,8 +202,8 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(50))
-                .background(VideoCardLift.copy(alpha = 0.5f))
-                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
+                .background(cardSurface(0.5f))
+                .border(1.dp, cardOutline(), RoundedCornerShape(50))
                 .padding(4.dp)
         ) {
             HomeSpan.values().forEach { sp ->
@@ -207,52 +231,33 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             }
             NavSquare(Icons.Default.ChevronRight, enabled = offset < 0) { offset += 1 }
         }
-        // Profit hero — like the video's "নিট লাভ (PROFIT)" card: large radius, green trend icon.
         }
+        // Hero: the all-time balance (it replaces the old net-profit card; the separate balance card is gone).
         Box(Modifier.staggerIn(4)) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(40.dp))
-                .background(Brush.linearGradient(listOf(Tok_FF0B1F1C, VideoCardLift.copy(alpha = 0.6f))))
-                .border(1.dp, incomeGreen.copy(alpha = 0.22f), RoundedCornerShape(40.dp))
-                .padding(24.dp)
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text(tr("নিট লাভ (PROFIT)", "Net profit (PROFIT)"), fontSize = 12.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    CountUpText(net, { taka(it, p) }, fontSize = 36.sp, fontWeight = FontWeight.Bold, color = netTone(net))
-                }
-                Box(Modifier.size(64.dp).clip(CircleShape).background(netTone(net).copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
-                    Icon(if (net >= 0) Icons.Default.TrendingUp else Icons.Default.TrendingDown, contentDescription = null, tint = netTone(net), modifier = Modifier.size(30.dp))
-                }
-            }
-            if (income > 0) Text(tr("সঞ্চয়ের হার", "Savings rate") + ": ${bnDigits("%.0f".format(savingsRate))}%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
-        }
-        }
-        Box(Modifier.staggerIn(5)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatPill(tr("মোট আয়", "Total income"), taka(income, p), incomeGreen, Modifier.weight(1f), countTo = income, countFmt = { taka(it, p) })
-            StatPill(tr("মোট ব্যয়", "Total expense"), taka(expense, p), expenseRed, Modifier.weight(1f), countTo = expense, countFmt = { taka(it, p) })
-        }
-        // Wallet card — all-time balance.
-        }
-        Box(Modifier.staggerIn(6)) {
         Row(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(40.dp))
-                .background(VideoCardLift.copy(alpha = 0.55f))
-                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(40.dp))
-                .padding(horizontal = 24.dp, vertical = 20.dp),
+                .background(heroBrush())
+                .border(1.dp, if (isDarkTheme()) incomeGreen.copy(alpha = 0.22f) else cardOutline(), RoundedCornerShape(40.dp))
+                .padding(horizontal = 24.dp, vertical = 24.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
-                Text(tr("অবশিষ্ট ব্যালেন্স (ALL TIME)", "Balance (all time)"), fontSize = 11.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(taka(total, p), fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Text(tr("অবশিষ্ট ব্যালেন্স (ALL TIME)", "Balance (all time)"), fontSize = 12.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                CountUpText(total, { taka(it, p) }, fontSize = 36.sp, fontWeight = FontWeight.Bold)
             }
-            Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Sky400.copy(alpha = 0.6f), modifier = Modifier.size(32.dp))
+            Box(Modifier.size(64.dp).clip(CircleShape).background(Sky400.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Sky400, modifier = Modifier.size(30.dp))
+            }
+        }
+        }
+        // Total income and total expense pills sit directly under the hero.
+        Box(Modifier.staggerIn(5)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatPill(tr("মোট আয়", "Total income"), taka(income, p), incomeTone(), Modifier.weight(1f), countTo = income, countFmt = { taka(it, p) })
+            StatPill(tr("মোট ব্যয়", "Total expense"), taka(expense, p), expenseTone(), Modifier.weight(1f), countTo = expense, countFmt = { taka(it, p) })
         }
         }
         Box(Modifier.staggerIn(1)) { CreditDueCard(state) { openOverlay(Overlay.CREDIT) } }
@@ -260,9 +265,11 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
         val heatMonth = heatmapMonthOf(span, offset, period)
         val nextMonth: (() -> Unit)? = if (heatMonth < java.time.YearMonth.now()) ({ jumpToMonth(heatMonth.plusMonths(1)) }) else null
         HeatmapCard(txs, p, heatMonth, onPrev = { jumpToMonth(heatMonth.minusMonths(1)) }, onNext = nextMonth)
-        Box(Modifier.staggerIn(3)) { SmsParserCard(state, vm) }
+        Box(Modifier.staggerIn(3)) { AiAssistantCard(state) { openOverlay(Overlay.CHAT) } }
 
-        Box(Modifier.staggerIn(7)) {
+        // Each block below is a Column (not a Box): a Box stacks its children on top of each other,
+        // which made the section titles print over the first row (the overlap bug).
+        Column(Modifier.staggerIn(7), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (state.pendingSms.isNotEmpty()) {
             SectionTitle(tr("SMS থেকে নতুন লেনদেন", "New transactions from SMS"))
             state.pendingSms.take(3).forEach { s ->
@@ -276,9 +283,8 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
                 }
             }
         }
-
         }
-        Box(Modifier.staggerIn(8)) {
+        Column(Modifier.staggerIn(8), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (accounts.isNotEmpty()) {
             SectionTitle(tr("অ্যাকাউন্ট", "Accounts"))
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -291,9 +297,8 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
                 }
             }
         }
-
         }
-        Box(Modifier.staggerIn(9)) {
+        Column(Modifier.staggerIn(9), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(tr("এই মাসের বাজেট", "This month's budget"))
         val budgets = state.rows("budgets")
         if (budgets.isEmpty()) {
@@ -314,25 +319,34 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
                 }
             }
         }
-
         }
-        Box(Modifier.staggerIn(10)) {
-        SectionTitle(tr("খরচের ট্রেন্ড (এই মাস)", "Expense trend (this month)"))
+        Column(Modifier.staggerIn(10), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle(tr("আয় ও ব্যয়ের ট্রেন্ড", "Income & expense trend"))
         AppCard {
-            val days = (1..31).map { d ->
-                val key = month + "-" + d.toString().padStart(2, '0')
-                monthTx.filter { it.str("type") == "Expense" && dateOf(it, "tx_date") == key }.sumOf { it.num("amount") }
+            DualLineChart(trend.first, incomeTone(), trend.second, expenseTone())
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                LegendDot(tr("আয়", "Income"), incomeTone())
+                LegendDot(tr("ব্যয়", "Expense"), expenseTone())
             }
-            LineChart(days.take(maxOf(1, lastIndexWithData(days) + 1)), expenseRed)
         }
-
         }
-        Box(Modifier.staggerIn(11)) {
+        Column(Modifier.staggerIn(11), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(tr("সাম্প্রতিক লেনদেন", "Recent transactions"))
         if (txs.isEmpty()) EmptyHint(tr("এখনো কোনো লেনদেন নেই। নিচের + বাটন দিয়ে যোগ করুন।", "No transactions yet. Add one with the + button below."))
         txs.take(5).forEach { t -> TxItem(t, state, onClick = { openReceipt(t) }, onLongClick = { onTxLongPress(t) }) }
         }
+        AppFooter()
         Spacer(Modifier.height(90.dp))
+    }
+}
+
+/** Small coloured dot with a label, used under the trend chart. */
+@Composable
+private fun LegendDot(label: String, color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(6.dp))
+        Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -608,6 +622,7 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                 }
                 }
             }
+            item { AppFooter() }
         }
     }
 }
@@ -1040,17 +1055,6 @@ fun heatmapMonthOf(span: HomeSpan, offset: Int, period: HomePeriod): java.time.Y
     HomeSpan.YEAR -> java.time.YearMonth.of(period.from.substring(0, 4).toInt(), java.time.YearMonth.now().monthValue)
 }
 
-/** SMART SMS PARSER card on the home screen; opens the paste-and-scan dialog. */
-@Composable
-private fun SmsParserCard(state: UiState, vm: AppViewModel) {
-    var open by remember { mutableStateOf(false) }
-    AppCard(onClick = { open = true }) {
-        Text("SMART SMS PARSER", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-        Text(tr("bKash, Nagad বা ব্যাংকের SMS থেকে লেনদেন বের করুন", "Pull transactions from bKash, Nagad or bank SMS"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    if (open) SmsParserDialog(state, vm) { open = false }
-}
-
 @Composable
 fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
     var text by remember { mutableStateOf("") }
@@ -1090,6 +1094,10 @@ fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
             result?.let { s ->
                 AppCard(borderColor = Sky400.copy(alpha = 0.4f)) {
                     Text("${s.provider} · ${s.type} · ${taka(s.amount, state.privacy)}", fontWeight = FontWeight.Bold)
+                    Text(
+                        tr("তারিখ: ", "Date: ") + (if (s.date.isNotEmpty()) displayDate(s.date) else tr("এসএমএসে নেই, আজকের তারিখ", "not in SMS, today is used")),
+                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Text(s.note, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Button(modifier = Modifier.pressScale(), onClick = {
                         vm.save("transactions", row(
@@ -1098,7 +1106,7 @@ fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
                             "currency" to state.currency,
                             "category" to "অন্যান্য",
                             "note" to s.note,
-                            "tx_date" to todayIso(),
+                            "tx_date" to s.date.ifEmpty { todayIso() },
                             "payment_mode" to (if (s.provider in PAYMENT_MODES) s.provider else "Bank"),
                             "mood" to "",
                             "is_recurring" to false,

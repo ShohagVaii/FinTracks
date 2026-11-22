@@ -268,7 +268,7 @@ fun ToolsScreen(onOpen: (Overlay) -> Unit) {
             }
         }
         IntelligenceCard { onOpen(Overlay.REPORTS) }
-        ToolsFooter()
+        AppFooter()
     }
 }
 
@@ -611,42 +611,45 @@ private fun IntelligenceCard(onOpen: () -> Unit) {
     }
 }
 
+/**
+ * The same footer on every main screen: social buttons (Facebook, YouTube, Telegram) and the credit line.
+ * No large brand block here; the app name is only in the header.
+ */
 @Composable
-internal fun ToolsFooter() {
+internal fun AppFooter() {
     Column(
-        Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 96.dp),
+        Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("FinTrack AI", color = MaterialTheme.colorScheme.primary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text(
-            "The smartest solution for your personal finance and transactions.\nMake life easier through technology.",
-            color = Slate400,
-            fontSize = 13.sp,
-            lineHeight = 20.sp,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(8.dp))
         val uri = LocalUriHandler.current
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             SocialButton(FacebookGlyph, "Facebook") { uri.openUri(FACEBOOK_URL) }
+            SocialButton(YouTubeGlyph, "YouTube") { uri.openUri(YOUTUBE_URL) }
             SocialButton(TelegramGlyph, "Telegram") { uri.openUri(TELEGRAM_URL) }
         }
-        Text("v${com.fintracks.app.BuildConfig.VERSION_NAME}-${com.fintracks.app.BuildConfig.VERSION_CODE}", color = Slate500, fontSize = 11.sp)
-        Spacer(Modifier.height(8.dp))
         Text("CRAFTED WITH ❤ BY SHOHAG VAII", color = Slate500, fontSize = 10.sp, letterSpacing = 2.sp)
-        Text("© FINTRACK PREMIUM FINANCE", color = Slate600, fontSize = 9.sp, letterSpacing = 1.sp)
+        Text("v${com.fintracks.app.BuildConfig.VERSION_NAME}-${com.fintracks.app.BuildConfig.VERSION_CODE}", color = Slate500, fontSize = 10.sp)
     }
 }
 
 // Profile links for the footer buttons.
 internal const val FACEBOOK_URL = "https://facebook.com/shohag.vai.ofc"
 internal const val TELEGRAM_URL = "https://t.me/shohag_vaii"
+internal const val YOUTUBE_URL = "https://www.youtube.com/@FAKETECHBD"
 
 private val FacebookGlyph: ImageVector by lazy {
     ImageVector.Builder(name = "Facebook", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
         .addPath(
             pathData = addPathNodes("M9 8H6v4h3v12h5V12h3.642L18 8h-4V6.333C14 5.378 14.192 5 15.115 5H18V0h-3.808C10.596 0 9 1.583 9 4.615V8z"),
+            fill = SolidColor(Color.White)
+        ).build()
+}
+
+private val YouTubeGlyph: ImageVector by lazy {
+    ImageVector.Builder(name = "YouTube", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+        .addPath(
+            pathData = addPathNodes("M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"),
             fill = SolidColor(Color.White)
         ).build()
 }
