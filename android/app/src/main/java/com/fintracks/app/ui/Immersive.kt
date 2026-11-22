@@ -62,5 +62,6 @@ fun ImmersiveEffect() {
  * Top padding for headers. Uses the status bar height when it is shown, and the camera cutout height when there is one,
  * so content never sits under the notch or punch hole. With the status bar hidden it is only the cutout (often zero).
  */
+@Composable
 fun Modifier.topInsetPadding(): Modifier =
     windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top))
