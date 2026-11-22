@@ -17,12 +17,15 @@ object AppPrefs {
     @Volatile var dateBn: Boolean = false
     @Volatile var accent: AccentColor = AccentColor.SKY
     @Volatile var customCats: List<CustomCat> = emptyList()
+    /** Demo mode flag, read by [shownAmount]. Stored on the device; the data itself is never changed. */
+    @Volatile var demo: Boolean = false
 
     fun apply(state: UiState) {
         symbol = currencySymbol(state.currency)
         english = state.profile?.str("language") == "en"
         dateBn = state.profile?.str("date_format") == "bn"
         accent = state.accent
+        demo = state.demo
         customCats = state.rows("categories").map {
             CustomCat(it.str("name"), it.str("icon").ifEmpty { "📦" }, it.str("type"))
         }

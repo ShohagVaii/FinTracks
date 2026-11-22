@@ -96,7 +96,9 @@ data class UiState(
     /** Local changes waiting to be sent (the "সিঙ্ক বাকি" count). Shown by the sync indicator, never as a toast. */
     val pendingSync: Int = 0,
     /** Sync problem text (offline, server refused, session renewal). Shown by the sync indicator, never as a toast. */
-    val syncError: String? = null
+    val syncError: String? = null,
+    /** Demo mode: amounts are shown as fake numbers. Saved on the device. */
+    val demo: Boolean = false
 ) {
     fun rows(table: String): List<JsonObject> = tables[table].orEmpty()
     val dark: Boolean get() = profile?.str("theme") != "light"
@@ -124,7 +126,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // A saved session opens the home screen at once, from the saved copy. The server is asked in the background,
         // so a slow or missing network never holds the entry screen.
         val hasSession = repo.session != null
-        _state.update { it.copy(signedIn = hasSession, checking = false) }
+        val savedDemo = getApplication<Application>().getSharedPreferences("fintracks", Context.MODE_PRIVATE).getBoolean("demo_mode", false)
+        _state.update { it.copy(signedIn = hasSession, checking = false, demo = savedDemo) }
         if (hasSession) publish(outbox.cached())
         viewModelScope.launch { outbox.pendingCount.collect { n -> _state.update { it.copy(pendingSync = n) } } }
         if (hasSession) viewModelScope.launch { runGuarded { loadAll() } }
@@ -589,6 +592,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (row != null && plain) _state.update { it.copy(undo = UndoEntry(table, row, System.nanoTime())) }
     }
 
+
+    /** Deletes several rows of one table in one local batch. Mirrored rows (debt / dues payments) follow the same rule as remove. */
+    fun removeMany(table: String, ids: List<String>) {
+        if (ids.isEmpty()) return
+        localChange(ids.flatMap { deleteOps(table, it) })
+    }
+
+    /** Turns demo mode on or off. Only the display changes; the saved data stays the same. */
+    fun setDemo(on: Boolean) {
+        getApplication<Application>().getSharedPreferences("fintracks", Context.MODE_PRIVATE).edit().putBoolean("demo_mode", on).apply()
+        _state.update { it.copy(demo = on) }
+    }
 
     fun undoRemove() {
         val u = state.value.undo ?: return

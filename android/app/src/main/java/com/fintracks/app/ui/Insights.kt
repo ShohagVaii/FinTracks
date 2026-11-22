@@ -132,13 +132,13 @@ fun InsightsCards(state: UiState) {
         } else {
             unusual.take(5).forEach { u ->
                 val pct = ((u.thisMonth - u.average) / u.average * 100).toInt()
-                Text(tr("${catIcon(u.category)} ${catLabel(u.category)}: এই মাসে ${taka(u.thisMonth, p)} (গড়ের চেয়ে +$pct%)", "${catIcon(u.category)} ${catLabel(u.category)}: this month ${taka(u.thisMonth, p)} (+$pct% vs average)"), fontSize = 13.sp, color = Color(0xFFF59E0B))
+                Text(tr("${catIcon(u.category)} ${catLabel(u.category)}: এই মাসে ${taka(u.thisMonth, p)} (গড়ের চেয়ে +$pct%)", "${catIcon(u.category)} ${catLabel(u.category)}: this month ${taka(u.thisMonth, p)} (+$pct% vs average)"), fontSize = 13.sp, color = Amber500)
             }
         }
     }
     AppCard {
         Text(tr("নেট ওয়ার্থ", "Net worth"), fontWeight = FontWeight.Bold)
-        KeyValue(tr("মোট সম্পদ − দেনা", "Total assets − debts"), taka(Insights.netWorth(state), p), Color(0xFF38BDF8))
+        KeyValue(tr("মোট সম্পদ − দেনা", "Total assets − debts"), taka(Insights.netWorth(state), p), ChartNet)
         Text(tr("সম্পদ: অ্যাকাউন্ট ব্যালেন্স + বিনিয়োগ। দেনা: অপরিশোধিত ধার ও লোনের বাকি।", "Assets: account balances + investments. Debts: unpaid loans and dues."), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -161,7 +161,7 @@ fun HeatmapCard(txs: List<JsonObject>, privacy: Boolean, ym: YearMonth, onPrev: 
         if (day in 1..days) perDay[day] += t.num("amount")
     }
     val max = (perDay.maxOrNull() ?: 0.0).coerceAtLeast(1.0)
-    val base = Color(0xFFF43F5E)
+    val base = Rose500
     val lead = first.dayOfWeek.value % 7 // Sunday = 0
     val cells: List<Int?> = List(lead) { null } + (1..days).map { it }
     fun shade(day: Int?): Float {

@@ -187,6 +187,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                 fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
+            SwitchRow(tr("ফেক মোড (DEMO): টাকার অঙ্ক বদলে দেখাবে", "Demo mode: show fake amounts"), state.demo) { vm.setDemo(it) }
             SwitchRow(tr("প্রাইভেসি মোড (টাকার পরিমাণ লুকানো)", "Privacy mode (hide amounts)"), state.privacy) {
                 vm.saveProfile(row("is_privacy_mode" to it))
             }

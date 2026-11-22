@@ -246,7 +246,7 @@ fun MoneyCounterScreen(vm: AppViewModel, showHistory: Boolean, onHistory: (Boole
 
     Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(tr("টাকা গণক", "Money counter"), fontWeight = FontWeight.Black, fontSize = 18.sp, modifier = Modifier.weight(1f))
+            Text(tr("টাকা গণক", "Money counter"), fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
             TextButton(onClick = { onHistory(true) }) { Text(tr("ইতিহাস ›", "History ›")) }
         }
 
@@ -269,13 +269,13 @@ fun MoneyCounterScreen(vm: AppViewModel, showHistory: Boolean, onHistory: (Boole
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF0F766E), Color(0xFF0EA5E9))))
+                .background(Brush.linearGradient(listOf(Tok_FF0F766E, Tok_FF0EA5E9)))
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(tr("সর্বমোট", "Grand total"), fontSize = 11.sp, color = Color.White.copy(alpha = 0.8f), letterSpacing = 2.sp)
-                    Text(bnDigits("৳ ${grouped(total)}"), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Color.White)
+                    Text(bnDigits("৳ ${grouped(total)}"), fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(tr("মোট নোট/কয়েন", "Notes/coins"), fontSize = 11.sp, color = Color.White.copy(alpha = 0.8f))
@@ -296,7 +296,7 @@ fun MoneyCounterScreen(vm: AppViewModel, showHistory: Boolean, onHistory: (Boole
                     }
                 },
                 enabled = total > 0,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF14B8A6), contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(containerColor = Tok_FF14B8A6, contentColor = Color.White),
                 modifier = Modifier.weight(1f)
             ) { Text(tr("সংরক্ষণ করুন", "Save")) }
         }
@@ -320,7 +320,7 @@ private fun NoteCell(denomination: Int, value: String, subtotal: Long, modifier:
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Column(Modifier.weight(1f)) {
-            Text(bnDigits("৳$denomination"), fontWeight = FontWeight.Black, fontSize = 17.sp)
+            Text(bnDigits("৳$denomination"), fontWeight = FontWeight.Bold, fontSize = 17.sp)
             Text(bnDigits("= ৳${grouped(subtotal)}"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
         Box(
@@ -329,7 +329,7 @@ private fun NoteCell(denomination: Int, value: String, subtotal: Long, modifier:
                 .height(40.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(Color.White.copy(alpha = 0.08f))
-                .border(1.dp, Color(0xFF14B8A6).copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                .border(1.dp, Tok_FF14B8A6.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
                 .padding(horizontal = 6.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -344,7 +344,7 @@ private fun NoteCell(denomination: Int, value: String, subtotal: Long, modifier:
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurface
                 ),
-                cursorBrush = SolidColor(Color(0xFF14B8A6)),
+                cursorBrush = SolidColor(Tok_FF14B8A6),
                 decorationBox = { inner ->
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         if (value.isEmpty()) Text(tr("কয়টা", "Count"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -365,7 +365,7 @@ private fun CounterHistory(store: CashCountStore, history: List<CountRecord>, on
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack) { Text(tr("‹ ফিরে যান", "‹ Back")) }
-            Text(tr("গণনার ইতিহাস", "Count history"), fontWeight = FontWeight.Black, fontSize = 18.sp)
+            Text(tr("গণনার ইতিহাস", "Count history"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
         }
         status?.let { Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         if (history.isEmpty()) EmptyHint(tr("এখনো কোনো সংরক্ষিত গণনা নেই", "No saved counts yet"))

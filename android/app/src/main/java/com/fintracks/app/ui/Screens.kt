@@ -1,5 +1,9 @@
 package com.fintracks.app.ui
 
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Checkbox
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.text.TextStyle
@@ -95,8 +99,8 @@ import com.fintracks.app.data.str
 import com.fintracks.app.data.strOrNull
 import kotlinx.serialization.json.JsonObject
 
-private val incomeGreen = Color(0xFF10B981)
-private val expenseRed = Color(0xFFF43F5E)
+private val incomeGreen = ChartIncome
+private val expenseRed = Rose500
 
 /**
  * Balance of one account from its opening balance and its income/expense rows.
@@ -182,14 +186,14 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(40.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF0B1F1C), VideoCardLift.copy(alpha = 0.6f))))
+                .background(Brush.linearGradient(listOf(Tok_FF0B1F1C, VideoCardLift.copy(alpha = 0.6f))))
                 .border(1.dp, incomeGreen.copy(alpha = 0.22f), RoundedCornerShape(40.dp))
                 .padding(24.dp)
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
                     Text(tr("নিট লাভ (PROFIT)", "Net profit (PROFIT)"), fontSize = 12.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(taka(net, p), fontSize = 36.sp, fontWeight = FontWeight.Black, color = if (net >= 0) incomeGreen else expenseRed)
+                    Text(taka(net, p), fontSize = 36.sp, fontWeight = FontWeight.Bold, color = if (net >= 0) incomeGreen else expenseRed)
                 }
                 Box(Modifier.size(64.dp).clip(CircleShape).background(incomeGreen.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.TrendingUp, contentDescription = null, tint = incomeGreen, modifier = Modifier.size(30.dp))
@@ -327,6 +331,13 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
     var customFrom by remember { mutableStateOf(todayIso().substring(0, 8) + "01") }
     var customTo by remember { mutableStateOf(todayIso()) }
     var busy by remember { mutableStateOf(false) }
+    // Bulk delete: long-press a row to start selecting; taps then toggle rows.
+    var selecting by remember { mutableStateOf(false) }
+    var picked by remember { mutableStateOf(setOf<String>()) }
+    var confirmBulk by remember { mutableStateOf(false) }
+    fun togglePick(id: String) { picked = if (id in picked) picked - id else picked + id }
+    fun endSelect() { selecting = false; picked = emptySet() }
+    BackHandler(enabled = selecting) { endSelect() }
     val range = rangeFor(period, customFrom, customTo)
     val all = state.rows("transactions").filter { segment == "history" || it.str("source").isNotEmpty() }
     val inRange = filterByRange(all, range)
@@ -351,7 +362,7 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StatPill(tr("আয়", "Income"), taka(income, state.privacy), incomeGreen, Modifier.weight(1f))
             StatPill(tr("ব্যয়", "Expense"), taka(expense, state.privacy), expenseRed, Modifier.weight(1f))
-            StatPill(tr("নিট", "Net"), taka(income - expense, state.privacy), Sky400, Modifier.weight(1f))
+            StatPill(tr("নিট", "Net"), taka(income - expense, state.privacy), ChartNet, Modifier.weight(1f))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf(Export.Format.XLSX to "Excel", Export.Format.PDF to "PDF", Export.Format.CSV to "CSV").forEach { (fmt, label) ->
@@ -380,15 +391,42 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                 }
             }) { Text(tr("ভাউচার", "Voucher"), maxLines = 1, softWrap = false, fontSize = 13.sp) }
         }
+        if (selecting) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(tr("${picked.size}টি নির্বাচিত", "${picked.size} selected"), modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                TextButton(enabled = picked.isNotEmpty(), onClick = { confirmBulk = true }) { Text(tr("মুছুন", "Delete"), color = Rose500) }
+                TextButton(onClick = { endSelect() }) { Text(tr("বাতিল", "Cancel")) }
+            }
+        }
+        if (confirmBulk) {
+            val chosen = state.rows("transactions").filter { it.id() in picked }
+            // Debt and dues rows keep their mirrored-delete rule: their payment records go too.
+            val linked = chosen.count { it.str("source") == "debt_payment" || it.str("source") == "personal_debt_payment" }
+            val warn = if (linked > 0) tr("\n\nএর মধ্যে $linked টি ধার/বাকি-সংযুক্ত লেনদেন আছে; সেগুলোর পরিশোধের রেকর্ডও মুছে যাবে।", "\n\n$linked of them are linked to debts or dues; their payment records will be deleted too.") else ""
+            ConfirmDialog(
+                text = tr("${chosen.size}টি লেনদেন মুছবেন?", "Delete ${chosen.size} transactions?") + warn,
+                confirmText = tr("মুছে ফেলুন", "Delete"),
+                cancelText = tr("বাতিল", "Cancel"),
+                onConfirm = {
+                    vm.removeMany("transactions", chosen.map { it.id() })
+                    confirmBulk = false
+                    endSelect()
+                },
+                onDismiss = { confirmBulk = false }
+            )
+        }
         if (filtered.isEmpty()) EmptyHint(tr("এই সময়সীমায় কোনো লেনদেন পাওয়া যায়নি", "No transactions found in this period"))
         // weight() keeps the list inside the remaining height; the bottom padding keeps the last row above the nav bar and the + button.
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f), contentPadding = PaddingValues(bottom = 120.dp)) {
             items(filtered, key = { it.id() }) { t ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (selecting) Checkbox(checked = t.id() in picked, onCheckedChange = { togglePick(t.id()) })
+                    Box(Modifier.weight(1f)) {
                 TxItem(
                     t, state,
-                    onClick = { openReceipt(t) },
-                    onLongClick = { onTxLongPress(t) },
-                    onDelete = { vm.remove("transactions", t.id()) },
+                    onClick = { if (selecting) togglePick(t.id()) else openReceipt(t) },
+                    onLongClick = { if (!selecting) { selecting = true; picked = setOf(t.id()) } },
+                    onDelete = if (selecting) null else { { vm.remove("transactions", t.id()) } },
                     onShare = {
                         scope.launch {
                             try {
@@ -400,6 +438,8 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                         }
                     }
                 )
+                    }
+                }
             }
         }
     }
@@ -492,6 +532,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         cameraLauncher.launch(uri)
     }
     val cats = categoriesFor(type)
+    var otherOpen by remember { mutableStateOf(category == OTHER_CAT || category !in cats.map { it.name }) }
     val accounts = state.rows("accounts")
 
     if (showCalc) {
@@ -529,7 +570,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
             Modifier
                 .fillMaxWidth(0.94f)
                 .clip(RoundedCornerShape(32.dp))
-                .background(Color(0xFF0B1220))
+                .background(Tok_FF0B1220)
                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(32.dp))
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
@@ -548,7 +589,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                             .weight(1f)
                             .clip(RoundedCornerShape(50))
                             .background(if (on) c else Color.Transparent)
-                            .clickable { type = key; category = if (key == "Income") "বেতন" else "খাদ্য" }
+                            .clickable { type = key; category = if (key == "Income") "বেতন" else "খাদ্য"; otherOpen = false }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -563,7 +604,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                     value = amount,
                     onValueChange = { amount = it },
                     placeholder = { Text("0.00", fontSize = 30.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                    textStyle = TextStyle(fontSize = 30.sp, fontWeight = FontWeight.Black),
+                    textStyle = TextStyle(fontSize = 30.sp, fontWeight = FontWeight.Bold),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     colors = TextFieldDefaults.colors(
@@ -588,13 +629,17 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                 if (type != "Transfer") {
                     Column(Modifier.weight(1f)) {
                         Text(if (type == "Income") tr("আয়ের উৎস", "Income source") else tr("ক্যাটাগরি", "Category"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        PickerField(category, cats.map { it.name to "${it.icon} ${catLabel(it.name)}" }) { category = it }
+                        PickerField(category, cats.map { it.name to "${it.icon} ${catLabel(it.name)}" }) { pick ->
+                            otherOpen = pick == OTHER_CAT
+                            category = pick
+                        }
                     }
                 }
                 Column(Modifier.weight(1f)) {
                     DateField(tr("তারিখ", "Date"), date, { date = it })
                 }
             }
+            if (otherOpen && type != "Transfer") OtherCategoryField(category) { category = it }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (accounts.isNotEmpty() && type != "Transfer") {
                     Column(Modifier.weight(1f)) {
@@ -797,7 +842,7 @@ fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
             Modifier
                 .fillMaxWidth(0.94f)
                 .clip(RoundedCornerShape(32.dp))
-                .background(Color(0xFF0B1220))
+                .background(Tok_FF0B1220)
                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(32.dp))
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)

@@ -127,7 +127,7 @@ fun TxActionDialog(t: JsonObject, onEdit: () -> Unit, onDelete: () -> Unit, onDi
                 Text(t.str("category").ifEmpty { tr("লেনদেন", "Transaction") }.let { catLabel(it) }, fontSize = 14.sp)
                 TextButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) { Text(tr("এডিট করুন", "Edit")) }
                 TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) {
-                    Text(tr("মুছে ফেলুন", "Delete"), color = Color(0xFFF43F5E))
+                    Text(tr("মুছে ফেলুন", "Delete"), color = Rose500)
                 }
             }
         },

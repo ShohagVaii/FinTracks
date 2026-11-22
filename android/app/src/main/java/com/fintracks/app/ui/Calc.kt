@@ -207,7 +207,7 @@ fun CalculatorDialog(onUse: (Double) -> Unit, onDismiss: () -> Unit) {
     }
     // Android 12+ blurs the window behind the popup, so a lighter tint shows the blur.
     // Older devices cannot blur, so the panel gets a darker tint to stay readable.
-    val glass = if (Build.VERSION.SDK_INT >= 31) Color(0x99101828) else Color(0xE6101828)
+    val glass = if (Build.VERSION.SDK_INT >= 31) Tok_99101828 else Tok_E6101828
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(
             Modifier.fillMaxSize().padding(24.dp).onSizeChanged { boxW = it.width; boxH = it.height },
@@ -220,7 +220,7 @@ fun CalculatorDialog(onUse: (Double) -> Unit, onDismiss: () -> Unit) {
                     .width(340.dp)
                     .clip(RoundedCornerShape(28.dp))
                     .background(glass)
-                    .border(1.dp, Color(0x40FFFFFF), RoundedCornerShape(28.dp))
+                    .border(1.dp, Tok_40FFFFFF, RoundedCornerShape(28.dp))
                     .padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -240,7 +240,7 @@ fun CalculatorDialog(onUse: (Double) -> Unit, onDismiss: () -> Unit) {
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Box(Modifier.width(44.dp).height(5.dp).background(Color(0x80FFFFFF), RoundedCornerShape(3.dp)))
+                    Box(Modifier.width(44.dp).height(5.dp).background(Tok_80FFFFFF, RoundedCornerShape(3.dp)))
                 }
                 Text(tr("ক্যালকুলেটর", "Calculator"), fontWeight = FontWeight.Bold, color = Color.White)
                 Text(if (expr.isEmpty()) "0" else expr, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.fillMaxWidth())
@@ -252,7 +252,7 @@ fun CalculatorDialog(onUse: (Double) -> Unit, onDismiss: () -> Unit) {
                         shown.lastComplete -> "= " + fmtNum(live) + tr("  (আগের সম্পূর্ণ মান)", "  (last complete value)")
                         else -> "= " + fmtNum(live)
                     },
-                    fontSize = 13.sp, color = Color(0xCCFFFFFF)
+                    fontSize = 13.sp, color = Tok_CCFFFFFF
                 )
                 keys.forEach { row ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -261,7 +261,7 @@ fun CalculatorDialog(onUse: (Double) -> Unit, onDismiss: () -> Unit) {
                                 Modifier
                                     .weight(1f)
                                     .height(52.dp)
-                                    .background(Color(0x55FFFFFF), RoundedCornerShape(14.dp))
+                                    .background(Tok_55FFFFFF, RoundedCornerShape(14.dp))
                                     .clickable { press(k) },
                                 contentAlignment = Alignment.Center
                             ) { Text(k, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Color.White) }

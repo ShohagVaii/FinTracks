@@ -211,7 +211,7 @@ fun NotesScreen(vm: AppViewModel) {
             Text(bnDigits(notes.size.toString()) + tr("টি নোট", " notes"), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
             Button(
                 onClick = { openId = null; editorOpen = true },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFACC15), contentColor = Color(0xFF1F2937))
+                colors = ButtonDefaults.buttonColors(containerColor = Tok_FFFACC15, contentColor = Tok_FF1F2937)
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
@@ -222,7 +222,7 @@ fun NotesScreen(vm: AppViewModel) {
             Text(
                 tr("অফলাইন: ", "Offline: ") + bnDigits(pendingCount.toString()) + tr("টি পরিবর্তন সিঙ্ক বাকি। সংযোগ পেলে আপনাআপনি যাবে।", " changes waiting to sync. They sync automatically when online."),
                 fontSize = 12.sp,
-                color = Color(0xFFFACC15)
+                color = Tok_FFFACC15
             )
         }
         OutlinedTextField(

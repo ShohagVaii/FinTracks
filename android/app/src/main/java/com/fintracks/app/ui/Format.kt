@@ -4,10 +4,21 @@ import java.time.LocalDate
 import java.util.Locale
 
 /** Money in taka. Privacy mode masks the amount, like the web app. */
+/**
+ * Demo mode: every amount that is shown on screen (and sent to the AI summary) goes through here.
+ * It changes only the displayed number; the stored data is never touched. Receipts and vouchers do not use it.
+ */
+fun shownAmount(value: Double): Double {
+    if (!AppPrefs.demo || value == 0.0) return value
+    val fake = Math.round(Math.abs(value) * 1.9 + 137.0).toDouble()
+    return if (value < 0) -fake else fake
+}
+
 fun taka(value: Double, privacy: Boolean = false): String {
     if (privacy) return AppPrefs.symbol + " ••••"
-    val whole = value % 1.0 == 0.0
-    val body = String.format(Locale.US, if (whole) "%,.0f" else "%,.2f", value)
+    val shown = shownAmount(value)
+    val whole = shown % 1.0 == 0.0
+    val body = String.format(Locale.US, if (whole) "%,.0f" else "%,.2f", shown)
     return AppPrefs.symbol + " " + (if (AppPrefs.english) body else bnDigits(body))
 }
 

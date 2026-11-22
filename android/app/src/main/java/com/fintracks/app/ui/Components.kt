@@ -1,5 +1,11 @@
 package com.fintracks.app.ui
 
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.Group
@@ -63,9 +69,11 @@ import androidx.compose.foundation.verticalScroll
 /** Glass-style card, like the web app's `.glass` class. */
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
-fun AppCard(onClick: (() -> Unit)? = null, borderColor: Color = Color.White.copy(alpha = 0.08f), onLongClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
-    val colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    val border = BorderStroke(1.dp, borderColor)
+fun AppCard(onClick: (() -> Unit)? = null, borderColor: Color? = null, onLongClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+    // Dark mode uses the web glass card (white 3% fill, white 10% border); light mode keeps its surface.
+    val darkNow = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val colors = CardDefaults.cardColors(containerColor = if (darkNow) GlassFill else MaterialTheme.colorScheme.surface)
+    val border = BorderStroke(1.dp, borderColor ?: if (darkNow) GlassBorder else Color.White.copy(alpha = 0.08f))
     val inner: @Composable ColumnScope.() -> Unit = {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp), content = content)
     }
@@ -262,4 +270,26 @@ fun FloatingSmsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     ) {
         M3Icon(Icons.Outlined.Sms, contentDescription = "SMART SMS PARSER", tint = Sky400, modifier = Modifier.size(24.dp))
     }
+}
+
+/** The catch-all category. Picking it, or a custom name typed in the box, is saved as the category itself. */
+const val OTHER_CAT = "অন্যান্য"
+
+/**
+ * Text box that opens when "অন্যান্য" is picked. Whatever is typed becomes the category name.
+ * Left empty, the category stays "অন্যান্য". The caller decides when to show it.
+ */
+@Composable
+fun OtherCategoryField(value: String, onChange: (String) -> Unit) {
+    var text by rememberSaveable { mutableStateOf(if (value == OTHER_CAT) "" else value) }
+    OutlinedTextField(
+        value = text,
+        onValueChange = {
+            text = it.take(40)
+            onChange(text.trim().ifEmpty { OTHER_CAT })
+        },
+        label = { Text(tr("অন্যান্য: নিজের খাতের নাম (ঐচ্ছিক)", "Other: your own category name (optional)")) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
 }

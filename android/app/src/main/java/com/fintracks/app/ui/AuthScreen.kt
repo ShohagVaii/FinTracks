@@ -65,7 +65,7 @@ fun AuthScreen(
         Text(
             "FinTracks",
             style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Black,
+            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
         Text(

@@ -29,7 +29,7 @@ enum class AccentColor(val key: String, private val bnLabel: String, private val
 // Colour grading sampled from the FinTrack walkthrough video and screenshots (Drive "FinTrack" folder):
 // the dark background is a blue-black (#000010 to #080818), cards lift slightly to #101828 / #181828,
 // and the primary accent is a sky blue close to #08A0E8.
-val VideoBackground = Color(0xFF05060F)
+val VideoBackground = Color(0xFF020617)
 val VideoCardLift = Color(0xFF101828)
 val VideoAccent = Color(0xFF08A0E8)
 val Slate950 = Color(0xFF020617)
@@ -50,6 +50,19 @@ val Rose500 = Color(0xFFF43F5E)
 val Amber500 = Color(0xFFF59E0B)
 val Amber400 = Color(0xFFFBBF24)
 val Indigo400 = Color(0xFF818CF8)
+val Violet600 = Color(0xFF7C3AED)
+val Indigo600 = Color(0xFF4F46E5)
+
+// Web tokens (the web app's Tailwind values). Charts use these fixed colours; income, expense and net keep their own.
+val ChartIncome = Emerald500
+val ChartExpense = Rose500
+val ChartNet = Color(0xFF38BDF8)
+/** Glass card: white 3% fill with a white 10% border (dark mode). */
+val GlassFill = Color.White.copy(alpha = 0.03f)
+val GlassBorder = Color.White.copy(alpha = 0.10f)
+/** Pie / category colour order from the web app. */
+val PieColors = listOf(Color(0xFF38BDF8), Color(0xFF818CF8), Color(0xFFFBBF24), Color(0xFFF472B6), Color(0xFF34D399), Color(0xFF94A3B8))
+
 
 /** Hind Siliguri (res/font) — the web app's font. */
 val HindFamily = FontFamily(
@@ -87,7 +100,7 @@ fun FinTracksTheme(dark: Boolean, accent: AccentColor, content: @Composable () -
             onPrimary = Slate950,
             background = VideoBackground,
             onBackground = Color.White,
-            surface = VideoCardLift.copy(alpha = 0.6f),
+            surface = Slate900,
             onSurface = Color.White,
             surfaceVariant = Slate800,
             onSurfaceVariant = Slate400,
@@ -110,3 +123,32 @@ fun FinTracksTheme(dark: Boolean, accent: AccentColor, content: @Composable () -
     }
     MaterialTheme(colorScheme = scheme, typography = Typography().withFamily(HindFamily), content = content)
 }
+
+// Colour literals that used to be scattered through the screens. Moved here so each one has one definition.
+val Tok_40FFFFFF = Color(0x40FFFFFF)
+val Tok_55FFFFFF = Color(0x55FFFFFF)
+val Tok_66888888 = Color(0x66888888)
+val Tok_80FFFFFF = Color(0x80FFFFFF)
+val Tok_99101828 = Color(0x99101828)
+val Tok_CCFFFFFF = Color(0xCCFFFFFF)
+val Tok_E6101828 = Color(0xE6101828)
+val Tok_FF0B1220 = Color(0xFF0B1220)
+val Tok_FF0B1F1C = Color(0xFF0B1F1C)
+val Tok_FF0EA5E9 = Color(0xFF0EA5E9)
+val Tok_FF0F766E = Color(0xFF0F766E)
+val Tok_FF14B8A6 = Color(0xFF14B8A6)
+val Tok_FF1E1B4B = Color(0xFF1E1B4B)
+val Tok_FF1F2937 = Color(0xFF1F2937)
+val Tok_FF2DD4BF = Color(0xFF2DD4BF)
+val Tok_FF34D399 = Color(0xFF34D399)
+val Tok_FF3730A3 = Color(0xFF3730A3)
+val Tok_FF60A5FA = Color(0xFF60A5FA)
+val Tok_FF6D5BF5 = Color(0xFF6D5BF5)
+val Tok_FF84CC16 = Color(0xFF84CC16)
+val Tok_FFA78BFA = Color(0xFFA78BFA)
+val Tok_FFC7D2FE = Color(0xFFC7D2FE)
+val Tok_FFDB2777 = Color(0xFFDB2777)
+val Tok_FFE879F9 = Color(0xFFE879F9)
+val Tok_FFFACC15 = Color(0xFFFACC15)
+val Tok_FFFB7185 = Color(0xFFFB7185)
+val Tok_FFFB923C = Color(0xFFFB923C)

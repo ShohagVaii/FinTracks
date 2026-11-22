@@ -135,7 +135,7 @@ object Assistant {
 /** Short financial summary sent to the AI (no raw rows; amounts hidden in privacy mode). */
 fun aiContext(state: UiState): String {
     val p = state.privacy
-    fun m(v: Double) = if (p) "***" else fmtNum(v)
+    fun m(v: Double) = if (p) "***" else fmtNum(shownAmount(v))
     val month = monthPrefix()
     val txs = state.rows("transactions").filter { dateOf(it, "tx_date").startsWith(month) }
     // Same calculation as the Dashboard (flowTotals). Debts are listed separately below and are never added to income or expense.
@@ -219,13 +219,13 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
         }
     }
 
-    val purple = Color(0xFF7C3AED)
+    val purple = Violet600
     Column(Modifier.fillMaxSize()) {
         // Purple advisor header, like the reference "Ask FinTrack AI" bar.
         Row(
             Modifier
                 .fillMaxWidth()
-                .background(Brush.horizontalGradient(listOf(Color(0xFF1E1B4B), Color(0xFF3730A3))))
+                .background(Brush.horizontalGradient(listOf(Tok_FF1E1B4B, Tok_FF3730A3)))
                 .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -237,7 +237,7 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("Ask FinTrack AI", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text("PREMIUM ADVISOR", color = Color(0xFFC7D2FE), fontSize = 10.sp, letterSpacing = 2.sp)
+                Text("PREMIUM ADVISOR", color = Tok_FFC7D2FE, fontSize = 10.sp, letterSpacing = 2.sp)
             }
             IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close"), tint = Color.White) }
         }
@@ -282,7 +282,7 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
                 Modifier
                     .size(54.dp)
                     .clip(CircleShape)
-                    .background(Brush.linearGradient(listOf(Color(0xFF7C3AED), Color(0xFF4F46E5))))
+                    .background(Brush.linearGradient(listOf(Violet600, Indigo600)))
                     .clickable(enabled = input.isNotBlank() && !thinking) { send(input) },
                 contentAlignment = Alignment.Center
             ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = tr("পাঠান", "Send"), tint = Color.White) }
@@ -299,7 +299,7 @@ private fun ChatBubble(msg: ChatMsg, thinking: Boolean, onRetry: () -> Unit, onL
             Modifier
                 .fillMaxWidth(0.82f)
                 .clip(RoundedCornerShape(20.dp))
-                .background(if (mine) Color(0xFF7C3AED) else MaterialTheme.colorScheme.surface)
+                .background(if (mine) Violet600 else MaterialTheme.colorScheme.surface)
                 .border(1.dp, if (mine) Color.Transparent else Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
                 .padding(14.dp)
         ) {
@@ -309,7 +309,7 @@ private fun ChatBubble(msg: ChatMsg, thinking: Boolean, onRetry: () -> Unit, onL
                     "assistant" -> "FinTrack AI"
                     else -> ""
                 }
-                if (label.isNotEmpty()) Text(label, fontSize = 10.sp, color = Color(0xFFA78BFA), letterSpacing = 1.sp)
+                if (label.isNotEmpty()) Text(label, fontSize = 10.sp, color = Tok_FFA78BFA, letterSpacing = 1.sp)
                 Text(msg.text, color = if (mine) Color.White else MaterialTheme.colorScheme.onSurface, lineHeight = 22.sp)
                 if (msg.at.isNotEmpty()) {
                     Text(
@@ -323,12 +323,12 @@ private fun ChatBubble(msg: ChatMsg, thinking: Boolean, onRetry: () -> Unit, onL
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Text(
                             tr("আবার চেষ্টা করুন", "Retry"),
-                            color = Color(0xFFA78BFA), fontWeight = FontWeight.Bold,
+                            color = Tok_FFA78BFA, fontWeight = FontWeight.Bold,
                             modifier = Modifier.clickable(enabled = !thinking) { if (msg.question.isNotEmpty()) onRetry() }
                         )
                         Text(
                             tr("লোকাল ডাটা থেকে উত্তর দেখুন", "Show answer from local data"),
-                            color = Color(0xFFA78BFA), fontWeight = FontWeight.Bold,
+                            color = Tok_FFA78BFA, fontWeight = FontWeight.Bold,
                             modifier = Modifier.clickable { onLocal() }
                         )
                     }

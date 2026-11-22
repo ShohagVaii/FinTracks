@@ -98,7 +98,7 @@ object Web {
 }
 
 fun fmtMoney(v: Double): String {
-    val body = String.format(Locale.US, "%,.0f", v)
+    val body = String.format(Locale.US, "%,.0f", shownAmount(v))
     return AppPrefs.symbol + " " + (if (AppPrefs.english) body else bnDigits(body))
 }
 
@@ -130,22 +130,22 @@ private const val TOOLS_ORDER_KEY = "tools_order"
 private const val TOOLS_PER_ROW = 3
 
 private fun defaultTools(): List<ToolTile> = listOf(
-    ToolTile(Overlay.CHAT, "AI সহকারী", Icons.Default.Info, Color(0xFF818CF8)),
-    ToolTile(Overlay.REPORTS, "রিপোর্ট", Icons.Default.Star, Color(0xFF38BDF8)),
-    ToolTile(Overlay.LOAN, "লোন", Icons.Default.CreditCard, Color(0xFFF59E0B)),
-    ToolTile(Overlay.ZAKAT, "যাকাত", Icons.Default.AccountBalance, Color(0xFF10B981)),
-    ToolTile(Overlay.DEBTS, "ধার ও পাওনা", Icons.Default.Work, Color(0xFFF43F5E)),
-    ToolTile(Overlay.INVESTMENTS, "সম্পদ", Icons.Default.Landscape, Color(0xFF34D399)),
-    ToolTile(Overlay.TAX, "ট্যাক্স", Icons.Default.Receipt, Color(0xFFFB7185)),
-    ToolTile(Overlay.CURRENCY, "কনভার্টার", Icons.Default.Refresh, Color(0xFF60A5FA)),
-    ToolTile(Overlay.SUBSCRIPTIONS, "সাবস্ক্রিপশন", Icons.Default.Repeat, Color(0xFFA78BFA)),
-    ToolTile(Overlay.CREDIT, "বাকি খাতা", Icons.Default.Receipt, Color(0xFFFBBF24)),
-    ToolTile(Overlay.BUDGETS, "বাজেট", Icons.Default.Check, Color(0xFF2DD4BF)),
-    ToolTile(Overlay.GOALS, "লক্ষ্য", Icons.Default.Star, Color(0xFFFB923C)),
-    ToolTile(Overlay.ACCOUNTS, "অ্যাকাউন্ট", Icons.Default.Add, Color(0xFF94A3B8)),
-    ToolTile(Overlay.COUNTER, "টাকা গণক", Icons.Default.Payments, Color(0xFF84CC16)),
-    ToolTile(Overlay.AGE, "বয়স ক্যালকুলেটর", Icons.Default.Cake, Color(0xFFE879F9)),
-    ToolTile(Overlay.NOTES, "নোটপ্যাড", Icons.Default.Description, Color(0xFFFACC15))
+    ToolTile(Overlay.CHAT, "AI সহকারী", Icons.Default.Info, Indigo400),
+    ToolTile(Overlay.REPORTS, "রিপোর্ট", Icons.Default.Star, ChartNet),
+    ToolTile(Overlay.LOAN, "লোন", Icons.Default.CreditCard, Amber500),
+    ToolTile(Overlay.ZAKAT, "যাকাত", Icons.Default.AccountBalance, Emerald500),
+    ToolTile(Overlay.DEBTS, "ধার ও পাওনা", Icons.Default.Work, Rose500),
+    ToolTile(Overlay.INVESTMENTS, "সম্পদ", Icons.Default.Landscape, Tok_FF34D399),
+    ToolTile(Overlay.TAX, "ট্যাক্স", Icons.Default.Receipt, Tok_FFFB7185),
+    ToolTile(Overlay.CURRENCY, "কনভার্টার", Icons.Default.Refresh, Tok_FF60A5FA),
+    ToolTile(Overlay.SUBSCRIPTIONS, "সাবস্ক্রিপশন", Icons.Default.Repeat, Tok_FFA78BFA),
+    ToolTile(Overlay.CREDIT, "বাকি খাতা", Icons.Default.Receipt, Amber400),
+    ToolTile(Overlay.BUDGETS, "বাজেট", Icons.Default.Check, Tok_FF2DD4BF),
+    ToolTile(Overlay.GOALS, "লক্ষ্য", Icons.Default.Star, Tok_FFFB923C),
+    ToolTile(Overlay.ACCOUNTS, "অ্যাকাউন্ট", Icons.Default.Add, Slate400),
+    ToolTile(Overlay.COUNTER, "টাকা গণক", Icons.Default.Payments, Tok_FF84CC16),
+    ToolTile(Overlay.AGE, "বয়স ক্যালকুলেটর", Icons.Default.Cake, Tok_FFE879F9),
+    ToolTile(Overlay.NOTES, "নোটপ্যাড", Icons.Default.Description, Tok_FFFACC15)
 )
 
 /** Saved order is stored by tile label on this device. Unknown labels are dropped; new tiles go to the end. */
@@ -176,7 +176,7 @@ fun ToolsScreen(onOpen: (Overlay) -> Unit) {
     }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Financial Hub", fontSize = 24.sp, fontWeight = FontWeight.Black)
+        Text("Financial Hub", fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Text("FINTRACK PREMIUM TOOLS GRID", fontSize = 10.sp, letterSpacing = 2.sp, color = Slate500)
         Text(
             tr("ধরে টেনে ক্রম বদলান", "Press and hold, then drag to reorder"),
@@ -300,7 +300,7 @@ fun ZakatScreen(state: UiState) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AppCard {
             Text(tr("যাকাত ক্যালকুলেটর", "Zakat calculator"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Text(tr("ক্যাশ: ${fmtMoney(cash)}", "Cash: ${fmtMoney(cash)}"), color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold)
+            Text(tr("ক্যাশ: ${fmtMoney(cash)}", "Cash: ${fmtMoney(cash)}"), color = Amber400, fontWeight = FontWeight.Bold)
             Text(tr("ইনভেস্টমেন্ট/সম্পদ: ${fmtMoney(assets)}", "Investments/assets: ${fmtMoney(assets)}"), fontSize = 13.sp)
             TextIn(tr("স্বর্ণ (৳)", "Gold (৳)"), gold, { gold = it }, number = true)
             TextIn(tr("রূপা (৳)", "Silver (৳)"), silver, { silver = it }, number = true)
@@ -318,7 +318,7 @@ fun ZakatScreen(state: UiState) {
         }
         AppCard {
             Text(tr("প্রদেয় যাকাত (২.৫%)", "Zakat due (2.5%)"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(if (zakat == null) "—" else fmtMoney(zakat), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Color(0xFFFBBF24))
+            Text(if (zakat == null) "—" else fmtMoney(zakat), fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Amber400)
             val status = when {
                 nisab == null -> tr("নিসাব না জানা পর্যন্ত যাকাত হিসাব করা যাবে না।", "Zakat cannot be worked out until the nisab is known.")
                 wealth >= nisab -> tr("সম্পদ নিসাবের সমান বা বেশি, তাই যাকাত দেওয়ার পর্যায়ে।", "Assets meet or exceed the nisab, so zakat is due.")
@@ -374,7 +374,7 @@ fun TaxScreen(state: UiState) {
         }
         AppCard {
             Text(tr("মোট ট্যাক্স", "Total tax"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(fmtMoney(tax), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Rose500)
+            Text(fmtMoney(tax), fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Rose500)
             Text(tr("কার্যকর হার", "Effective rate") + ": ${bnDigits(if (inc > 0) String.format(Locale.US, "%.2f", tax / inc * 100) else "0.00")}%", fontSize = 12.sp)
         }
         Text(
@@ -426,7 +426,7 @@ fun CurrencyScreen() {
         AppCard {
             Text(tr("ফলাফল", "Result"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (result != null) {
-                Text(bnDigits(String.format(Locale.US, "%,.2f", result)) + " $to", fontSize = 26.sp, fontWeight = FontWeight.Black, color = Color(0xFF34D399))
+                Text(bnDigits(String.format(Locale.US, "%,.2f", result)) + " $to", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Tok_FF34D399)
             } else {
                 Text(tr("রেট পাওয়া যায়নি। ইন্টারনেট দিয়ে একবার রেট আনুন।", "No rate yet. Fetch rates once with internet."), fontSize = 13.sp, color = Rose500)
             }
@@ -543,10 +543,10 @@ fun ReportsScreen(state: UiState) {
         Text(range.label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         InsightsCards(state)
         AppCard {
-            KeyValue(tr("আয়", "Income"), taka(income, p), Color(0xFF10B981))
-            KeyValue(tr("ব্যয়", "Expense"), taka(expense, p), Color(0xFFF43F5E))
-            KeyValue(tr("নিট", "Net"), taka(income - expense, p), Color(0xFF38BDF8))
-            KeyValue(tr("লেনদেন সংখ্যা", "Transactions"), txs.size.toString(), Color(0xFF94A3B8))
+            KeyValue(tr("আয়", "Income"), taka(income, p), Emerald500)
+            KeyValue(tr("ব্যয়", "Expense"), taka(expense, p), Rose500)
+            KeyValue(tr("নিট", "Net"), taka(income - expense, p), ChartNet)
+            KeyValue(tr("লেনদেন সংখ্যা", "Transactions"), txs.size.toString(), Slate400)
         }
         AppCard {
             Text(tr("আয় বনাম ব্যয় (সারসংক্ষেপ)", "Income vs expense (summary)"), fontWeight = FontWeight.Bold)
@@ -614,7 +614,7 @@ private fun IntelligenceCard(onOpen: () -> Unit) {
         Box(
             Modifier
                 .clip(RoundedCornerShape(50))
-                .background(Color(0xFF6D5BF5))
+                .background(Tok_FF6D5BF5)
                 .clickable(onClick = onOpen)
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {

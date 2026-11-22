@@ -30,8 +30,8 @@ import com.fintracks.app.data.strOrNull
 import kotlinx.serialization.json.JsonObject
 import java.time.YearMonth
 
-private val red = Color(0xFFF43F5E)
-private val green = Color(0xFF10B981)
+private val red = Rose500
+private val green = Emerald500
 
 // ======================= বাজেট এনভেলপ (rollover) =======================
 
@@ -110,6 +110,7 @@ fun BudgetsScreen(state: UiState, vm: AppViewModel) {
     if (showing || editing != null) {
         val existing = budgets.firstOrNull { it.id() == editing }
         var category by remember { mutableStateOf(existing?.str("category") ?: "খাদ্য") }
+        var otherOpen by remember { mutableStateOf(category == OTHER_CAT || category !in ALL_CATS.map { it.name }) }
         var limit by remember { mutableStateOf(existing?.let { fmtNum(it.num("monthly_limit")) } ?: "") }
         var rollover by remember { mutableStateOf(existing?.bool("rollover") == true) }
         FormDialog(tr("মাসিক বাজেট", "Monthly budget"), onDismiss = { showing = false; editing = null }, onConfirm = {
@@ -122,7 +123,11 @@ fun BudgetsScreen(state: UiState, vm: AppViewModel) {
             }
         }) {
             Text(tr("ক্যাটাগরি", "Category"), fontSize = 12.sp)
-            ChoiceChips(ALL_CATS.map { it.name to "${it.icon} ${it.name}" }.distinctBy { it.first }, category) { category = it }
+            ChoiceChips(ALL_CATS.map { it.name to "${it.icon} ${it.name}" }.distinctBy { it.first }, category) { pick ->
+                otherOpen = pick == OTHER_CAT
+                category = pick
+            }
+            if (otherOpen) OtherCategoryField(category) { category = it }
             TextIn(tr("মাসিক সীমা (৳)", "Monthly limit (৳)"), limit, { limit = it }, number = true)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(tr("অব্যবহৃত টাকা পরের মাসে নিয়ে যাবে", "Unused money carries to next month"), fontSize = 13.sp, modifier = Modifier.weight(1f))

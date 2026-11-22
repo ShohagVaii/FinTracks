@@ -46,10 +46,10 @@ import kotlinx.serialization.json.put
  * পরিশোধ পুরোনো কেনা থেকে ক্রমানুসারে মেটে (FIFO), তাই প্রতিটি কেনার অবস্থা জানা যায়।
  */
 
-private val BakiRed = Color(0xFFF43F5E)
-private val BakiGreen = Color(0xFF10B981)
-private val BakiAmber = Color(0xFFF59E0B)
-private val BakiSky = Color(0xFF38BDF8)
+private val BakiRed = Rose500
+private val BakiGreen = Emerald500
+private val BakiAmber = Amber500
+private val BakiSky = ChartNet
 private const val EPS = 0.005
 
 enum class BakiStatus(private val bnLabel: String, private val enLabel: String, val color: Color) {
@@ -127,7 +127,7 @@ fun CreditDueCard(state: UiState, onOpen: () -> Unit) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
                 Text(tr("মোট বাকি দেনা", "Total credit due"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                Text(taka(due, p), fontSize = 22.sp, fontWeight = FontWeight.Black, color = BakiRed)
+                Text(taka(due, p), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = BakiRed)
                 Text(tr("দোকানের বাকি · ধার/লোন থেকে আলাদা", "Shop credit · separate from loans"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (overdue > 0) Text(tr("$overdue টি মেয়াদোত্তীর্ণ", "$overdue overdue"), color = BakiRed, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -154,7 +154,7 @@ fun BakiScreen(state: UiState, vm: AppViewModel) {
     Page {
         AppCard {
             Text(tr("মোট বাকি দেনা", "Total credit due"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-            Text(taka(totalDue, p), fontSize = 26.sp, fontWeight = FontWeight.Black, color = BakiRed)
+            Text(taka(totalDue, p), fontSize = 26.sp, fontWeight = FontWeight.Bold, color = BakiRed)
             if (overdue > 0) Text(tr("$overdue টি কেনার শেষ তারিখ পার হয়ে গেছে", "$overdue purchases past due date"), fontSize = 12.sp, color = BakiRed)
             Text(tr("ধার/লোন থেকে আলাদা হিসাব। দোকান ও ব্যক্তির বাকি এখানে।", "Separate from loans. Shop and personal credit is here."), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

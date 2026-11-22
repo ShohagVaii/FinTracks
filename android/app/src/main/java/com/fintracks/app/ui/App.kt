@@ -180,6 +180,7 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
             SyncIndicator(state)
             if (overlay == null) {
                 Header(
+                    demo = state.demo,
                     privacy = state.privacy,
                     dark = state.dark,
                     onCalc = { showCalc = true },
@@ -242,6 +243,7 @@ class TxEditor(val row: JsonObject?)
 
 @Composable
 private fun Header(
+    demo: Boolean,
     privacy: Boolean,
     dark: Boolean,
     onCalc: () -> Unit,
@@ -257,7 +259,19 @@ private fun Header(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text("FinTrack", color = MaterialTheme.colorScheme.primary, fontSize = 26.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("FinTrack", color = MaterialTheme.colorScheme.primary, fontSize = 26.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                if (demo) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "DEMO",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Rose500).padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
             Text("PREMIUM FINANCE", color = Slate400, fontSize = 9.sp, letterSpacing = 3.sp)
         }
         HeaderIcon(Icons.Default.Calculate, tr("ক্যালকুলেটর", "Calculator"), onCalc)

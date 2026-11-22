@@ -53,8 +53,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 
-private val green = Color(0xFF10B981)
-private val red = Color(0xFFF43F5E)
+private val green = Emerald500
+private val red = Rose500
 
 /** Column wrapper with the standard padding used by every tool screen. */
 @Composable

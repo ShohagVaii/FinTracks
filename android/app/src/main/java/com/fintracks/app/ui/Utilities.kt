@@ -163,14 +163,14 @@ fun AgeCalcScreen() {
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(28.dp))
-                        .background(Brush.linearGradient(listOf(Color(0xFFDB2777), Color(0xFF7C3AED))))
+                        .background(Brush.linearGradient(listOf(Tok_FFDB2777, Violet600)))
                         .padding(22.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(tr("আপনার বয়স", "Your age"), fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f), letterSpacing = 2.sp)
                     Text(
                         bnDigits(tr("${result.period.years} বছর", "${result.period.years} years")),
-                        fontSize = 34.sp, fontWeight = FontWeight.Black, color = Color.White
+                        fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Color.White
                     )
                     Text(
                         bnDigits(tr("${result.period.months} মাস ${result.period.days} দিন", "${result.period.months} months ${result.period.days} days")),
@@ -183,7 +183,7 @@ fun AgeCalcScreen() {
                     KeyValue(
                         tr("জন্মদিন বাকি", "Days to birthday"),
                         if (result.daysToBirthday == 0L) tr("আজ! জন্মদিন মুবারক", "Today! Happy birthday") else bnDigits(tr("${result.daysToBirthday} দিন", "${result.daysToBirthday} days")),
-                        Color(0xFFE879F9)
+                        Tok_FFE879F9
                     )
                     KeyValue(tr("জন্মের বার", "Day of birth"), bnWeekday(result.weekday))
                 }

@@ -89,8 +89,8 @@ import java.util.Locale
 // দেনা (direction = owe) = আমি এই ব্যক্তির কাছে নিয়েছি। পাওনা (direction = owed) = এই ব্যক্তি আমার কাছে পাবে।
 // বাকি খাতা এই মডিউলের অংশ নয়।
 
-private val DebtViolet = Color(0xFF7C3AED)
-private val DebtIndigo = Color(0xFF4F46E5)
+private val DebtViolet = Violet600
+private val DebtIndigo = Indigo600
 
 /** Local date and time of a server timestamp, e.g. "19-11-2026 14:05:09" (digits follow the language setting). */
 fun debtStamp(ts: String): String = runCatching {
@@ -173,7 +173,7 @@ private fun DebtGradientButton(text: String, enabled: Boolean, onClick: () -> Un
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
-    ) { Text(text, color = Color.White, fontWeight = FontWeight.Black, fontSize = 13.sp) }
+    ) { Text(text, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
 }
 
 @Composable
@@ -195,7 +195,7 @@ private fun AddPill(text: String, modifier: Modifier, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ConfirmDialog(text: String, confirmText: String, cancelText: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+fun ConfirmDialog(text: String, confirmText: String, cancelText: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         text = { Text(text) },
@@ -216,7 +216,7 @@ private fun DebtFormDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title, fontWeight = FontWeight.Black) },
+        title = { Text(title, fontWeight = FontWeight.Bold) },
         text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp), content = content) },
         confirmButton = { DebtGradientButton(confirmText, confirmEnabled, onConfirm) },
         dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
@@ -227,7 +227,7 @@ private fun DebtFormDialog(
 private fun DashedDivider() {
     Canvas(Modifier.fillMaxWidth().height(1.dp)) {
         drawLine(
-            color = Color(0x66888888),
+            color = Tok_66888888,
             start = Offset(0f, 0f),
             end = Offset(size.width, 0f),
             strokeWidth = 2f,
@@ -274,7 +274,7 @@ private fun TabItem(label: String, selected: Boolean, modifier: Modifier, onClic
     ) {
         Text(
             label,
-            fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
             color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(6.dp))
@@ -547,7 +547,7 @@ private fun PersonCard(
     AppCard(onClick = onOpen) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(person.str("name"), fontWeight = FontWeight.Black, fontSize = 16.sp)
+                Text(person.str("name"), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Text(
                     tr("দেনা - ", "I owe - ") + taka(owe, p) + tr(" । পাওনা - ", " · Owed to me - ") + taka(owed, p),
                     fontSize = 13.sp,
@@ -614,7 +614,7 @@ private fun PersonDetail(
                     fontSize = 12.sp,
                     color = Color.White.copy(alpha = 0.85f)
                 )
-                Text(taka(total, p), fontSize = 28.sp, fontWeight = FontWeight.Black, color = Color.White)
+                Text(taka(total, p), fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
             AnimatedContent(
                 targetState = tab,
@@ -737,10 +737,10 @@ private fun EntryCard(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(entry.str("note"), fontWeight = FontWeight.Black, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(entry.str("note"), fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(debtStamp(entry.str("created_at")), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text(taka(remaining, privacy), fontWeight = FontWeight.Black, fontSize = 17.sp, color = accent)
+            Text(taka(remaining, privacy), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = accent)
         }
         DebtProgress(fraction, accent)
     }
@@ -778,7 +778,7 @@ private fun EntryDetail(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(entry.str("note"), fontWeight = FontWeight.Black, fontSize = 18.sp)
+            Text(entry.str("note"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Text(tr("তারিখ - ", "Date - ") + debtStamp(entry.str("created_at")), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DetailStat(tr("মোট", "Total"), taka(amount, privacy), MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
