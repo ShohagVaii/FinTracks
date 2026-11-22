@@ -41,7 +41,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
-import androidx.compose.foundation.layout.matchParentSize
 
 /*
  * বাকি খাতা: দোকান → কেনা (একাধিক আইটেম + ± সমন্বয়) → পরিশোধের কিস্তি।
