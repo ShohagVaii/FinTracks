@@ -176,7 +176,7 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
                     }
                 }
                 g.strOrNull("deadline")?.let { Text(tr("শেষ তারিখ: ${it.take(10)}", "Due: ${it.take(10)}"), fontSize = 11.sp) }
-                OutlinedButton(onClick = { topUp = g }) { Text(tr("জমা / তোলা", "Deposit / withdraw")) }
+                OutlinedButton(modifier = Modifier.pressScale(), onClick = { topUp = g }) { Text(tr("জমা / তোলা", "Deposit / withdraw")) }
             }
         }
     }
@@ -232,12 +232,12 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
                 Text("\"${c.goalName}\" goal: ${taka(c.saved, p)} saved. Keep going!")
             },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(modifier = Modifier.pressScale(), onClick = {
                     MilestoneCard.share(ctx, c)
                     vm.dismissCelebration()
                 }) { Text(tr("শেয়ার কার্ড", "Share card")) }
             },
-            dismissButton = { TextButton(onClick = { vm.dismissCelebration() }) { Text(tr("বন্ধ", "Off")) } }
+            dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = { vm.dismissCelebration() }) { Text(tr("বন্ধ", "Off")) } }
         )
     }
 }

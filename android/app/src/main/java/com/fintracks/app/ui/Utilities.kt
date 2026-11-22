@@ -107,12 +107,12 @@ internal fun DatePickerSheet(initial: LocalDate, title: String, onDismiss: () ->
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(onClick = {
+            TextButton(modifier = Modifier.pressScale(), onClick = {
                 state.selectedDateMillis?.let { onPick(localFromUtcMillis(it)) }
                 onDismiss()
             }) { Text(tr("ঠিক আছে", "OK")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
+        dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     ) {
         Column(Modifier.padding(horizontal = 16.dp)) {
             Text(title, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
@@ -210,7 +210,7 @@ fun DateField(label: String, iso: String, onChange: (String) -> Unit, optional: 
             OutlinedButton(onClick = { open = true }, modifier = Modifier.weight(1f)) {
                 Text(parsed?.let { displayDate(it.toString()) } ?: tr("তারিখ বাছাই করুন", "Pick a date"))
             }
-            if (optional && parsed != null) TextButton(onClick = { onChange("") }) { Text(tr("মুছুন", "Clear")) }
+            if (optional && parsed != null) TextButton(modifier = Modifier.pressScale(), onClick = { onChange("") }) { Text(tr("মুছুন", "Clear")) }
         }
     }
     if (open) DatePickerSheet(parsed ?: LocalDate.now(), label, onDismiss = { open = false }) { onChange(it.toString()) }

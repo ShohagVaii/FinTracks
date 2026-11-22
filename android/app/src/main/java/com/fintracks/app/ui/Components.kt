@@ -205,8 +205,8 @@ fun FormDialog(
                 content = content
             )
         },
-        confirmButton = { TextButton(onClick = onConfirm, enabled = confirmEnabled) { Text(tr("সেভ", "Save")) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
+        confirmButton = { TextButton(modifier = Modifier.pressScale(), onClick = onConfirm, enabled = confirmEnabled) { Text(tr("সেভ", "Save")) } },
+        dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }
 

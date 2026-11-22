@@ -437,7 +437,7 @@ fun CurrencyScreen() {
                 Text(tr("রেটের সময়: $stamp (ডিভাইসের সময়)", "Rate time: $stamp (device time)") + if (stale) tr(" · পুরনো ক্যাশ", " · cached") else "", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (failed) Text(tr("নতুন রেট আনা যায়নি, তাই ক্যাশ করা রেট দেখানো হচ্ছে।", "Couldn't fetch new rates, so the saved rate is shown."), fontSize = 11.sp, color = readableOn(Rose500))
             }
-            OutlinedButton(onClick = { refresh() }, enabled = !loading) {
+            OutlinedButton(modifier = Modifier.pressScale(), onClick = { refresh() }, enabled = !loading) {
                 Text(if (loading) tr("রেট আনা হচ্ছে…", "Fetching rates…") else tr("রেট নতুন করে আনুন", "Refresh rates"))
             }
             Text(tr("রেট সরবরাহ: ExchangeRate-API (open access)", "Rates: ExchangeRate-API (open access)"), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -483,7 +483,7 @@ fun LoanScreen(state: UiState, vm: AppViewModel) {
                 KeyValue(tr("পরিশোধ", "Pay"), bnDigits("$paid / $term") + " " + tr("মাস", "months"))
                 ProgressBar(if (term > 0) paid.toFloat() / term else 0f, Emerald500)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (!done) Button(onClick = {
+                    if (!done) Button(modifier = Modifier.pressScale(), onClick = {
                         vm.save("loans", row("paid" to (paid + 1).toDouble()), l.id())
                     }) { Text(tr("১ মাস পরিশোধ", "Pay 1 month")) }
                     else Text(tr("✅ সম্পন্ন", "✅ Done"), color = readableOn(Emerald500))

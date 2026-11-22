@@ -238,7 +238,7 @@ fun LockScreen(onSignOut: () -> Unit) {
             }
         }
         Spacer16()
-        OutlinedButton(onClick = onSignOut) { Text(tr("লগআউট", "Sign out")) }
+        OutlinedButton(modifier = Modifier.pressScale(), onClick = onSignOut) { Text(tr("লগআউট", "Sign out")) }
     }
 }
 
@@ -268,7 +268,7 @@ fun PinSetupDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(onClick = {
+            TextButton(modifier = Modifier.pressScale(), onClick = {
                 when {
                     first.length !in 4..6 -> error = tr("PIN ৪ থেকে ৬ সংখ্যার হতে হবে", "PIN must be 4 to 6 digits")
                     first != second -> error = tr("দুটি PIN মিলছে না", "The two PINs don't match")
@@ -276,7 +276,7 @@ fun PinSetupDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
                 }
             }) { Text(tr("সেভ", "Save")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
+        dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }
 
@@ -298,10 +298,10 @@ fun PinVerifyDialog(title: String, onDismiss: () -> Unit, onVerified: () -> Unit
             }
         },
         confirmButton = {
-            TextButton(onClick = {
+            TextButton(modifier = Modifier.pressScale(), onClick = {
                 if (AppLock.checkPin(ctx, pin)) onVerified() else error = tr("ভুল PIN", "Wrong PIN")
             }) { Text(tr("নিশ্চিত", "Confirm")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
+        dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }

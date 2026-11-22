@@ -110,6 +110,9 @@ import com.fintracks.app.data.row
 import com.fintracks.app.data.str
 import com.fintracks.app.data.strOrNull
 import kotlinx.serialization.json.JsonObject
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
 
 private val incomeGreen = ChartIncome
 private val expenseRed = Rose500
@@ -162,6 +165,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         // Period tabs + timeline navigator, like the video's দৈনিক / মাসিক / বাৎসরিক pill.
+        Box(Modifier.staggerIn(0)) {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -185,6 +189,8 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
                 }
             }
         }
+        }
+        Box(Modifier.staggerIn(2)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             NavSquare(Icons.Default.ChevronLeft, enabled = true) { offset -= 1 }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -194,6 +200,8 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             NavSquare(Icons.Default.ChevronRight, enabled = offset < 0) { offset += 1 }
         }
         // Profit hero — like the video's "নিট লাভ (PROFIT)" card: large radius, green trend icon.
+        }
+        Box(Modifier.staggerIn(4)) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -213,11 +221,15 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             }
             if (income > 0) Text(tr("সঞ্চয়ের হার", "Savings rate") + ": ${bnDigits("%.0f".format(savingsRate))}%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
         }
+        }
+        Box(Modifier.staggerIn(5)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             StatPill(tr("মোট আয়", "Total income"), taka(income, p), incomeGreen, Modifier.weight(1f), countTo = income, countFmt = { taka(it, p) })
             StatPill(tr("মোট ব্যয়", "Total expense"), taka(expense, p), expenseRed, Modifier.weight(1f), countTo = expense, countFmt = { taka(it, p) })
         }
         // Wallet card — all-time balance.
+        }
+        Box(Modifier.staggerIn(6)) {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -234,13 +246,15 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             }
             Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Sky400.copy(alpha = 0.6f), modifier = Modifier.size(32.dp))
         }
+        }
         Box(Modifier.staggerIn(1)) { CreditDueCard(state) { openOverlay(Overlay.CREDIT) } }
         // Heatmap follows the timeline month; its ‹ › buttons move the timeline too (one shared state).
         val heatMonth = heatmapMonthOf(span, offset, period)
         val nextMonth: (() -> Unit)? = if (heatMonth < java.time.YearMonth.now()) ({ jumpToMonth(heatMonth.plusMonths(1)) }) else null
-        Box(Modifier.popIn()) { HeatmapCard(txs, p, heatMonth, onPrev = { jumpToMonth(heatMonth.minusMonths(1)) }, onNext = nextMonth) }
+        HeatmapCard(txs, p, heatMonth, onPrev = { jumpToMonth(heatMonth.minusMonths(1)) }, onNext = nextMonth)
         Box(Modifier.staggerIn(3)) { SmsParserCard(state, vm) }
 
+        Box(Modifier.staggerIn(7)) {
         if (state.pendingSms.isNotEmpty()) {
             SectionTitle(tr("SMS থেকে নতুন লেনদেন", "New transactions from SMS"))
             state.pendingSms.take(3).forEach { s ->
@@ -248,13 +262,15 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
                     Text("${s.provider} · ${s.type} · ${taka(s.amount, p)}", fontWeight = FontWeight.Bold)
                     Text(s.raw, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { vm.acceptSms(s) }) { Text(tr("যোগ করুন", "Add")) }
-                        OutlinedButton(onClick = { vm.dismissSms(s) }) { Text(tr("বাতিল", "Cancel")) }
+                        Button(modifier = Modifier.pressScale(), onClick = { vm.acceptSms(s) }) { Text(tr("যোগ করুন", "Add")) }
+                        OutlinedButton(modifier = Modifier.pressScale(), onClick = { vm.dismissSms(s) }) { Text(tr("বাতিল", "Cancel")) }
                     }
                 }
             }
         }
 
+        }
+        Box(Modifier.staggerIn(8)) {
         if (accounts.isNotEmpty()) {
             SectionTitle(tr("অ্যাকাউন্ট", "Accounts"))
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -268,6 +284,8 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             }
         }
 
+        }
+        Box(Modifier.staggerIn(9)) {
         SectionTitle(tr("এই মাসের বাজেট", "This month's budget"))
         val budgets = state.rows("budgets")
         if (budgets.isEmpty()) {
@@ -289,6 +307,8 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             }
         }
 
+        }
+        Box(Modifier.staggerIn(10)) {
         SectionTitle(tr("খরচের ট্রেন্ড (এই মাস)", "Expense trend (this month)"))
         AppCard {
             val days = (1..31).map { d ->
@@ -298,9 +318,12 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             LineChart(days.take(maxOf(1, lastIndexWithData(days) + 1)), expenseRed)
         }
 
+        }
+        Box(Modifier.staggerIn(11)) {
         SectionTitle(tr("সাম্প্রতিক লেনদেন", "Recent transactions"))
         if (txs.isEmpty()) EmptyHint(tr("এখনো কোনো লেনদেন নেই। নিচের + বাটন দিয়ে যোগ করুন।", "No transactions yet. Add one with the + button below."))
         txs.take(5).forEach { t -> TxItem(t, state, onClick = { openReceipt(t) }, onLongClick = { onTxLongPress(t) }) }
+        }
         Spacer(Modifier.height(90.dp))
     }
 }
@@ -333,6 +356,7 @@ fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onLongClick: (() 
 fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit, openReceipt: (JsonObject) -> Unit, onTxLongPress: (JsonObject) -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
+    var removing by remember { mutableStateOf(emptySet<String>()) }
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("all") }
     var segment by remember { mutableStateOf("history") } // history | auto (created from dues / SMS)
@@ -420,13 +444,13 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(tr("${picked.size}টি নির্বাচিত", "${picked.size} selected"), modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
                 // One selected row can be edited here (or open its receipt by tapping it).
-                if (picked.size == 1) TextButton(onClick = {
+                if (picked.size == 1) TextButton(modifier = Modifier.pressScale(), onClick = {
                     val one = state.rows("transactions").firstOrNull { it.id() == picked.first() }
                     endSelect()
                     if (one != null) openTx(one)
                 }) { Text(tr("এডিট", "Edit")) }
                 TextButton(enabled = picked.isNotEmpty(), onClick = { confirmBulk = true }) { Text(tr("মুছুন", "Delete"), color = readableOn(Rose500)) }
-                TextButton(onClick = { endSelect() }) { Text(tr("বাতিল", "Cancel")) }
+                TextButton(modifier = Modifier.pressScale(), onClick = { endSelect() }) { Text(tr("বাতিল", "Cancel")) }
             }
         }
         if (confirmBulk) {
@@ -439,9 +463,16 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                 confirmText = tr("মুছে ফেলুন", "Delete"),
                 cancelText = tr("বাতিল", "Cancel"),
                 onConfirm = {
-                    vm.removeMany("transactions", chosen.map { it.id() })
+                    // Fade the rows out first, then remove them from the data.
+                    val ids = chosen.map { it.id() }
+                    removing = ids.toSet()
                     confirmBulk = false
                     endSelect()
+                    scope.launch {
+                        kotlinx.coroutines.delay(if (motionReduced(ctx)) 0L else 260L)
+                        vm.removeMany("transactions", ids)
+                        removing = emptySet()
+                    }
                 },
                 onDismiss = { confirmBulk = false }
             )
@@ -450,6 +481,7 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
         // weight() keeps the list inside the remaining height; the bottom padding keeps the last row above the nav bar and the + button.
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f), contentPadding = PaddingValues(bottom = 120.dp)) {
             items(filtered, key = { it.id() }) { t ->
+                AnimatedVisibility(visible = t.id() !in removing, exit = fadeOut(tween(250)) + slideOutHorizontally(tween(250)) { -it / 3 }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (selecting) Checkbox(checked = t.id() in picked, onCheckedChange = { togglePick(t.id()) })
                     Box(Modifier.weight(1f)) {
@@ -459,6 +491,7 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                             onLongClick = { if (!selecting) { selecting = true; picked = setOf(t.id()) } }
                         )
                     }
+                }
                 }
             }
         }
@@ -617,7 +650,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         var tagInput by remember { mutableStateOf("") }
         Column(
-            Modifier
+            Modifier.morphIn()
                 .fillMaxWidth(0.94f)
                 .clip(RoundedCornerShape(32.dp))
                 .background(Tok_FF0B1220)
@@ -628,7 +661,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(if (existing == null) tr("লেনদেন যোগ করুন", "Add transaction") else tr("লেনদেন সম্পাদনা", "Edit transaction"), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close")) }
+                IconButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close")) }
             }
             // Segmented toggle: ব্যয় red, আয় green, ট্রান্সফার sky.
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.05f)).padding(4.dp)) {
@@ -921,7 +954,7 @@ fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("SMART SMS PARSER", fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close")) }
+                IconButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close")) }
             }
             OutlinedTextField(
                 value = text,
@@ -944,7 +977,7 @@ fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
                 AppCard(borderColor = Sky400.copy(alpha = 0.4f)) {
                     Text("${s.provider} · ${s.type} · ${taka(s.amount, state.privacy)}", fontWeight = FontWeight.Bold)
                     Text(s.note, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Button(onClick = {
+                    Button(modifier = Modifier.pressScale(), onClick = {
                         vm.save("transactions", row(
                             "type" to s.type,
                             "amount" to s.amount,

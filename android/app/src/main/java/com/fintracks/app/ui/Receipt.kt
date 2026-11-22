@@ -85,8 +85,8 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onEdit: () -> Unit, onDismiss: 
             Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(tr("লেনদেনের ভাউচার", "Transaction voucher"), fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
-                    TextButton(onClick = onEdit) { Text(tr("এডিট", "Edit")) }
-                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close")) }
+                    TextButton(modifier = Modifier.pressScale(), onClick = onEdit) { Text(tr("এডিট", "Edit")) }
+                    IconButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close")) }
                 }
                 if (t.str("attachment_url").isNotEmpty()) AttachmentImage(t.id(), t.str("attachment_url"))
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -96,7 +96,7 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onEdit: () -> Unit, onDismiss: 
                             bitmap = bmp.asImageBitmap(),
                             contentDescription = tr("ভাউচার", "Voucher"),
                             contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize().slamIn()
                         )
                     } else {
                         CircularProgressIndicator()
@@ -134,6 +134,6 @@ fun TxActionDialog(t: JsonObject, onEdit: () -> Unit, onDelete: () -> Unit, onDi
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
+        confirmButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }

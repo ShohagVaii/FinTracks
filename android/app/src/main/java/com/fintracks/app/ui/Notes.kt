@@ -241,7 +241,7 @@ fun NotesScreen(vm: AppViewModel, onClose: () -> Unit) {
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             // Single back arrow for the list: the app header is hidden on this screen.
-            IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("ফিরে যান", "Back")) }
+            IconButton(modifier = Modifier.pressScale(), onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("ফিরে যান", "Back")) }
             Text(
                 tr("${bnDigits(notes.size.toString())}টি নোট", "${notes.size} notes"),
                 fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -320,7 +320,7 @@ private fun NoteCard(n: JsonObject, onOpen: () -> Unit, onShare: () -> Unit, onE
                 Text(noteStamp(n), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Box {
-                IconButton(onClick = { menu = true }) {
+                IconButton(modifier = Modifier.pressScale(), onClick = { menu = true }) {
                     Icon(Icons.Default.MoreVert, contentDescription = tr("মেনু", "Menu"))
                 }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -376,12 +376,12 @@ private fun NoteView(initial: JsonObject?, vm: AppViewModel, startEditing: Boole
 
     Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("ফিরে যান", "Back")) }
+            IconButton(modifier = Modifier.pressScale(), onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("ফিরে যান", "Back")) }
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = { copyText(ctx, "FinTrack note", noteText(title, body)) }) {
+            IconButton(modifier = Modifier.pressScale(), onClick = { copyText(ctx, "FinTrack note", noteText(title, body)) }) {
                 Icon(Icons.Default.ContentCopy, contentDescription = tr("কপি", "Copy"))
             }
-            IconButton(onClick = { shareNote(ctx, title, body) }) {
+            IconButton(modifier = Modifier.pressScale(), onClick = { shareNote(ctx, title, body) }) {
                 Icon(Icons.Default.Share, contentDescription = tr("শেয়ার", "Share"))
             }
         }
@@ -423,14 +423,14 @@ private fun NoteView(initial: JsonObject?, vm: AppViewModel, startEditing: Boole
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (id != null) {
-                        TextButton(onClick = {
+                        TextButton(modifier = Modifier.pressScale(), onClick = {
                             handled = true
                             vm.notes.delete(id!!)
                             onClose()
                         }) { Text(tr("মুছে ফেলুন", "Delete"), color = readableOn(Rose500)) }
                     }
                     Spacer(Modifier.weight(1f))
-                    Button(
+                    Button(modifier = Modifier.pressScale(), 
                         onClick = {
                             // A new note with nothing typed is not saved. Existing notes are saved only when changed.
                             if (id != null || title.isNotBlank() || body.isNotBlank()) {

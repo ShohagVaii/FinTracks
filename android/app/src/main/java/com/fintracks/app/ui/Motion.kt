@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -391,4 +392,46 @@ fun RippleBurst(trigger: Int, color: Color, modifier: Modifier = Modifier) {
         if (t >= 1f) return@Canvas
         drawCircle(color.copy(alpha = 0.35f * (1f - t)), radius = size.minDimension * 0.5f * t, center = center)
     }
+}
+
+/** Morphs a sheet in from [origin] (scale and fade, about 300 ms), as if it grew out of the button that opened it. Reduce Motion: none. */
+@Composable
+fun Modifier.morphIn(origin: TransformOrigin = TransformOrigin(1f, 1f)): Modifier {
+    val reduce = rememberReduceMotion()
+    val p = remember { Animatable(if (reduce) 1f else 0f) }
+    LaunchedEffect(Unit) { if (!reduce) p.animateTo(1f, tween(300, easing = FastOutSlowInEasing)) }
+    return this.graphicsLayer {
+        val s = 0.6f + 0.4f * p.value
+        scaleX = s
+        scaleY = s
+        alpha = p.value
+        transformOrigin = origin
+    }
+}
+
+/** Slams content in: scale down from 1.3 with fade (about 380 ms). Reduce Motion: none. */
+@Composable
+fun Modifier.slamIn(): Modifier {
+    val reduce = rememberReduceMotion()
+    val p = remember { Animatable(if (reduce) 1f else 0f) }
+    LaunchedEffect(Unit) { if (!reduce) p.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
+    return this.graphicsLayer {
+        val s = 1.3f - 0.3f * p.value
+        scaleX = s
+        scaleY = s
+        alpha = p.value
+    }
+}
+
+/** Short success pulse each time [trigger] changes (about 400 ms). Reduce Motion: none. */
+@Composable
+fun Modifier.pulseOn(trigger: Int): Modifier {
+    val reduce = rememberReduceMotion()
+    val s = remember { Animatable(1f) }
+    LaunchedEffect(trigger) {
+        if (trigger == 0 || reduce) return@LaunchedEffect
+        s.animateTo(1.05f, tween(150))
+        s.animateTo(1f, tween(250))
+    }
+    return this.graphicsLayer { scaleX = s.value; scaleY = s.value }
 }

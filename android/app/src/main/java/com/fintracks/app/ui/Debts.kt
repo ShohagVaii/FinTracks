@@ -156,7 +156,7 @@ private fun DebtHeader(title: String, onBack: () -> Unit) {
         Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onBack) {
+        IconButton(modifier = Modifier.pressScale(), onClick = onBack) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("ফিরে যান", "Back"))
         }
         Text(title, fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -199,8 +199,8 @@ fun ConfirmDialog(text: String, confirmText: String, cancelText: String, onConfi
     AlertDialog(
         onDismissRequest = onDismiss,
         text = { Text(text) },
-        confirmButton = { TextButton(onClick = onConfirm) { Text(confirmText) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(cancelText) } }
+        confirmButton = { TextButton(modifier = Modifier.pressScale(), onClick = onConfirm) { Text(confirmText) } },
+        dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(cancelText) } }
     )
 }
 
@@ -219,7 +219,7 @@ private fun DebtFormDialog(
         title = { Text(title, fontWeight = FontWeight.Bold) },
         text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp), content = content) },
         confirmButton = { DebtGradientButton(confirmText, confirmEnabled, onConfirm) },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
+        dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }
 
@@ -557,7 +557,7 @@ private fun PersonCard(
                 if (person.str("address").isNotBlank()) Text(person.str("address"), fontSize = 13.sp)
             }
             Box {
-                IconButton(onClick = { menu = true }) {
+                IconButton(modifier = Modifier.pressScale(), onClick = { menu = true }) {
                     Icon(Icons.Default.MoreVert, contentDescription = tr("মেনু", "Menu"))
                 }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -809,10 +809,10 @@ private fun EntryDetail(
             }
             if (!settled) DebtGradientButton(tr("পরিশোধ যোগ করুন", "Add payment"), true, onPay)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = onCall) { Text(tr("কল", "Call")) }
-                TextButton(onClick = onSms) { Text(tr("এসএমএস", "SMS")) }
-                TextButton(onClick = onEdit) { Text(tr("এডিট", "Edit")) }
-                TextButton(onClick = onDelete) { Text(tr("মুছুন", "Delete"), color = readableOn(Rose500)) }
+                TextButton(modifier = Modifier.pressScale(), onClick = onCall) { Text(tr("কল", "Call")) }
+                TextButton(modifier = Modifier.pressScale(), onClick = onSms) { Text(tr("এসএমএস", "SMS")) }
+                TextButton(modifier = Modifier.pressScale(), onClick = onEdit) { Text(tr("এডিট", "Edit")) }
+                TextButton(modifier = Modifier.pressScale(), onClick = onDelete) { Text(tr("মুছুন", "Delete"), color = readableOn(Rose500)) }
             }
             TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text(tr("বন্ধ করুন", "Close")) }
         }

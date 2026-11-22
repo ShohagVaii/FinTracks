@@ -158,7 +158,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                     Text(tr("ইউজার আইডি", "User ID"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(if (uid.isEmpty()) "—" else uid.take(8) + "…", fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                 }
-                if (uid.isNotEmpty()) TextButton(onClick = { copyText(ctx, "FinTrack user id", uid) }) { Text(tr("কপি", "Copy")) }
+                if (uid.isNotEmpty()) TextButton(modifier = Modifier.pressScale(), onClick = { copyText(ctx, "FinTrack user id", uid) }) { Text(tr("কপি", "Copy")) }
             }
         }
         AppCard {
@@ -236,9 +236,9 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (!hasPin) {
-                Button(onClick = { showSetPin = true }) { Text(tr("PIN সেট করুন", "Set PIN")) }
+                Button(modifier = Modifier.pressScale(), onClick = { showSetPin = true }) { Text(tr("PIN সেট করুন", "Set PIN")) }
             } else {
-                OutlinedButton(onClick = { showOldPin = true }) { Text(tr("PIN বদলান", "Change PIN")) }
+                OutlinedButton(modifier = Modifier.pressScale(), onClick = { showOldPin = true }) { Text(tr("PIN বদলান", "Change PIN")) }
             }
             SwitchRow(tr("অ্যাপ লক চালু", "App lock on"), lockOn) {
                 if (it && !hasPin) {
@@ -289,7 +289,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                 if (on) vm.saveProfile(row("reminder_time" to reminderTime))
             }
             if (reminderOn) {
-                OutlinedButton(onClick = { showTime = true }) {
+                OutlinedButton(modifier = Modifier.pressScale(), onClick = { showTime = true }) {
                     Text(tr("সময়: ", "Time: ") + if (AppPrefs.english) reminderTime else bnDigits(reminderTime))
                 }
                 Text(
@@ -307,7 +307,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                 tr("সর্বশেষ সফল সিঙ্ক: ", "Last successful sync: ") + syncText(lastSync),
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            OutlinedButton(onClick = { vm.syncNow() }) { Text(tr("এখনই সিঙ্ক করুন", "Sync now")) }
+            OutlinedButton(modifier = Modifier.pressScale(), onClick = { vm.syncNow() }) { Text(tr("এখনই সিঙ্ক করুন", "Sync now")) }
 
             Text(tr("এক্সপোর্ট", "Export"), fontWeight = FontWeight.SemiBold)
             Text(tr("সব লেনদেন (সময়সীমা অনুযায়ী) Excel, PDF বা CSV হিসেবে শেয়ার করুন। PDF-এ বাংলা লেখা থাকে।",
@@ -336,7 +336,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
             Text(tr("সব লেনদেন, বাকি, ধার, বাজেট, লক্ষ্য, বিনিয়োগ, ক্যাটাগরি ও অন্য সব ডেটা একটি JSON ফাইলে। PIN ও লক সেটিং ব্যাকআপে থাকে না।",
                 "All transactions, credit, debts, budgets, goals, investments, categories and other data in one JSON file. The PIN and lock settings are not included."),
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedButton(onClick = {
+            OutlinedButton(modifier = Modifier.pressScale(), onClick = {
                 scope.launch {
                     try {
                         val file = withContext(Dispatchers.IO) { Backup.file(ctx, state) }
@@ -346,7 +346,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                     }
                 }
             }) { Text(tr("ব্যাকআপ ফাইল শেয়ার", "Share backup file")) }
-            OutlinedButton(onClick = { pickBackup.launch(arrayOf("application/json", "text/plain")) }) {
+            OutlinedButton(modifier = Modifier.pressScale(), onClick = { pickBackup.launch(arrayOf("application/json", "text/plain")) }) {
                 Text(tr("ব্যাকআপ থেকে ফিরিয়ে আনুন", "Restore from backup"))
             }
 
@@ -354,7 +354,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
             Text(tr("এই ফোনের সব লোকাল ডেটা (PIN, লক, অফলাইন নোট, গণনা, পছন্দ, লগইন) মুছবে। সার্ভারের ডেটা মুছবে না।",
                 "Deletes all local data on this phone (PIN, lock, offline notes, counts, preferences, sign-in). Server data is not deleted."),
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedButton(onClick = { showReset = true }) {
+            OutlinedButton(modifier = Modifier.pressScale(), onClick = { showReset = true }) {
                 Text(tr("লোকাল ডেটা মুছুন", "Erase local data"), color = MaterialTheme.colorScheme.error)
             }
         }
@@ -366,7 +366,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
             Text(tr("অ্যাকাউন্ট মুছলে আপনার সব লেনদেন, বাকি, ধার, বাজেট ও অন্য সব ডেটা স্থায়ীভাবে চলে যাবে। এটি ফিরিয়ে আনা যাবে না।",
                 "Deleting the account permanently removes all your transactions, credit, debts, budgets and other data. This cannot be undone."),
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Button(onClick = { showDelete = true }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+            Button(modifier = Modifier.pressScale(), onClick = { showDelete = true }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
                 Text(tr("অ্যাকাউন্ট স্থায়ীভাবে মুছুন", "Delete account permanently"))
             }
         }
@@ -427,7 +427,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
             title = { Text(tr("রিমাইন্ডারের সময়", "Reminder time"), fontWeight = FontWeight.Bold) },
             text = { TimePicker(state = timeState) },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(modifier = Modifier.pressScale(), onClick = {
                     val t = "%02d:%02d".format(timeState.hour, timeState.minute)
                     reminderTime = t
                     DailyReminder.set(ctx, reminderOn, t)
@@ -435,7 +435,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                     showTime = false
                 }) { Text(tr("ঠিক আছে", "OK")) }
             },
-            dismissButton = { TextButton(onClick = { showTime = false }) { Text(tr("বাতিল", "Cancel")) } }
+            dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = { showTime = false }) { Text(tr("বাতিল", "Cancel")) } }
         )
     }
     restorePlan?.let { plan ->
@@ -452,8 +452,8 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                         fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
-            confirmButton = { TextButton(onClick = { vm.restoreBackup(plan); restorePlan = null }) { Text(tr("ফিরিয়ে আনুন", "Restore")) } },
-            dismissButton = { TextButton(onClick = { restorePlan = null }) { Text(tr("বাতিল", "Cancel")) } }
+            confirmButton = { TextButton(modifier = Modifier.pressScale(), onClick = { vm.restoreBackup(plan); restorePlan = null }) { Text(tr("ফিরিয়ে আনুন", "Restore")) } },
+            dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = { restorePlan = null }) { Text(tr("বাতিল", "Cancel")) } }
         )
     }
     if (showDelete) {
@@ -505,7 +505,7 @@ private fun ProfileCard(state: UiState, email: String, emailLoaded: Boolean, onE
                     fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1
                 )
             }
-            IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, contentDescription = tr("প্রোফাইল এডিট", "Edit profile")) }
+            IconButton(modifier = Modifier.pressScale(), onClick = onEdit) { Icon(Icons.Default.Edit, contentDescription = tr("প্রোফাইল এডিট", "Edit profile")) }
         }
         Spacer(Modifier.height(10.dp))
         CompletenessBar(profileChecks(state.profile), showMissing = false)
@@ -630,7 +630,7 @@ private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () ->
                 onDismiss()
             }) { Text(tr("সেভ", "Save")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
+        dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 
     if (pickDistrict) {
@@ -697,7 +697,7 @@ private fun ResetDialog(pendingOffline: Int, onDismiss: () -> Unit, onConfirm: (
                 Text(tr("মুছুন", "Erase"), color = MaterialTheme.colorScheme.error)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
+        dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }
 
@@ -722,6 +722,6 @@ fun DeleteAccountDialog(email: String, onDismiss: () -> Unit, onConfirm: (String
                 Text(tr("স্থায়ীভাবে মুছুন", "Delete permanently"), color = MaterialTheme.colorScheme.error)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
+        dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }

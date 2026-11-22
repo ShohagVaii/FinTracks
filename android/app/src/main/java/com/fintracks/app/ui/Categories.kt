@@ -73,14 +73,14 @@ fun CategoryManager(state: UiState, vm: AppViewModel) {
             Text(c.str("icon").ifEmpty { "📦" }, fontSize = 20.sp)
             Spacer(Modifier.width(10.dp))
             Text(c.str("name"), modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-            IconButton(onClick = { editing = c }) { Icon(Icons.Default.Edit, contentDescription = tr("এডিট", "Edit")) }
+            IconButton(modifier = Modifier.pressScale(), onClick = { editing = c }) { Icon(Icons.Default.Edit, contentDescription = tr("এডিট", "Edit")) }
             DeleteButton { deleting = c }
         }
     }
     if (custom.isEmpty()) {
         Text(tr("এখনো নিজের কোনো ক্যাটাগরি নেই", "No custom categories yet"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    OutlinedButton(onClick = { creating = true }) { Text(tr("+ নতুন ক্যাটাগরি", "+ New category")) }
+    OutlinedButton(modifier = Modifier.pressScale(), onClick = { creating = true }) { Text(tr("+ নতুন ক্যাটাগরি", "+ New category")) }
 
     if (creating || editing != null) {
         val original = editing
@@ -124,11 +124,11 @@ fun CategoryManager(state: UiState, vm: AppViewModel) {
                 )
             },
             confirmButton = {
-                TextButton(onClick = { vm.remove("categories", c.id()); deleting = null }) {
+                TextButton(modifier = Modifier.pressScale(), onClick = { vm.remove("categories", c.id()); deleting = null }) {
                     Text(tr("মুছুন", "Delete"), color = readableOn(Rose500))
                 }
             },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text(tr("বাতিল", "Cancel")) } }
+            dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = { deleting = null }) { Text(tr("বাতিল", "Cancel")) } }
         )
     }
 }
@@ -169,6 +169,6 @@ private fun CategoryDialog(
                 Text(tr("সেভ", "Save"))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
+        dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }

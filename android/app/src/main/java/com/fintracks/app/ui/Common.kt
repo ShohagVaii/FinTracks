@@ -56,12 +56,12 @@ fun KeyValue(label: String, value: String, valueColor: Color = Color.Unspecified
 
 @Composable
 fun DeleteButton(onClick: () -> Unit) {
-    IconButton(onClick = onClick) { Icon(Icons.Default.Delete, contentDescription = tr("মুছুন", "Delete"), tint = com.fintracks.app.ui.Rose500) }
+    IconButton(modifier = Modifier.pressScale(), onClick = onClick) { Icon(Icons.Default.Delete, contentDescription = tr("মুছুন", "Delete"), tint = com.fintracks.app.ui.Rose500) }
 }
 
 @Composable
 fun AddButton(text: String, onClick: () -> Unit) {
-    TextButton(onClick = onClick) {
+    TextButton(modifier = Modifier.pressScale(), onClick = onClick) {
         Icon(Icons.Default.Add, contentDescription = null)
         Spacer(Modifier.width(4.dp))
         Text(text)

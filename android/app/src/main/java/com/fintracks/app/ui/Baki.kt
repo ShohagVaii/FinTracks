@@ -220,7 +220,7 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
     val balance = bought - paid
 
     Page {
-        OutlinedButton(onClick = onBack) { Text(tr("← সব দোকান", "← All shops")) }
+        OutlinedButton(modifier = Modifier.pressScale(), onClick = onBack) { Text(tr("← সব দোকান", "← All shops")) }
         AppCard {
             Text(shop.str("name"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
             if (shop.str("phone").isNotBlank()) Text(shop.str("phone"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -233,11 +233,11 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
             KeyValue(tr("মোট কেনা", "Total bought"), taka(bought, p))
             KeyValue(tr("মোট পরিশোধ", "Total paid"), taka(paid, p))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { addingPurchase = true }) { Text(tr("নতুন কেনা", "New purchase")) }
-                OutlinedButton(onClick = { addingPayment = true }, enabled = balance > EPS) { Text(tr("পরিশোধ", "Pay")) }
+                Button(modifier = Modifier.pressScale(), onClick = { addingPurchase = true }) { Text(tr("নতুন কেনা", "New purchase")) }
+                OutlinedButton(modifier = Modifier.pressScale(), onClick = { addingPayment = true }, enabled = balance > EPS) { Text(tr("পরিশোধ", "Pay")) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = { editingShop = true }) { Text(tr("দোকান সম্পাদনা", "Edit shop")) }
+                TextButton(modifier = Modifier.pressScale(), onClick = { editingShop = true }) { Text(tr("দোকান সম্পাদনা", "Edit shop")) }
                 DeleteButton { confirmDelete = true }
             }
         }
@@ -272,7 +272,7 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
                 )
                 if (e.str("note").isNotBlank()) Text(e.str("note"), fontSize = 11.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = { editingPurchase = e }) { Text(tr("সম্পাদনা", "Edit")) }
+                    TextButton(modifier = Modifier.pressScale(), onClick = { editingPurchase = e }) { Text(tr("সম্পাদনা", "Edit")) }
                     DeleteButton { vm.remove("credit_entries", e.id()) }
                 }
             }
@@ -304,9 +304,9 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
             title = { Text(tr("দোকানটি মুছবেন?", "Delete this shop?"), fontWeight = FontWeight.Bold) },
             text = { Text(tr("এই দোকানের সব কেনা ও পরিশোধের হিসাব মুছে যাবে। এটি ফেরানো যাবে না।", "All purchases and payments of this shop will be deleted. This cannot be undone.")) },
             confirmButton = {
-                TextButton(onClick = { confirmDelete = false; vm.remove("credit_shops", shop.id()); onBack() }) { Text(tr("মুছুন", "Delete")) }
+                TextButton(modifier = Modifier.pressScale(), onClick = { confirmDelete = false; vm.remove("credit_shops", shop.id()); onBack() }) { Text(tr("মুছুন", "Delete")) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(tr("বাতিল", "Cancel")) } }
+            dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = { confirmDelete = false }) { Text(tr("বাতিল", "Cancel")) } }
         )
     }
 }

@@ -177,7 +177,7 @@ private fun BillCard(b: JsonObject, vm: AppViewModel, p: Boolean) {
         }
         payouts.forEach { Text(tr("${it.from} → ${it.to}-কে ফেরত: ${taka(it.amount, p)}", "${it.from} → ${it.to} repays: ${taka(it.amount, p)}"), fontSize = 13.sp) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = { vm.save("bill_splits", row("is_settled" to !settled), b.id()) }) {
+            OutlinedButton(modifier = Modifier.pressScale(), onClick = { vm.save("bill_splits", row("is_settled" to !settled), b.id()) }) {
                 Text(if (settled) tr("অমীমাংসিত করুন", "Mark unsettled") else tr("মিটে গেছে", "Settled"))
             }
             DeleteButton { vm.remove("bill_splits", b.id()) }
@@ -247,7 +247,7 @@ private fun NewBillDialog(state: UiState, vm: AppViewModel, onDone: () -> Unit) 
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             TextIn(tr("নতুন নাম", "New name"), newName, { newName = it }, modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = {
+            OutlinedButton(modifier = Modifier.pressScale(), onClick = {
                 val n = newName.trim()
                 if (n.isNotEmpty()) {
                     extra = (extra + n).distinct()
@@ -292,7 +292,7 @@ private fun ShoppingSection(state: UiState, vm: AppViewModel) {
         Text(tr("নতুন জিনিসের তালিকা", "New shopping list"), fontWeight = FontWeight.Bold)
         TextIn(tr("আইটেমের নাম", "Item name"), name, { name = it })
         TextIn(tr("আনুমানিক বাজেট (৳)", "Estimated budget (৳)"), budget, { budget = it }, number = true)
-        Button(
+        Button(modifier = Modifier.pressScale(), 
             onClick = {
                 vm.save("shopping_items", row("name" to name.trim(), "estimated_price" to (parseAmount(budget) ?: 0.0)), null)
                 name = ""
@@ -334,12 +334,12 @@ private fun ShoppingSection(state: UiState, vm: AppViewModel) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (done) {
-                    OutlinedButton(onClick = { buying = i }) { Text(tr("দাম বদলান", "Change price")) }
-                    OutlinedButton(onClick = { vm.save("shopping_items", row("is_done" to false, "actual_price" to JsonNull), i.id()) }) {
+                    OutlinedButton(modifier = Modifier.pressScale(), onClick = { buying = i }) { Text(tr("দাম বদলান", "Change price")) }
+                    OutlinedButton(modifier = Modifier.pressScale(), onClick = { vm.save("shopping_items", row("is_done" to false, "actual_price" to JsonNull), i.id()) }) {
                         Text(tr("আবার কিনতে হবে", "Need to buy again"))
                     }
                 } else {
-                    Button(onClick = { buying = i }) { Text(tr("কেনা হয়েছে", "Bought")) }
+                    Button(modifier = Modifier.pressScale(), onClick = { buying = i }) { Text(tr("কেনা হয়েছে", "Bought")) }
                 }
             }
         }
@@ -442,7 +442,7 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(m.str("name"), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Row {
-                    IconButton(onClick = { editingMember = m }) { Icon(Icons.Default.Edit, contentDescription = tr("এডিট", "Edit")) }
+                    IconButton(modifier = Modifier.pressScale(), onClick = { editingMember = m }) { Icon(Icons.Default.Edit, contentDescription = tr("এডিট", "Edit")) }
                     DeleteButton { vm.remove("mess_members", m.id()) }
                 }
             }
@@ -608,9 +608,9 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
             Text(tr("কে খেয়েছেন", "Who ate"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             ChoiceChips(members.map { it.id() to it.str("name") }, member) { member = it }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { count = (count - 0.5).coerceAtLeast(0.0) }) { Text("−", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+                IconButton(modifier = Modifier.pressScale(), onClick = { count = (count - 0.5).coerceAtLeast(0.0) }) { Text("−", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
                 Text(fmtNum(count), fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 18.dp))
-                IconButton(onClick = { count += 0.5 }) { Text("+", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+                IconButton(modifier = Modifier.pressScale(), onClick = { count += 0.5 }) { Text("+", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
             }
             Text(tr("ধাপ ০.৫", "Step 0.5"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             DateField(tr("তারিখ", "Date"), date, { date = it })
@@ -624,9 +624,9 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
 @Composable
 private fun MonthNav(ym: YearMonth, onChange: (YearMonth) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        IconButton(onClick = { onChange(ym.minusMonths(1)) }) { Icon(Icons.Default.ChevronLeft, contentDescription = tr("আগের মাস", "Previous month")) }
+        IconButton(modifier = Modifier.pressScale(), onClick = { onChange(ym.minusMonths(1)) }) { Icon(Icons.Default.ChevronLeft, contentDescription = tr("আগের মাস", "Previous month")) }
         Text(monthYearLabel(ym.year, ym.monthValue), fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        IconButton(onClick = { onChange(ym.plusMonths(1)) }) { Icon(Icons.Default.ChevronRight, contentDescription = tr("পরের মাস", "Next month")) }
+        IconButton(modifier = Modifier.pressScale(), onClick = { onChange(ym.plusMonths(1)) }) { Icon(Icons.Default.ChevronRight, contentDescription = tr("পরের মাস", "Next month")) }
     }
 }
 
@@ -669,7 +669,7 @@ private fun SharedDialog(
                 content = content
             )
         },
-        confirmButton = { TextButton(onClick = onConfirm) { Text(confirmLabel) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
+        confirmButton = { TextButton(modifier = Modifier.pressScale(), onClick = onConfirm) { Text(confirmLabel) } },
+        dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }

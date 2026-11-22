@@ -203,13 +203,14 @@ fun HeatmapCard(txs: List<JsonObject>, privacy: Boolean, ym: YearMonth, onPrev: 
                 Text(it, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        cells.chunked(7).forEach { week ->
+        cells.chunked(7).forEachIndexed { wi, week ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 week.forEach { day ->
                     Box(
                         Modifier
                             .weight(1f)
                             .aspectRatio(1f)
+                            .popIn(delayMs = wi * 40L)
                             .clip(RoundedCornerShape(12.dp))
                             .background(if (day == null) Color.Transparent else base.copy(alpha = shade(day))),
                         contentAlignment = Alignment.Center

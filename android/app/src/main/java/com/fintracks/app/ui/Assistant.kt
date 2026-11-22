@@ -239,7 +239,7 @@ fun ChatScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit = {}) {
                 Text("Ask FinTrack AI", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Text("PREMIUM ADVISOR", color = Tok_FFC7D2FE, fontSize = 10.sp, letterSpacing = 2.sp)
             }
-            IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close"), tint = Color.White) }
+            IconButton(modifier = Modifier.pressScale(), onClick = onClose) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close"), tint = Color.White) }
         }
         ChoiceChips(
             // Label follows the language switch; the question sent matches the language so the answer engine reads it.

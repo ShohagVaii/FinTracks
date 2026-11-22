@@ -269,7 +269,7 @@ fun CalculatorDialog(onUse: (Double) -> Unit, onDismiss: () -> Unit) {
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel"), color = Color.White) }
+                    TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel"), color = Color.White) }
                     Spacer(Modifier.width(8.dp))
                     TextButton(enabled = live != null && live > 0, onClick = { onUse(live!!) }) { Text(tr("ব্যবহার", "Use")) }
                 }

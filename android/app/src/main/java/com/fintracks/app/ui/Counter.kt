@@ -227,6 +227,7 @@ private fun bdTime(epochMs: Long): String =
  */
 @Composable
 fun MoneyCounterScreen(vm: AppViewModel, showHistory: Boolean, onHistory: (Boolean) -> Unit) {
+    var savedPulse by remember { mutableStateOf(0) }
     val store = vm.cashCounts
     val history by store.records.collectAsState()
     val pending by store.pendingCount.collectAsState()
@@ -247,7 +248,7 @@ fun MoneyCounterScreen(vm: AppViewModel, showHistory: Boolean, onHistory: (Boole
     Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(tr("টাকা গণক", "Money counter"), fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
-            TextButton(onClick = { onHistory(true) }) { Text(tr("ইতিহাস ›", "History ›")) }
+            TextButton(modifier = Modifier.pressScale(), onClick = { onHistory(true) }) { Text(tr("ইতিহাস ›", "History ›")) }
         }
 
         DENOMINATIONS.chunked(2).forEach { pair ->
@@ -269,6 +270,7 @@ fun MoneyCounterScreen(vm: AppViewModel, showHistory: Boolean, onHistory: (Boole
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
+                .pulseOn(savedPulse)
                 .background(Brush.linearGradient(listOf(Tok_FF0F766E, Tok_FF0EA5E9)))
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
@@ -292,6 +294,7 @@ fun MoneyCounterScreen(vm: AppViewModel, showHistory: Boolean, onHistory: (Boole
                     val toSave = counts
                     scope.launch {
                         val onServer = store.save(toSave)
+                        savedPulse++
                         status = if (onServer) tr("✅ ডিভাইসে ও সার্ভারে সংরক্ষিত", "✅ Saved on device and server") else tr("💾 শুধু এই ফোনে সংরক্ষিত — সার্ভারে সিঙ্ক বাকি (ইন্টারনেট এলে নিজে যাবে)", "💾 Saved on this phone only — server sync pending (it will sync when online)")
                     }
                 },
@@ -364,7 +367,7 @@ private fun CounterHistory(store: CashCountStore, history: List<CountRecord>, on
     var status by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text(tr("‹ ফিরে যান", "‹ Back")) }
+            TextButton(modifier = Modifier.pressScale(), onClick = onBack) { Text(tr("‹ ফিরে যান", "‹ Back")) }
             Text(tr("গণনার ইতিহাস", "Count history"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
         }
         status?.let { Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -379,7 +382,7 @@ private fun CounterHistory(store: CashCountStore, history: List<CountRecord>, on
                             Text(bnDigits("${AppPrefs.symbol} ${grouped(r.total)}"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
                             Text(bnDigits("${r.pieces}") + tr(" টি নোট/কয়েন", " notes/coins"), fontSize = 12.sp)
                         }
-                        IconButton(onClick = {
+                        IconButton(modifier = Modifier.pressScale(), onClick = {
                             scope.launch {
                                 val onServer = store.delete(r.id)
                                 status = if (onServer) tr("✅ গণনাটি মুছে ফেলা হয়েছে (ডিভাইস ও সার্ভার)", "✅ Count deleted (device and server)") else tr("💾 এই ফোনে মুছেছে — সার্ভারে সিঙ্ক বাকি", "💾 Deleted on this phone — server sync pending")

@@ -53,6 +53,7 @@ import com.fintracks.app.data.SupabaseException
 import com.fintracks.app.data.str
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
+import androidx.compose.ui.graphics.Color
 
 // ---------- Profile completeness ----------
 
@@ -309,11 +310,11 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
         Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        TextButton(onClick = onBack) { Text(tr("‹ ফিরে যান", "‹ Back")) }
+        TextButton(modifier = Modifier.pressScale(), onClick = onBack) { Text(tr("‹ ফিরে যান", "‹ Back")) }
         Text(tr("লগইন ও নিরাপত্তা", "Login & security"), fontSize = 22.sp, fontWeight = FontWeight.Bold)
         loadError?.let {
             Text(tr("লগইন তথ্য আনা যায়নি: $it", "Could not load login details: $it"), color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
-            OutlinedButton(onClick = { reload++ }) { Text(tr("আবার চেষ্টা", "Try again")) }
+            OutlinedButton(modifier = Modifier.pressScale(), onClick = { reload++ }) { Text(tr("আবার চেষ্টা", "Try again")) }
         }
         // Email
         AppCardPlain {
@@ -335,7 +336,7 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
             if (google != null) {
                 Text(tr("✅ যুক্ত আছে", "✅ Linked"), fontSize = 13.sp)
                 if (hasEmailLogin && (info?.providers?.size ?: 0) > 1) {
-                    OutlinedButton(onClick = { confirmUnlink = google.second }) { Text(tr("Google সরান", "Remove Google")) }
+                    OutlinedButton(modifier = Modifier.pressScale(), onClick = { confirmUnlink = google.second }) { Text(tr("Google সরান", "Remove Google")) }
                     Text(tr("সরালে Google দিয়ে আর লগইন হবে না; ইমেইল দিয়ে লগইন চলবে।", "After removal you can't sign in with Google, but email sign-in still works."), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
@@ -347,7 +348,7 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
         AppCardPlain {
             Text(tr("পাসওয়ার্ড", "Password"), fontWeight = FontWeight.Bold)
             Text(tr("বদলাতে বর্তমান পাসওয়ার্ড লাগবে।", "Changing it needs your current password."), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedButton(onClick = { changing = true }, enabled = info != null) { Text(tr("পাসওয়ার্ড বদলান", "Change password")) }
+            OutlinedButton(modifier = Modifier.pressScale(), onClick = { changing = true }, enabled = info != null) { Text(tr("পাসওয়ার্ড বদলান", "Change password")) }
         }
         // Device security (PIN / biometric), not two-step verification
         AppCardPlain {
@@ -384,7 +385,7 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
             title = { Text(tr("Google সরাবেন?", "Remove Google?"), fontWeight = FontWeight.Bold) },
             text = { Text(tr("এই অ্যাকাউন্টে Google দিয়ে আর লগইন করা যাবে না। নিশ্চিত?", "You won't be able to sign in with Google to this account. Continue?")) },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(modifier = Modifier.pressScale(), onClick = {
                     confirmUnlink = null
                     scope.launch {
                         try {
@@ -397,7 +398,7 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
                     }
                 }) { Text(tr("সরান", "Remove"), color = readableOn(Rose500)) }
             },
-            dismissButton = { TextButton(onClick = { confirmUnlink = null }) { Text(tr("বাতিল", "Cancel")) } }
+            dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = { confirmUnlink = null }) { Text(tr("বাতিল", "Cancel")) } }
         )
     }
 }
@@ -512,7 +513,7 @@ fun FaqPage(onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            TextButton(onClick = onBack) { Text(tr("‹ ফিরে যান", "‹ Back")) }
+            TextButton(modifier = Modifier.pressScale(), onClick = onBack) { Text(tr("‹ ফিরে যান", "‹ Back")) }
             Text(tr("প্রশ্ন-উত্তর", "Questions & answers"), fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Text(tr("এই পেজ অফলাইনেও পড়া যায়।", "This page works offline too."), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

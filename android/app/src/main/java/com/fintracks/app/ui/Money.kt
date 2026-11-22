@@ -94,7 +94,7 @@ fun InvestmentsScreen(state: UiState, vm: AppViewModel) {
                     DeleteButton { vm.remove("investments", i.id()) }
                 }
                 KeyValue(tr("বিনিয়োগ / বর্তমান", "Invested / current"), "${taka(i.num("invested"), p)} / ${taka(i.num("current_value"), p)}")
-                OutlinedButton(onClick = {
+                OutlinedButton(modifier = Modifier.pressScale(), onClick = {
                     val now = i.num("current_value")
                     vm.save("investments", row("current_value" to now), i.id())
                 }) { Text(tr("মূল্য হালনাগাদ", "Update value")) }
@@ -166,7 +166,7 @@ fun SubscriptionsScreen(state: UiState, vm: AppViewModel) {
                     Text(taka(s.num("amount"), state.privacy), fontWeight = FontWeight.Bold)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { vm.save("subscriptions", row("is_active" to !s.bool("is_active")), s.id()) }) {
+                    OutlinedButton(modifier = Modifier.pressScale(), onClick = { vm.save("subscriptions", row("is_active" to !s.bool("is_active")), s.id()) }) {
                         Text(if (s.bool("is_active")) tr("বন্ধ করুন", "Close") else tr("চালু করুন", "Activate"))
                     }
                     DeleteButton { vm.remove("subscriptions", s.id()) }

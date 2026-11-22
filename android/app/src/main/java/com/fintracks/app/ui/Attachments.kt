@@ -29,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
+import androidx.compose.ui.Alignment
 
 /**
  * Transaction photos. A photo is first saved on the device (works offline) and listed as waiting for upload.

@@ -565,7 +565,7 @@ private fun AuthCardScene(
                         )
                         Text(tr("মনে রাখুন", "Remember me"), color = Color.White, fontSize = 14.sp)
                         Spacer(Modifier.weight(1f))
-                        TextButton(onClick = onReset) {
+                        TextButton(modifier = Modifier.pressScale(), onClick = onReset) {
                             Text(tr("পাসওয়ার্ড ভুলে গেছেন?", "Forgot password?"), color = auSkyA, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
