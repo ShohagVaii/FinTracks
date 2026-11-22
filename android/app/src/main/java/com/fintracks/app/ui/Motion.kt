@@ -236,11 +236,12 @@ fun CountUpText(
 @Composable
 fun AnimatedRing(fraction: Float, color: Color, size: Dp, stroke: Dp, modifier: Modifier = Modifier) {
     val f by animateFloatAsState(fraction.coerceIn(0f, 1f), tween(400, easing = FastOutSlowInEasing), label = "ring")
+    val track = faint(0.08f) // read here: Canvas drawing blocks are not composable
     Canvas(modifier.size(size)) {
         val s = stroke.toPx()
         val inset = s / 2f
         drawArc(
-            color = Color.White.copy(alpha = 0.08f),
+            color = track,
             startAngle = -90f,
             sweepAngle = 360f,
             useCenter = false,

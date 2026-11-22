@@ -85,7 +85,7 @@ fun AppCard(onClick: (() -> Unit)? = null, borderColor: Color? = null, onLongCli
     // Dark mode uses the web glass card (white 3% fill, white 10% border); light mode keeps its surface.
     val darkNow = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val colors = CardDefaults.cardColors(containerColor = if (darkNow) GlassFill else MaterialTheme.colorScheme.surface)
-    val border = BorderStroke(1.dp, borderColor ?: if (darkNow) GlassBorder else Color.White.copy(alpha = 0.08f))
+    val border = BorderStroke(1.dp, borderColor ?: if (darkNow) GlassBorder else Color.Black.copy(alpha = 0.08f))
     val inner: @Composable ColumnScope.() -> Unit = {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp), content = content)
     }
@@ -157,7 +157,7 @@ fun ProgressBar(fraction: Float, color: Color, modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .height(8.dp)
             .clip(RoundedCornerShape(4.dp))
-            .background(Color.White.copy(alpha = 0.08f))
+            .background(faint(0.08f))
     ) {
         Box(Modifier.fillMaxWidth(f).height(8.dp).background(color))
     }
@@ -279,7 +279,7 @@ fun BottomBar(selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
                 .height(68.dp)
                 .clip(barShape)
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
-                .border(1.dp, Color.White.copy(alpha = 0.08f), barShape)
+                .border(1.dp, faint(0.08f), barShape)
                 .onSizeChanged { barWidth = it.width }
         ) {
             // Sliding pill behind the selected tab (four equal slots; the "+" sits over the centre).

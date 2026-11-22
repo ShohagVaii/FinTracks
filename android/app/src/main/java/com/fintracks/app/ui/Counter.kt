@@ -317,7 +317,7 @@ private fun NoteCell(denomination: Int, value: String, subtotal: Long, modifier:
         modifier
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
+            .border(1.dp, faint(0.12f), RoundedCornerShape(16.dp))
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -331,7 +331,7 @@ private fun NoteCell(denomination: Int, value: String, subtotal: Long, modifier:
                 .width(72.dp)
                 .height(40.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(Color.White.copy(alpha = 0.08f))
+                .background(faint(0.08f))
                 .border(1.dp, Tok_FF14B8A6.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
                 .padding(horizontal = 6.dp),
             contentAlignment = Alignment.Center

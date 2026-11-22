@@ -212,7 +212,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
                     Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(50))
-                        .background(if (on) Sky500 else Color.Transparent)
+                        .background(if (on) selectedFill() else Color.Transparent)
                         .clickable { span = sp; offset = 0 }
                         .padding(vertical = 10.dp),
                     contentAlignment = Alignment.Center
@@ -249,7 +249,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
                 CountUpText(total, { taka(it, p) }, fontSize = 36.sp, fontWeight = FontWeight.Bold)
             }
             Box(Modifier.size(64.dp).clip(CircleShape).background(Sky400.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Sky400, modifier = Modifier.size(30.dp))
+                Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = readableOn(Sky400), modifier = Modifier.size(30.dp))
             }
         }
         }
@@ -901,8 +901,8 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                             .weight(1f)
                             .height(52.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (on) Sky500.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.05f))
-                            .border(1.dp, if (on) Sky500 else Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                            .background(if (on) Sky500.copy(alpha = 0.2f) else faint(0.05f))
+                            .border(1.dp, if (on) Sky500 else faint(0.08f), RoundedCornerShape(16.dp))
                             .clickable { mood = if (on) "" else m },
                         contentAlignment = Alignment.Center
                     ) { Text(m, fontSize = 22.sp) }
@@ -999,8 +999,8 @@ private fun NavSquare(icon: androidx.compose.ui.graphics.vector.ImageVector, ena
         Modifier
             .size(52.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(VideoCardLift.copy(alpha = 0.5f))
-            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp))
+            .background(cardSurface(0.5f))
+            .border(1.dp, cardOutline(), RoundedCornerShape(18.dp))
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -1014,8 +1014,8 @@ private fun RoundIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, des
         Modifier
             .size(44.dp)
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.06f))
-            .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
+            .background(faint(0.06f))
+            .border(1.dp, faint(0.1f), CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) { Icon(icon, contentDescription = desc, tint = Sky400, modifier = Modifier.size(20.dp)) }
@@ -1031,8 +1031,8 @@ private fun PickerField(value: String, options: List<Pair<String, String>>, onPi
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
-                .background(Color.White.copy(alpha = 0.05f))
-                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+                .background(faint(0.05f))
+                .border(1.dp, faint(0.1f), RoundedCornerShape(16.dp))
                 .clickable { open = true }
                 .padding(horizontal = 14.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically

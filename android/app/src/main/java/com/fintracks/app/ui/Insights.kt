@@ -281,7 +281,7 @@ fun ExpenseTrendCard(txs: List<JsonObject>, privacy: Boolean) {
                     Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(50))
-                        .background(if (on) Sky500.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.05f))
+                        .background(if (on) Sky500.copy(alpha = 0.2f) else faint(0.05f))
                         .clickable { view = key }
                         .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center
@@ -348,7 +348,7 @@ fun IncomeExpenseBars(income: Double, expense: Double, privacy: Boolean) {
                     Text(label, fontSize = 13.sp)
                     Text(taka(value, privacy), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = color)
                 }
-                Box(Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = 0.06f))) {
+                Box(Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(6.dp)).background(faint(0.06f))) {
                     val frac = if (max > 0) (value / max).toFloat() else 0f
                     Box(Modifier.fillMaxWidth(frac).height(12.dp).clip(RoundedCornerShape(6.dp)).background(color))
                 }

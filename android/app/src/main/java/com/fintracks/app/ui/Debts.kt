@@ -802,7 +802,7 @@ private fun EntryDetail(
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color.White.copy(alpha = 0.05f))
+                        .background(faint(0.05f))
                         .padding(horizontal = 12.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -830,7 +830,7 @@ private fun DetailStat(label: String, value: String, color: Color, modifier: Mod
     Column(
         modifier
             .clip(RoundedCornerShape(16.dp))
-            .background(Color.White.copy(alpha = 0.05f))
+            .background(faint(0.05f))
             .padding(10.dp)
     ) {
         Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -352,7 +352,7 @@ private fun ChatBubble(msg: ChatMsg, thinking: Boolean, onRetry: () -> Unit, onL
                 .fillMaxWidth(0.82f)
                 .clip(RoundedCornerShape(20.dp))
                 .background(if (mine) Violet600 else MaterialTheme.colorScheme.surface)
-                .border(1.dp, if (mine) Color.Transparent else Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
+                .border(1.dp, if (mine) Color.Transparent else faint(0.08f), RoundedCornerShape(20.dp))
                 .padding(14.dp)
         ) {
             Column {

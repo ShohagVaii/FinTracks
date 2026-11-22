@@ -184,11 +184,22 @@ fun cardSurface(darkAlpha: Float = 0.55f): Color = if (isDarkTheme()) VideoCardL
 @Composable
 fun cardOutline(): Color = if (isDarkTheme()) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)
 
+/**
+ * Faint fill or line for tracks, chips and borders. Dark mode: white at [alpha] (unchanged values).
+ * Light mode: black at the same alpha, so the element stays visible on white surfaces.
+ */
+@Composable
+fun faint(alpha: Float): Color = if (isDarkTheme()) Color.White.copy(alpha = alpha) else Color.Black.copy(alpha = alpha)
+
 /** Hero card gradient: dark keeps the deep green-navy glow; light uses a soft sky-to-mint wash. */
 @Composable
 fun heroBrush(): Brush =
     if (isDarkTheme()) Brush.linearGradient(listOf(Tok_FF0B1F1C, VideoCardLift.copy(alpha = 0.6f)))
     else Brush.linearGradient(listOf(Color(0xFFE0F2FE), Color(0xFFECFDF5)))
+
+/** Selected segment fill. Dark: the sky accent (white text). Light: a deeper sky so white text stays readable. */
+@Composable
+fun selectedFill(): Color = if (isDarkTheme()) Sky500 else lerp(Sky500, Color.Black, 0.25f)
 
 /** Income and expense text/line colour. Dark: the bright chart tones. Light: deeper emerald and rose. */
 @Composable

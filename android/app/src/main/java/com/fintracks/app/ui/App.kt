@@ -379,7 +379,7 @@ private fun HeaderIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, de
             .size(40.dp)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+            .border(1.dp, faint(0.08f), CircleShape)
             .pressScale()
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center

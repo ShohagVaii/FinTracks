@@ -216,7 +216,7 @@ fun ToolsScreen(onOpen: (Overlay) -> Unit) {
                             }
                             .clip(RoundedCornerShape(32.dp))
                             .background(MaterialTheme.colorScheme.surface)
-                            .border(1.dp, if (dragging) t.color.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.08f), RoundedCornerShape(32.dp))
+                            .border(1.dp, if (dragging) t.color.copy(alpha = 0.6f) else faint(0.08f), RoundedCornerShape(32.dp))
                             .pointerInput(t.label, cellXPx, cellYPx) {
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = {
@@ -597,7 +597,7 @@ private fun IntelligenceCard(onOpen: () -> Unit) {
             tr("FinTrack AI আপনার খরচ বিশ্লেষণ করে বাজেট ভারসাম্য বজায় রাখতে সাহায্য করে।", "FinTrack AI analyses your spending and helps keep your budget balanced."),
             fontSize = 14.sp,
             lineHeight = 22.sp,
-            color = Slate400
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Box(
             Modifier
@@ -669,7 +669,7 @@ private fun SocialButton(glyph: ImageVector, desc: String, onClick: () -> Unit) 
             .size(56.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp))
+            .border(1.dp, faint(0.08f), RoundedCornerShape(18.dp))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) { Icon(glyph, contentDescription = desc, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp)) }
