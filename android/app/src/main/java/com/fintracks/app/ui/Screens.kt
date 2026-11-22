@@ -1,5 +1,13 @@
 package com.fintracks.app.ui
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -197,10 +205,10 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
                     Text(tr("নিট লাভ (PROFIT)", "Net profit (PROFIT)"), fontSize = 12.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(taka(net, p), fontSize = 36.sp, fontWeight = FontWeight.Bold, color = if (net >= 0) incomeGreen else expenseRed)
+                    Text(taka(net, p), fontSize = 36.sp, fontWeight = FontWeight.Bold, color = netTone(net))
                 }
-                Box(Modifier.size(64.dp).clip(CircleShape).background(incomeGreen.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.TrendingUp, contentDescription = null, tint = incomeGreen, modifier = Modifier.size(30.dp))
+                Box(Modifier.size(64.dp).clip(CircleShape).background(netTone(net).copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
+                    Icon(if (net >= 0) Icons.Default.TrendingUp else Icons.Default.TrendingDown, contentDescription = null, tint = netTone(net), modifier = Modifier.size(30.dp))
                 }
             }
             if (income > 0) Text(tr("সঞ্চয়ের হার", "Savings rate") + ": ${bnDigits("%.0f".format(savingsRate))}%", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
@@ -254,7 +262,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
                     AppCard(onClick = { openOverlay(Overlay.ACCOUNTS) }) {
                         Text(acc.str("name"), fontWeight = FontWeight.Bold)
                         Text(acc.str("kind"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(taka(accountBalance(acc, txs), p), fontWeight = FontWeight.Bold)
+                        Text(taka(accountBalance(acc, txs), p), fontWeight = FontWeight.Bold, color = netTone(accountBalance(acc, txs)))
                     }
                 }
             }
@@ -292,7 +300,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
 
         SectionTitle(tr("সাম্প্রতিক লেনদেন", "Recent transactions"))
         if (txs.isEmpty()) EmptyHint(tr("এখনো কোনো লেনদেন নেই। নিচের + বাটন দিয়ে যোগ করুন।", "No transactions yet. Add one with the + button below."))
-        txs.take(5).forEach { t -> TxItem(t, state, onClick = { openReceipt(t) }, onDelete = null, onLongClick = { onTxLongPress(t) }) }
+        txs.take(5).forEach { t -> TxItem(t, state, onClick = { openReceipt(t) }, onLongClick = { onTxLongPress(t) }) }
         Spacer(Modifier.height(90.dp))
     }
 }
@@ -301,9 +309,9 @@ private fun lastIndexWithData(list: List<Double>): Int = list.indexOfLast { it >
 
 /** One transaction line: icon, note, mode, date, amount. */
 @Composable
-fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onDelete: (() -> Unit)?, onShare: (() -> Unit)? = null, onLongClick: (() -> Unit)? = null) {
+fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onLongClick: (() -> Unit)? = null) {
     val type = t.str("type")
-    val amountColor = when (type) { "Income" -> incomeGreen; "Expense" -> expenseRed; else -> Sky400 }
+    val amountColor = readableOn(when (type) { "Income" -> incomeGreen; "Expense" -> expenseRed; else -> Sky400 })
     val sign = when (type) { "Income" -> "+"; "Expense" -> "-"; else -> "⇄" }
     AppCard(onClick = onClick, onLongClick = onLongClick) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -317,8 +325,6 @@ fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onDelete: (() -> 
                 Text("${displayDate(dateOf(t, "tx_date"))} · ${t.str("payment_mode")}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text("$sign ${taka(t.num("amount"), state.privacy)}", color = amountColor, fontWeight = FontWeight.Bold)
-            if (onShare != null) IconButton(onClick = onShare) { Icon(Icons.Default.Share, contentDescription = tr("শেয়ার", "Share"), tint = Sky400) }
-            if (onDelete != null) DeleteButton(onDelete)
         }
     }
 }
@@ -342,6 +348,17 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
     fun togglePick(id: String) { picked = if (id in picked) picked - id else picked + id }
     fun endSelect() { selecting = false; picked = emptySet() }
     BackHandler(enabled = selecting) { endSelect() }
+    // Scrolling the list down folds the control block away; scrolling up (or reaching the top) brings it back.
+    var collapsed by remember { mutableStateOf(false) }
+    val listScroll = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < -4f) collapsed = true
+                else if (available.y > 4f) collapsed = false
+                return Offset.Zero
+            }
+        }
+    }
     val range = rangeFor(period, customFrom, customTo)
     val all = state.rows("transactions").filter { segment == "history" || it.str("source").isNotEmpty() }
     val inRange = filterByRange(all, range)
@@ -356,7 +373,9 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
     val income = inRange.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
     val expense = inRange.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.fillMaxSize().padding(16.dp).nestedScroll(listScroll)) {
+        AnimatedVisibility(visible = !collapsed, enter = expandVertically(), exit = shrinkVertically()) {
+        Column(Modifier.padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         ChoiceChips(listOf("history" to tr("লেনদেনের ইতিহাস", "History"), "auto" to tr("অটো-লেনদেন", "Auto-created")), segment) { segment = it }
         OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text(tr("খুঁজুন (নোট / ক্যাটাগরি / #ট্যাগ)", "Search (note / category / #tag)")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
         PeriodPicker(period, customFrom, customTo, onPeriod = { period = it }, onFrom = { customFrom = it }, onTo = { customTo = it })
@@ -366,7 +385,7 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StatPill(tr("আয়", "Income"), taka(income, state.privacy), incomeGreen, Modifier.weight(1f))
             StatPill(tr("ব্যয়", "Expense"), taka(expense, state.privacy), expenseRed, Modifier.weight(1f))
-            StatPill(tr("নিট", "Net"), taka(income - expense, state.privacy), ChartNet, Modifier.weight(1f))
+            StatPill(tr("নিট", "Net"), taka(income - expense, state.privacy), netTone(income - expense), Modifier.weight(1f))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf(Export.Format.XLSX to "Excel", Export.Format.PDF to "PDF", Export.Format.CSV to "CSV").forEach { (fmt, label) ->
@@ -395,10 +414,18 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                 }
             }) { Text(tr("ভাউচার", "Voucher"), maxLines = 1, softWrap = false, fontSize = 13.sp) }
         }
+        }
+        }
         if (selecting) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(tr("${picked.size}টি নির্বাচিত", "${picked.size} selected"), modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
-                TextButton(enabled = picked.isNotEmpty(), onClick = { confirmBulk = true }) { Text(tr("মুছুন", "Delete"), color = Rose500) }
+                // One selected row can be edited here (or open its receipt by tapping it).
+                if (picked.size == 1) TextButton(onClick = {
+                    val one = state.rows("transactions").firstOrNull { it.id() == picked.first() }
+                    endSelect()
+                    if (one != null) openTx(one)
+                }) { Text(tr("এডিট", "Edit")) }
+                TextButton(enabled = picked.isNotEmpty(), onClick = { confirmBulk = true }) { Text(tr("মুছুন", "Delete"), color = readableOn(Rose500)) }
                 TextButton(onClick = { endSelect() }) { Text(tr("বাতিল", "Cancel")) }
             }
         }
@@ -426,22 +453,11 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (selecting) Checkbox(checked = t.id() in picked, onCheckedChange = { togglePick(t.id()) })
                     Box(Modifier.weight(1f)) {
-                TxItem(
-                    t, state,
-                    onClick = { if (selecting) togglePick(t.id()) else openReceipt(t) },
-                    onLongClick = { if (!selecting) { selecting = true; picked = setOf(t.id()) } },
-                    onDelete = if (selecting) null else { { vm.remove("transactions", t.id()) } },
-                    onShare = {
-                        scope.launch {
-                            try {
-                                val file = withContext(Dispatchers.IO) { Export.receiptFile(ctx, state, t) }
-                                Export.share(ctx, file, "application/pdf", tr("FinTrack লেনদেন ভাউচার", "FinTrack transaction voucher"))
-                            } catch (e: Exception) {
-                                Toast.makeText(ctx, tr("শেয়ার ব্যর্থ: ${e.message}", "Share failed: ${e.message}"), Toast.LENGTH_LONG).show()
-                            }
-                        }
-                    }
-                )
+                        TxItem(
+                            t, state,
+                            onClick = { if (selecting) togglePick(t.id()) else openReceipt(t) },
+                            onLongClick = { if (!selecting) { selecting = true; picked = setOf(t.id()) } }
+                        )
                     }
                 }
             }
@@ -657,7 +673,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                 RoundIcon(Icons.Default.Calculate, tr("ক্যালকুলেটর", "Calculator")) { showCalc = true }
             }
             if (reading) Text(tr("রসিদ পড়া হচ্ছে…", "Reading receipt…"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            captureNote?.let { Text(it, fontSize = 12.sp, color = Sky400) }
+            captureNote?.let { Text(it, fontSize = 12.sp, color = readableOn(Sky400)) }
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (type != "Transfer") {
@@ -710,7 +726,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                 OutlinedButton(modifier = Modifier.weight(1f), onClick = { launchAttachCamera() }) { Text(tr("ক্যামেরা", "Camera"), maxLines = 1) }
                 if (pv != null || (attachPath.isNotEmpty() && !attachRemoved)) {
                     OutlinedButton(modifier = Modifier.weight(1f), onClick = { attachBytes = null; attachPreview = null; attachRemoved = true }) {
-                        Text(tr("ছবি সরান", "Remove"), color = Rose500, maxLines = 1)
+                        Text(tr("ছবি সরান", "Remove"), color = readableOn(Rose500), maxLines = 1)
                     }
                 }
             }
@@ -749,11 +765,11 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                 ) { Icon(Icons.Default.Add, contentDescription = tr("ট্যাগ যোগ করুন", "Add tag"), tint = Color.White) }
             }
             val tagList = tagsText.split(',').map { it.trim() }.filter { it.isNotEmpty() }
-            if (tagList.isNotEmpty()) Text(tagList.joinToString("  ") { "#$it" }, fontSize = 12.sp, color = Sky400)
+            if (tagList.isNotEmpty()) Text(tagList.joinToString("  ") { "#$it" }, fontSize = 12.sp, color = readableOn(Sky400))
             TextIn(tr("নোট", "Note"), note, { note = it })
             SwitchRow(tr("প্রতি মাসে পুনরাবৃত্ত", "Repeats monthly"), recurring) { recurring = it }
-            error?.let { Text(it, color = expenseRed, fontSize = 12.sp) }
-            if (locked) Text(tr("এটি বাকি পরিশোধ থেকে তৈরি। পরিবর্তন করতে বাকি খাতা থেকে এই পরিশোধ মুছে আবার যোগ করুন।", "Created from a credit payment. To change it, delete this payment in the credit ledger and add it again."), fontSize = 12.sp, color = Sky400)
+            error?.let { Text(it, color = readableOn(expenseRed), fontSize = 12.sp) }
+            if (locked) Text(tr("এটি বাকি পরিশোধ থেকে তৈরি। পরিবর্তন করতে বাকি খাতা থেকে এই পরিশোধ মুছে আবার যোগ করুন।", "Created from a credit payment. To change it, delete this payment in the credit ledger and add it again."), fontSize = 12.sp, color = readableOn(Sky400))
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -776,8 +792,8 @@ internal fun StatPill(label: String, value: String, color: Color, modifier: Modi
             .border(1.dp, color.copy(alpha = 0.18f), RoundedCornerShape(40.dp))
             .padding(horizontal = 20.dp, vertical = 18.dp)
     ) {
-        Text(label, fontSize = 12.sp, color = color)
-        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
+        Text(label, fontSize = 12.sp, color = readableOn(color))
+        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = readableOn(color))
     }
 }
 
@@ -825,7 +841,7 @@ private fun NavSquare(icon: androidx.compose.ui.graphics.vector.ImageVector, ena
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = null, tint = if (enabled) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.25f))
+        Icon(icon, contentDescription = null, tint = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
     }
 }
 
@@ -944,7 +960,7 @@ fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
                     }) { Text(tr("লেনদেনে যোগ করুন", "Add to transactions")) }
                 }
             }
-            message?.let { Text(it, color = expenseRed, fontSize = 12.sp) }
+            message?.let { Text(it, color = readableOn(expenseRed), fontSize = 12.sp) }
         }
     }
 }

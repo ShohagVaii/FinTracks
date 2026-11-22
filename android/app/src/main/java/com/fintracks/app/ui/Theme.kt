@@ -1,5 +1,7 @@
 package com.fintracks.app.ui
 
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -47,6 +49,8 @@ val Blue600: Color get() = AppPrefs.accent.gradientEnd
 
 val Emerald500 = Color(0xFF10B981)
 val Rose500 = Color(0xFFF43F5E)
+/** Deeper rose for light-theme charts and heatmap cells (Tailwind rose-700). */
+val Rose700 = Color(0xFFBE123C)
 val Amber500 = Color(0xFFF59E0B)
 val Amber400 = Color(0xFFFBBF24)
 val Indigo400 = Color(0xFF818CF8)
@@ -156,3 +160,19 @@ val Tok_FFFB923C = Color(0xFFFB923C)
 /** Social-link tiles in Settings. */
 val FacebookBlue = Color(0xFF1877F2)
 val TelegramBlue = Color(0xFF229ED9)
+
+/** True when the current theme is dark. */
+@Composable
+fun isDarkTheme(): Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f
+
+/**
+ * Text colour that stays readable on the current background. In light mode accent colours
+ * (sky, amber, emerald, rose) get a deeper tone; in dark mode they are used as they are.
+ */
+@Composable
+fun readableOn(c: Color): Color =
+    if (c == Color.Unspecified || isDarkTheme()) c else lerp(c, Color.Black, 0.4f)
+
+/** Net (income − expense) or any balance difference: zero or positive uses the income green, negative the expense red. */
+@Composable
+fun netTone(value: Double): Color = readableOn(if (value >= 0) ChartIncome else ChartExpense)

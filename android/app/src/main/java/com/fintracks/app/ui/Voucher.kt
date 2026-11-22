@@ -445,7 +445,7 @@ object Voucher {
         val income = txs.filter { it.str("type") == "Income" }.sumOf { it.num("amount") }
         val expense = txs.filter { it.str("type") == "Expense" }.sumOf { it.num("amount") }
         val net = income - expense
-        val netColor = if (net >= 0) "#0F172A" else "#BE123C"
+        val netColor = if (net >= 0) "#047857" else "#BE123C"
         val dash = line("#CBD5E1", 1.5f).apply { pathEffect = DashPathEffect(floatArrayOf(6f, 6f), 0f) }
 
         base(c, ctx)

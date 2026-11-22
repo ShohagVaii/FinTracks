@@ -195,7 +195,7 @@ object Export {
         val boxes = listOf(
             Triple(tr("মোট আয়", "Total income"), income, "#10B981"),
             Triple(tr("মোট ব্যয়", "Total expense"), expense, "#F43F5E"),
-            Triple(tr("নিট", "Net"), income - expense, "#0EA5E9")
+            Triple(tr("নিট", "Net"), income - expense, if (income - expense >= 0) "#047857" else "#BE123C")
         )
         boxes.forEachIndexed { i, (label, value, col) ->
             val left = 40f + i * 175f

@@ -132,13 +132,13 @@ fun InsightsCards(state: UiState) {
         } else {
             unusual.take(5).forEach { u ->
                 val pct = ((u.thisMonth - u.average) / u.average * 100).toInt()
-                Text(tr("${catIcon(u.category)} ${catLabel(u.category)}: এই মাসে ${taka(u.thisMonth, p)} (গড়ের চেয়ে +$pct%)", "${catIcon(u.category)} ${catLabel(u.category)}: this month ${taka(u.thisMonth, p)} (+$pct% vs average)"), fontSize = 13.sp, color = Amber500)
+                Text(tr("${catIcon(u.category)} ${catLabel(u.category)}: এই মাসে ${taka(u.thisMonth, p)} (গড়ের চেয়ে +$pct%)", "${catIcon(u.category)} ${catLabel(u.category)}: this month ${taka(u.thisMonth, p)} (+$pct% vs average)"), fontSize = 13.sp, color = readableOn(Amber500))
             }
         }
     }
     AppCard {
         Text(tr("নেট ওয়ার্থ", "Net worth"), fontWeight = FontWeight.Bold)
-        KeyValue(tr("মোট সম্পদ − দেনা", "Total assets − debts"), taka(Insights.netWorth(state), p), ChartNet)
+        KeyValue(tr("মোট সম্পদ − দেনা", "Total assets − debts"), taka(Insights.netWorth(state), p), netTone(Insights.netWorth(state)))
         Text(tr("সম্পদ: অ্যাকাউন্ট ব্যালেন্স + বিনিয়োগ। দেনা: অপরিশোধিত ধার ও লোনের বাকি।", "Assets: account balances + investments. Debts: unpaid loans and dues."), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -161,12 +161,25 @@ fun HeatmapCard(txs: List<JsonObject>, privacy: Boolean, ym: YearMonth, onPrev: 
         if (day in 1..days) perDay[day] += t.num("amount")
     }
     val max = (perDay.maxOrNull() ?: 0.0).coerceAtLeast(1.0)
-    val base = Rose500
+    // Dark theme: rose on a dark cell, white numbers. Light theme: a deeper rose on a pale cell, its own
+    // intensity scale (0.10 to 1.0), and dark numbers on pale cells, white numbers only on dense cells.
+    val dark = isDarkTheme()
+    val base = if (dark) Rose500 else Rose700
     val lead = first.dayOfWeek.value % 7 // Sunday = 0
     val cells: List<Int?> = List(lead) { null } + (1..days).map { it }
     fun shade(day: Int?): Float {
         val v = if (day == null) 0.0 else perDay[day]
-        return if (v <= 0.0) 0.06f else (0.25f + 0.75f * (v / max).toFloat()).coerceAtMost(1f)
+        val r = (v / max).toFloat()
+        return when {
+            v <= 0.0 -> if (dark) 0.06f else 0.08f
+            dark -> (0.25f + 0.75f * r).coerceAtMost(1f)
+            else -> (0.10f + 0.90f * r).coerceAtMost(1f)
+        }
+    }
+    fun numberColor(alpha: Float): Color = when {
+        dark -> Color.White.copy(alpha = 0.85f)
+        alpha >= 0.75f -> Color.White
+        else -> Slate900
     }
     AppCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -201,7 +214,7 @@ fun HeatmapCard(txs: List<JsonObject>, privacy: Boolean, ym: YearMonth, onPrev: 
                             .background(if (day == null) Color.Transparent else base.copy(alpha = shade(day))),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (day != null) Text(bnDigits(day.toString()), fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
+                        if (day != null) Text(bnDigits(day.toString()), fontSize = 12.sp, color = numberColor(shade(day)))
                     }
                 }
                 repeat(7 - week.size) { Spacer(Modifier.weight(1f)) }
@@ -340,6 +353,6 @@ fun IncomeExpenseBars(income: Double, expense: Double, privacy: Boolean) {
                 }
             }
         }
-        Text(tr("নিট: ${taka(income - expense, privacy)}", "Net: ${taka(income - expense, privacy)}"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(tr("নিট: ${taka(income - expense, privacy)}", "Net: ${taka(income - expense, privacy)}"), fontSize = 12.sp, color = netTone(income - expense))
     }
 }

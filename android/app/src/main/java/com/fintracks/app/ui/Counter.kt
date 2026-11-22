@@ -302,7 +302,7 @@ fun MoneyCounterScreen(vm: AppViewModel, showHistory: Boolean, onHistory: (Boole
         }
         status?.let { Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2) }
         if (pending > 0) {
-            Text(tr("অপেক্ষমাণ সিঙ্ক: ", "Pending sync: ") + bnDigits(pending.toString()) + tr("টি", ""), fontSize = 12.sp, color = Amber500)
+            Text(tr("অপেক্ষমাণ সিঙ্ক: ", "Pending sync: ") + bnDigits(pending.toString()) + tr("টি", ""), fontSize = 12.sp, color = readableOn(Amber500))
         }
     }
 }

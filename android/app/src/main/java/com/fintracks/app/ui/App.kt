@@ -220,7 +220,7 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
     if (smsOpen) SmsParserDialog(state, vm) { smsOpen = false }
     if (showCalc) CalculatorDialog(onUse = { showCalc = false }, onDismiss = { showCalc = false })
 
-    receipt?.let { r -> ReceiptDialog(r, state) { receipt = null } }
+    receipt?.let { r -> ReceiptDialog(r, state, onEdit = { receipt = null; openTx(r) }) { receipt = null } }
     txAction?.let { a ->
         TxActionDialog(
             a,
@@ -274,7 +274,7 @@ private fun Header(
                     )
                 }
             }
-            Text("PREMIUM FINANCE", color = Slate400, fontSize = 9.sp, letterSpacing = 3.sp)
+            Text("PREMIUM FINANCE", color = readableOn(Slate400), fontSize = 9.sp, letterSpacing = 3.sp)
         }
         HeaderIcon(Icons.Default.Calculate, tr("ক্যালকুলেটর", "Calculator"), onCalc)
         HeaderIcon(Icons.Default.WbSunny, if (dark) tr("লাইট থিম", "Light theme") else tr("ডার্ক থিম", "Dark theme"), onToggleTheme, tint = Amber400)

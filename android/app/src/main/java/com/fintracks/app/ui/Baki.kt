@@ -127,10 +127,10 @@ fun CreditDueCard(state: UiState, onOpen: () -> Unit) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
                 Text(tr("মোট বাকি দেনা", "Total credit due"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                Text(taka(due, p), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = BakiRed)
+                Text(taka(due, p), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = readableOn(BakiRed))
                 Text(tr("দোকানের বাকি · ধার/লোন থেকে আলাদা", "Shop credit · separate from loans"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (overdue > 0) Text(tr("$overdue টি মেয়াদোত্তীর্ণ", "$overdue overdue"), color = BakiRed, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            if (overdue > 0) Text(tr("$overdue টি মেয়াদোত্তীর্ণ", "$overdue overdue"), color = readableOn(BakiRed), fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -154,8 +154,8 @@ fun BakiScreen(state: UiState, vm: AppViewModel) {
     Page {
         AppCard {
             Text(tr("মোট বাকি দেনা", "Total credit due"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-            Text(taka(totalDue, p), fontSize = 26.sp, fontWeight = FontWeight.Bold, color = BakiRed)
-            if (overdue > 0) Text(tr("$overdue টি কেনার শেষ তারিখ পার হয়ে গেছে", "$overdue purchases past due date"), fontSize = 12.sp, color = BakiRed)
+            Text(taka(totalDue, p), fontSize = 26.sp, fontWeight = FontWeight.Bold, color = readableOn(BakiRed))
+            if (overdue > 0) Text(tr("$overdue টি কেনার শেষ তারিখ পার হয়ে গেছে", "$overdue purchases past due date"), fontSize = 12.sp, color = readableOn(BakiRed))
             Text(tr("ধার/লোন থেকে আলাদা হিসাব। দোকান ও ব্যক্তির বাকি এখানে।", "Separate from loans. Shop and personal credit is here."), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         AddButton(tr("নতুন দোকান", "New shop")) { addingShop = true }
@@ -172,7 +172,7 @@ fun BakiScreen(state: UiState, vm: AppViewModel) {
                         ).joinToString(" · ")
                         Text(sub, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Text(taka(shopBalance(s.id(), state), p), fontWeight = FontWeight.Bold, color = BakiRed)
+                    Text(taka(shopBalance(s.id(), state), p), fontWeight = FontWeight.Bold, color = readableOn(BakiRed))
                 }
             }
         }
@@ -277,7 +277,7 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
             AppCard {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
-                        Text(taka(pay.num("amount"), p), fontWeight = FontWeight.Bold, color = BakiGreen)
+                        Text(taka(pay.num("amount"), p), fontWeight = FontWeight.Bold, color = readableOn(BakiGreen))
                         Text(displayDate(dateOf(pay, "paid_on")) + (if (pay.str("note").isNotBlank()) " · ${pay.str("note")}" else ""), fontSize = 11.sp)
                     }
                     DeleteButton { vm.remove("credit_payments", pay.id()) }
@@ -374,7 +374,7 @@ private fun PurchaseDialog(shopId: String, existing: JsonObject?, vm: AppViewMod
         AddButton(tr("আইটেম যোগ", "Add item")) { lines.add(ItemDraft()) }
         TextIn(tr("সমন্বয় (+ ডেলিভারি, − ছাড়; না থাকলে খালি)", "Adjustment (+ delivery, − discount; empty if none)"), adjust, { adjust = it })
         Text(tr("মোট: ${taka(total, false)}", "Total: ${taka(total, false)}"), fontWeight = FontWeight.Bold)
-        if (total < 0) Text(tr("মোট ঋণাত্মক হতে পারে না", "Total cannot be negative"), fontSize = 12.sp, color = BakiRed)
+        if (total < 0) Text(tr("মোট ঋণাত্মক হতে পারে না", "Total cannot be negative"), fontSize = 12.sp, color = readableOn(BakiRed))
         DateField(tr("কেনার তারিখ", "Purchase date"), date, { date = it })
         DateField(tr("শেষ তারিখ (ঐচ্ছিক)", "Due date (optional)"), due, { due = it }, optional = true)
         TextIn(tr("নোট (ঐচ্ছিক)", "Note (optional)"), note, { note = it })
@@ -400,7 +400,7 @@ private fun PaymentDialog(shopId: String, shopName: String, balance: Double, vm:
     }) {
         Text(tr("বর্তমান বাকি: ${taka(balance, false)}", "Current due: ${taka(balance, false)}"), fontSize = 13.sp, fontWeight = FontWeight.Bold)
         TextIn(tr("পরিমাণ (৳)", "Amount (৳)"), amount, { amount = it }, number = true)
-        if (tooMuch) Text(tr("বাকির বেশি টাকা দেওয়া যাবে না", "Payment cannot exceed the balance due"), fontSize = 12.sp, color = BakiRed)
+        if (tooMuch) Text(tr("বাকির বেশি টাকা দেওয়া যাবে না", "Payment cannot exceed the balance due"), fontSize = 12.sp, color = readableOn(BakiRed))
         DateField(tr("তারিখ", "Date"), date, { date = it })
         TextIn(tr("নোট (ঐচ্ছিক)", "Note (optional)"), note, { note = it })
     }

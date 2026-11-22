@@ -277,7 +277,7 @@ fun LogoutRow(onClick: () -> Unit) {
             .padding(vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(tr("লগআউট", "Log out"), color = Rose500, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text(tr("লগআউট", "Log out"), color = readableOn(Rose500), fontWeight = FontWeight.Bold, fontSize = 16.sp)
     }
 }
 
@@ -395,7 +395,7 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
                             Toast.makeText(ctx, tr("সরানো যায়নি: ${e.message}", "Could not remove: ${e.message}"), Toast.LENGTH_LONG).show()
                         }
                     }
-                }) { Text(tr("সরান", "Remove"), color = Rose500) }
+                }) { Text(tr("সরান", "Remove"), color = readableOn(Rose500)) }
             },
             dismissButton = { TextButton(onClick = { confirmUnlink = null }) { Text(tr("বাতিল", "Cancel")) } }
         )

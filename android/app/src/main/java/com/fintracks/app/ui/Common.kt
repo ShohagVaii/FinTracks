@@ -50,7 +50,7 @@ fun TextIn(label: String, value: String, onChange: (String) -> Unit, number: Boo
 fun KeyValue(label: String, value: String, valueColor: Color = Color.Unspecified) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-        Text(value, fontWeight = FontWeight.Bold, color = valueColor, fontSize = 14.sp)
+        Text(value, fontWeight = FontWeight.Bold, color = readableOn(valueColor), fontSize = 14.sp)
     }
 }
 

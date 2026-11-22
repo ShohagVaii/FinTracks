@@ -300,7 +300,7 @@ fun ZakatScreen(state: UiState) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AppCard {
             Text(tr("যাকাত ক্যালকুলেটর", "Zakat calculator"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Text(tr("ক্যাশ: ${fmtMoney(cash)}", "Cash: ${fmtMoney(cash)}"), color = Amber400, fontWeight = FontWeight.Bold)
+            Text(tr("ক্যাশ: ${fmtMoney(cash)}", "Cash: ${fmtMoney(cash)}"), color = readableOn(Amber400), fontWeight = FontWeight.Bold)
             Text(tr("ইনভেস্টমেন্ট/সম্পদ: ${fmtMoney(assets)}", "Investments/assets: ${fmtMoney(assets)}"), fontSize = 13.sp)
             TextIn(tr("স্বর্ণ (৳)", "Gold (৳)"), gold, { gold = it }, number = true)
             TextIn(tr("রূপা (৳)", "Silver (৳)"), silver, { silver = it }, number = true)
@@ -310,7 +310,7 @@ fun ZakatScreen(state: UiState) {
             TextIn(tr("রূপার দর (প্রতি গ্রাম, ৳)", "Silver price per gram (৳)"), silverPerGram, { silverPerGram = it }, number = true)
             TextIn(tr("স্বর্ণের দর (প্রতি গ্রাম, ৳)", "Gold price per gram (৳)"), goldPerGram, { goldPerGram = it }, number = true)
             if (nisab == null) {
-                Text(tr("নিসাব জানতে রূপার দর (প্রতি গ্রাম) লিখুন।", "Enter the silver price per gram to find the nisab."), fontSize = 12.sp, color = Rose500)
+                Text(tr("নিসাব জানতে রূপার দর (প্রতি গ্রাম) লিখুন।", "Enter the silver price per gram to find the nisab."), fontSize = 12.sp, color = readableOn(Rose500))
             } else {
                 val basis = if (silverBasis) tr("রূপার ভিত্তিতে ${Web.NISAB_SILVER_GRAMS} গ্রাম", "silver basis, ${Web.NISAB_SILVER_GRAMS} g") else tr("স্বর্ণের ভিত্তিতে ${Web.NISAB_GOLD_GRAMS} গ্রাম", "gold basis, ${Web.NISAB_GOLD_GRAMS} g")
                 Text(tr("নিসাব: ${fmtMoney(nisab)} ($basis)", "Nisab: ${fmtMoney(nisab)} ($basis)"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -318,7 +318,7 @@ fun ZakatScreen(state: UiState) {
         }
         AppCard {
             Text(tr("প্রদেয় যাকাত (২.৫%)", "Zakat due (2.5%)"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(if (zakat == null) "—" else fmtMoney(zakat), fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Amber400)
+            Text(if (zakat == null) "—" else fmtMoney(zakat), fontSize = 30.sp, fontWeight = FontWeight.Bold, color = readableOn(Amber400))
             val status = when {
                 nisab == null -> tr("নিসাব না জানা পর্যন্ত যাকাত হিসাব করা যাবে না।", "Zakat cannot be worked out until the nisab is known.")
                 wealth >= nisab -> tr("সম্পদ নিসাবের সমান বা বেশি, তাই যাকাত দেওয়ার পর্যায়ে।", "Assets meet or exceed the nisab, so zakat is due.")
@@ -374,7 +374,7 @@ fun TaxScreen(state: UiState) {
         }
         AppCard {
             Text(tr("মোট ট্যাক্স", "Total tax"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(fmtMoney(tax), fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Rose500)
+            Text(fmtMoney(tax), fontSize = 30.sp, fontWeight = FontWeight.Bold, color = readableOn(Rose500))
             Text(tr("কার্যকর হার", "Effective rate") + ": ${bnDigits(if (inc > 0) String.format(Locale.US, "%.2f", tax / inc * 100) else "0.00")}%", fontSize = 12.sp)
         }
         Text(
@@ -428,14 +428,14 @@ fun CurrencyScreen() {
             if (result != null) {
                 Text(bnDigits(String.format(Locale.US, "%,.2f", result)) + " $to", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Tok_FF34D399)
             } else {
-                Text(tr("রেট পাওয়া যায়নি। ইন্টারনেট দিয়ে একবার রেট আনুন।", "No rate yet. Fetch rates once with internet."), fontSize = 13.sp, color = Rose500)
+                Text(tr("রেট পাওয়া যায়নি। ইন্টারনেট দিয়ে একবার রেট আনুন।", "No rate yet. Fetch rates once with internet."), fontSize = 13.sp, color = readableOn(Rose500))
             }
             if (s != null) {
                 val at = fxUpdatedLocal(s.updatedUtc)
                 val stamp = at?.let { displayDate(it.toLocalDate().toString()) + " " + bnDigits(String.format(Locale.US, "%02d:%02d", it.hour, it.minute)) } ?: s.updatedUtc
                 val stale = System.currentTimeMillis() - s.fetchedAt > FxStore.MAX_AGE_MS
                 Text(tr("রেটের সময়: $stamp (ডিভাইসের সময়)", "Rate time: $stamp (device time)") + if (stale) tr(" · পুরনো ক্যাশ", " · cached") else "", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (failed) Text(tr("নতুন রেট আনা যায়নি, তাই ক্যাশ করা রেট দেখানো হচ্ছে।", "Couldn't fetch new rates, so the saved rate is shown."), fontSize = 11.sp, color = Rose500)
+                if (failed) Text(tr("নতুন রেট আনা যায়নি, তাই ক্যাশ করা রেট দেখানো হচ্ছে।", "Couldn't fetch new rates, so the saved rate is shown."), fontSize = 11.sp, color = readableOn(Rose500))
             }
             OutlinedButton(onClick = { refresh() }, enabled = !loading) {
                 Text(if (loading) tr("রেট আনা হচ্ছে…", "Fetching rates…") else tr("রেট নতুন করে আনুন", "Refresh rates"))
@@ -486,7 +486,7 @@ fun LoanScreen(state: UiState, vm: AppViewModel) {
                     if (!done) Button(onClick = {
                         vm.save("loans", row("paid" to (paid + 1).toDouble()), l.id())
                     }) { Text(tr("১ মাস পরিশোধ", "Pay 1 month")) }
-                    else Text(tr("✅ সম্পন্ন", "✅ Done"), color = Emerald500)
+                    else Text(tr("✅ সম্পন্ন", "✅ Done"), color = readableOn(Emerald500))
                 }
             }
         }
@@ -545,7 +545,7 @@ fun ReportsScreen(state: UiState) {
         AppCard {
             KeyValue(tr("আয়", "Income"), taka(income, p), Emerald500)
             KeyValue(tr("ব্যয়", "Expense"), taka(expense, p), Rose500)
-            KeyValue(tr("নিট", "Net"), taka(income - expense, p), ChartNet)
+            KeyValue(tr("নিট", "Net"), taka(income - expense, p), netTone(income - expense))
             KeyValue(tr("লেনদেন সংখ্যা", "Transactions"), txs.size.toString(), Slate400)
         }
         AppCard {

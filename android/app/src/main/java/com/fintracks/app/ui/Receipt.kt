@@ -48,7 +48,7 @@ import kotlinx.serialization.json.JsonObject
 
 /** Receipt view for one transaction (opened by a normal tap): the voucher, then share as image or PDF. */
 @Composable
-fun ReceiptDialog(t: JsonObject, state: UiState, onDismiss: () -> Unit) {
+fun ReceiptDialog(t: JsonObject, state: UiState, onEdit: () -> Unit, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var preview by remember { mutableStateOf<Bitmap?>(null) }
@@ -85,6 +85,7 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onDismiss: () -> Unit) {
             Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(tr("লেনদেনের ভাউচার", "Transaction voucher"), fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                    TextButton(onClick = onEdit) { Text(tr("এডিট", "Edit")) }
                     IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close")) }
                 }
                 if (t.str("attachment_url").isNotEmpty()) AttachmentImage(t.id(), t.str("attachment_url"))
@@ -129,7 +130,7 @@ fun TxActionDialog(t: JsonObject, onEdit: () -> Unit, onDelete: () -> Unit, onDi
                 Text(t.str("category").ifEmpty { tr("লেনদেন", "Transaction") }.let { catLabel(it) }, fontSize = 14.sp)
                 TextButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) { Text(tr("এডিট করুন", "Edit")) }
                 TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) {
-                    Text(tr("মুছে ফেলুন", "Delete"), color = Rose500)
+                    Text(tr("মুছে ফেলুন", "Delete"), color = readableOn(Rose500))
                 }
             }
         },

@@ -212,7 +212,7 @@ fun AccountsScreen(state: UiState, vm: AppViewModel) {
                         Text(a.str("name"), fontWeight = FontWeight.Bold)
                         Text(a.str("kind"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Text(taka(accountBalance(a, txs), state.privacy), fontWeight = FontWeight.Bold)
+                    Text(taka(accountBalance(a, txs), state.privacy), fontWeight = FontWeight.Bold, color = netTone(accountBalance(a, txs)))
                 }
                 DeleteButton { vm.remove("accounts", a.id()) }
             }

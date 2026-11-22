@@ -786,7 +786,7 @@ private fun EntryDetail(
                 DetailStat(tr("বাকি", "Left"), taka(remaining, privacy), accent, Modifier.weight(1f))
             }
             DebtProgress(fraction, accent)
-            if (settled) Text(tr("পরিশোধিত", "Settled"), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Emerald500)
+            if (settled) Text(tr("পরিশোধিত", "Settled"), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = readableOn(Emerald500))
             Text(tr("পরিশোধের ইতিহাস", "Payment history"), fontWeight = FontWeight.Bold, fontSize = 14.sp)
             if (history.isEmpty()) {
                 Text(tr("এখনো কোনো পরিশোধ নেই", "No payments yet"), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -812,7 +812,7 @@ private fun EntryDetail(
                 TextButton(onClick = onCall) { Text(tr("কল", "Call")) }
                 TextButton(onClick = onSms) { Text(tr("এসএমএস", "SMS")) }
                 TextButton(onClick = onEdit) { Text(tr("এডিট", "Edit")) }
-                TextButton(onClick = onDelete) { Text(tr("মুছুন", "Delete"), color = Rose500) }
+                TextButton(onClick = onDelete) { Text(tr("মুছুন", "Delete"), color = readableOn(Rose500)) }
             }
             TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text(tr("বন্ধ করুন", "Close")) }
         }

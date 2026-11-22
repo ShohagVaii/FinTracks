@@ -269,7 +269,7 @@ private fun NewBillDialog(state: UiState, vm: AppViewModel, onDone: () -> Unit) 
         } else if (t != null && people.isNotEmpty()) {
             Text(tr("জনপ্রতি", "Per person") + ": ${taka(tv / people.size)}", fontSize = 12.sp)
         }
-        error?.let { Text(it, color = Rose500, fontSize = 12.sp) }
+        error?.let { Text(it, color = readableOn(Rose500), fontSize = 12.sp) }
     }
 }
 
@@ -363,7 +363,7 @@ private fun BoughtDialog(item: JsonObject, vm: AppViewModel, onDone: () -> Unit)
         }
     }) {
         TextIn(tr("কত টাকায় কেনা হলো (৳)", "Bought for how much (৳)"), price, { price = it }, number = true)
-        error?.let { Text(it, color = Rose500, fontSize = 12.sp) }
+        error?.let { Text(it, color = readableOn(Rose500), fontSize = 12.sp) }
     }
 }
 
@@ -539,7 +539,7 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
             TextIn(tr("টাকা (৳)", "Amount (৳)"), amount, { amount = it }, number = true)
             DateField(tr("তারিখ", "Date"), date, { date = it })
             TextIn(tr("নোট (ঐচ্ছিক)", "Note (optional)"), note, { note = it })
-            error?.let { Text(it, color = Rose500, fontSize = 12.sp) }
+            error?.let { Text(it, color = readableOn(Rose500), fontSize = 12.sp) }
         }
     }
     if (addingMember) {
@@ -586,7 +586,7 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
             TextIn(tr("টাকা (৳)", "Amount (৳)"), amount, { amount = it }, number = true)
             TextIn(tr("কী কেনা হলো", "What was bought"), item, { item = it })
             DateField(tr("তারিখ", "Date"), date, { date = it })
-            error?.let { Text(it, color = Rose500, fontSize = 12.sp) }
+            error?.let { Text(it, color = readableOn(Rose500), fontSize = 12.sp) }
         }
     }
     if (addingMeal && members.isNotEmpty()) {
@@ -613,7 +613,7 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
             }
             Text(tr("ধাপ ০.৫", "Step 0.5"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             DateField(tr("তারিখ", "Date"), date, { date = it })
-            error?.let { Text(it, color = Rose500, fontSize = 12.sp) }
+            error?.let { Text(it, color = readableOn(Rose500), fontSize = 12.sp) }
         }
     }
 }

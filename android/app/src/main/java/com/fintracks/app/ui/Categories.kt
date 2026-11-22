@@ -125,7 +125,7 @@ fun CategoryManager(state: UiState, vm: AppViewModel) {
             },
             confirmButton = {
                 TextButton(onClick = { vm.remove("categories", c.id()); deleting = null }) {
-                    Text(tr("মুছুন", "Delete"), color = Rose500)
+                    Text(tr("মুছুন", "Delete"), color = readableOn(Rose500))
                 }
             },
             dismissButton = { TextButton(onClick = { deleting = null }) { Text(tr("বাতিল", "Cancel")) } }

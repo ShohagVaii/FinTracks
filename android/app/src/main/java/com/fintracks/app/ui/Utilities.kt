@@ -157,7 +157,7 @@ fun AgeCalcScreen() {
         if (b == null) {
             EmptyHint(tr("জন্ম তারিখ বাছাই করলে বয়স দেখাবে", "Pick a birth date to see the age"))
         } else if (result == null) {
-            Text(tr("জন্ম তারিখ রেফারেন্স তারিখের পরে হতে পারে না।", "Birth date cannot be after the reference date."), color = Rose500, fontSize = 13.sp)
+            Text(tr("জন্ম তারিখ রেফারেন্স তারিখের পরে হতে পারে না।", "Birth date cannot be after the reference date."), color = readableOn(Rose500), fontSize = 13.sp)
         } else {
                 Column(
                     Modifier
