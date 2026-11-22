@@ -1,5 +1,15 @@
 package com.fintracks.app.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.offset
+
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.graphics.Color
@@ -74,10 +84,47 @@ enum class Overlay(private val bnTitle: String, private val enTitle: String) {
     val title: String get() = tr(bnTitle, enTitle)
 }
 
+/** A success moment to show over the app. A new object each time, so repeated saves replay it. */
+class Celebrate(val kind: Int)
+
 @Composable
 fun FinTracksApp(vm: AppViewModel = viewModel()) {
     val state by vm.state.collectAsState()
     val locked by AppLock.locked.collectAsState()
+    val ctx = LocalContext.current
+    // 1 = sign-in or Google, 2 = sign-up. Set when the user submits; read when the request finishes.
+    var pendingAuth by rememberSaveable { mutableStateOf(0) }
+    var celebration by remember { mutableStateOf<Celebrate?>(null) }
+    var holdAuth by remember { mutableStateOf(false) }
+    var splashOn by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(if (motionReduced(ctx)) 300L else 1400L)
+        splashOn = false
+    }
+    LaunchedEffect(state.busy) {
+        if (!state.busy && pendingAuth != 0) {
+            val kind = pendingAuth
+            pendingAuth = 0
+            if (state.signedIn) {
+                // Keep the sign-in screen up for the tick, then let the home screen in.
+                holdAuth = true
+                celebration = Celebrate(if (kind == 2) 2 else 1)
+            } else if (kind == 2 && state.notice != null) {
+                // Sign-up succeeded but needs the confirmation email: stamp and confetti still play.
+                // Sign-up that needs the confirmation email: the stamp and confetti show on the sign-up card.
+                celebration = Celebrate(2)
+            }
+        }
+    }
+    LaunchedEffect(celebration) {
+        val c = celebration ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(if (c.kind == 2) 1800L else 900L)
+        if (celebration === c) {
+            celebration = null
+            holdAuth = false
+        }
+    }
 
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
     LaunchedEffect(state.signedIn) {
@@ -94,16 +141,33 @@ fun FinTracksApp(vm: AppViewModel = viewModel()) {
                 state.checking -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-                !state.signedIn -> AuthScreen(
+                !state.signedIn || holdAuth -> AuthScreen(
                     state = state,
-                    onSignIn = { e, p -> vm.signIn(e, p) },
-                    onSignUp = { n, e, p -> vm.signUp(n, e, p) },
-                    onGoogle = { token -> vm.signInWithGoogle(token) },
+                    onSignIn = { e, p -> pendingAuth = 1; vm.signIn(e, p) },
+                    onSignUp = { n, e, p -> pendingAuth = 2; vm.signUp(n, e, p) },
+                    onGoogle = { token -> pendingAuth = 1; vm.signInWithGoogle(token) },
                     onReset = { email -> vm.resetPassword(email) }
                 )
                 locked -> LockScreen(onSignOut = { AppLock.unlock(); vm.signOut() })
-                else -> MainScaffold(state, vm)
+                else -> MainScaffold(state, vm, onSaved = { celebration = Celebrate(1) })
             }
+            celebration?.let { CelebrationOverlay(it.kind) }
+            AnimatedVisibility(visible = splashOn, exit = fadeOut(tween(350))) {
+                SplashScreen(onSkip = { splashOn = false })
+            }
+        }
+    }
+}
+
+/** Short success moment drawn on top of the screen. It takes no taps, so input is never held up. */
+@Composable
+private fun CelebrationOverlay(kind: Int) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        if (kind == 2) {
+            ConfettiBurst(Modifier.fillMaxSize())
+            StampText(tr("নতুন অ্যাকাউন্ট", "New account"), color = Emerald500, tilt = -8f)
+        } else {
+            SuccessTick()
         }
     }
 }
@@ -135,8 +199,9 @@ private fun SyncIndicator(state: UiState) {
 }
 
 @Composable
-private fun MainScaffold(state: UiState, vm: AppViewModel) {
+private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) {
     var tab by rememberSaveable { mutableStateOf("dashboard") }
+    val reduce = rememberReduceMotion()
     var overlayName by rememberSaveable { mutableStateOf<String?>(null) }
     // Money counter: true while its history page is open (that page has its own back link, so the header's back arrow is hidden).
     var counterHistory by rememberSaveable { mutableStateOf(false) }
@@ -191,7 +256,7 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
                     onTogglePrivacy = { vm.saveProfile(row("is_privacy_mode" to !state.privacy)) },
                     onSettings = { overlayName = Overlay.SETTINGS.name }
                 )
-            } else if (overlay != Overlay.CHAT && overlay != Overlay.DEBTS && !(overlay == Overlay.COUNTER && counterHistory)) {
+            } else if (overlay != Overlay.CHAT && overlay != Overlay.DEBTS && overlay != Overlay.NOTES && !(overlay == Overlay.COUNTER && counterHistory)) {
                 // ধার screen draws its own header (it shows the person's name on the detail page).
                 OverlayHeader(overlay.title) { overlayName = null }
             }
@@ -202,11 +267,23 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
                         counterHistory = false
                         overlayName = null
                     }
-                } else when (tab) {
-                    "dashboard" -> DashboardScreen(state, vm, openTx, { receipt = it }, { txAction = it }) { overlayName = it.name }
-                    "transactions" -> TransactionsScreen(state, vm, openTx, { receipt = it }, { txAction = it })
-                    "shared" -> SharedScreen(state, vm)
-                    else -> ToolsScreen { overlayName = it.name }
+                } else AnimatedContent(
+                    targetState = tab,
+                    transitionSpec = {
+                        if (reduce) {
+                            fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                        } else {
+                            (fadeIn(tween(250)) + slideInHorizontally(tween(250)) { it / 10 }) togetherWith fadeOut(tween(200))
+                        }
+                    },
+                    label = "tabs"
+                ) { current ->
+                    when (current) {
+                        "dashboard" -> DashboardScreen(state, vm, openTx, { receipt = it }, { txAction = it }) { overlayName = it.name }
+                        "transactions" -> TransactionsScreen(state, vm, openTx, { receipt = it }, { txAction = it })
+                        "shared" -> SharedScreen(state, vm)
+                        else -> ToolsScreen { overlayName = it.name }
+                    }
                 }
                 if (overlay == null) {
                     FloatingSmsButton(
@@ -236,7 +313,7 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
             state = state,
             existing = editor.row,
             onDismiss = { txEditor = null },
-            onSave = { body, id -> vm.save("transactions", body, id); txEditor = null }
+            onSave = { body, id -> vm.save("transactions", body, id); txEditor = null; onSaved() }
         )
     }
 }
@@ -293,6 +370,7 @@ private fun HeaderIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, de
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+            .pressScale()
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -338,6 +416,6 @@ private fun OverlayContent(
         Overlay.SETTINGS -> SettingsScreen(state, vm)
         Overlay.COUNTER -> MoneyCounterScreen(vm, counterHistory, onCounterHistory)
         Overlay.AGE -> AgeCalcScreen()
-        Overlay.NOTES -> NotesScreen(vm)
+        Overlay.NOTES -> NotesScreen(vm, onClose)
     }
 }

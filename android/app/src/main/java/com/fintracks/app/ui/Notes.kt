@@ -219,7 +219,7 @@ private class NoteRoute(val id: String?, val edit: Boolean)
 
 /** Notepad: a list of note cards, a floating "add" pill, and a note view with copy and share. Works offline; syncs when online. */
 @Composable
-fun NotesScreen(vm: AppViewModel) {
+fun NotesScreen(vm: AppViewModel, onClose: () -> Unit) {
     val ctx = LocalContext.current
     val notes by vm.notes.notes.collectAsState()
     val pendingCount by vm.notes.pendingCount.collectAsState()
@@ -240,6 +240,8 @@ fun NotesScreen(vm: AppViewModel) {
     }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Single back arrow for the list: the app header is hidden on this screen.
+            IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("ফিরে যান", "Back")) }
             Text(
                 tr("${bnDigits(notes.size.toString())}টি নোট", "${notes.size} notes"),
                 fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -1,9 +1,26 @@
 package com.fintracks.app.ui
 
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import kotlin.math.roundToInt
+
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material.icons.outlined.Home
@@ -23,13 +40,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -45,7 +58,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -78,7 +90,7 @@ fun AppCard(onClick: (() -> Unit)? = null, borderColor: Color? = null, onLongCli
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp), content = content)
     }
     if (onClick != null || onLongClick != null) {
-        Card(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick ?: {}, onLongClick = onLongClick), colors = colors, border = border, shape = RoundedCornerShape(24.dp)) { inner() }
+        Card(modifier = Modifier.fillMaxWidth().pressScale(enabled = onClick != null || onLongClick != null).combinedClickable(onClick = onClick ?: {}, onLongClick = onLongClick), colors = colors, border = border, shape = RoundedCornerShape(24.dp)) { inner() }
     } else {
         Card(modifier = Modifier.fillMaxWidth(), colors = colors, border = border, shape = RoundedCornerShape(24.dp)) { inner() }
     }
@@ -121,18 +133,25 @@ fun ChoiceChips(options: List<Pair<String, String>>, selected: String, onSelect:
 
 @Composable
 fun EmptyHint(text: String) {
-    Text(
-        text,
-        modifier = Modifier.fillMaxWidth().padding(24.dp),
-        textAlign = TextAlign.Center,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
+    Column(
+        Modifier.fillMaxWidth().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        M3Icon(
+            Icons.Outlined.Inbox,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(36.dp).floatingBob()
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(text, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 /** Thin progress bar used for budgets and goals. */
 @Composable
 fun ProgressBar(fraction: Float, color: Color, modifier: Modifier = Modifier) {
-    val f = fraction.coerceIn(0f, 1f)
+    val f by animateFloatAsState(fraction.coerceIn(0f, 1f), tween(400, easing = FastOutSlowInEasing), label = "progressBar")
     Box(
         modifier
             .fillMaxWidth()
@@ -191,7 +210,7 @@ fun FormDialog(
     )
 }
 
-/** Glass bottom bar with a blue halo, outlined icons and a raised centre "+" — matches the video's nav. */
+/** Glass bottom bar with a blue halo, outlined icons and a raised centre "+". The selected tab's pill slides, and its icon bounces. */
 @Composable
 fun BottomBar(selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
     val items = listOf(
@@ -201,6 +220,14 @@ fun BottomBar(selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
         "tools" to (tr("টুলস", "Tools") to Icons.Outlined.Work)
     )
     val barShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val reduce = rememberReduceMotion()
+    val selIndex = items.indexOfFirst { it.first == selected }.coerceAtLeast(0)
+    val slotIndex by animateFloatAsState(
+        selIndex.toFloat(),
+        if (reduce) tween(0) else spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
+        label = "navSlide"
+    )
+    var barWidth by remember { mutableStateOf(0) }
     Box(Modifier.fillMaxWidth().height(100.dp)) {
         // Blue halo above the bar.
         Box(
@@ -210,7 +237,7 @@ fun BottomBar(selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
                 .height(100.dp)
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Sky500.copy(alpha = 0.16f))))
         )
-        Row(
+        Box(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
@@ -218,13 +245,32 @@ fun BottomBar(selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
                 .clip(barShape)
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
                 .border(1.dp, Color.White.copy(alpha = 0.08f), barShape)
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceAround
+                .onSizeChanged { barWidth = it.width }
         ) {
-            items.take(2).forEach { (id, pair) -> NavItem(pair.first, pair.second, selected == id) { onSelect(id) } }
-            Spacer(Modifier.width(72.dp))
-            items.drop(2).forEach { (id, pair) -> NavItem(pair.first, pair.second, selected == id) { onSelect(id) } }
+            // Sliding pill behind the selected tab (four equal slots; the "+" sits over the centre).
+            if (barWidth > 0) {
+                Box(
+                    Modifier
+                        .offset {
+                            val slotW = (barWidth - 16.dp.toPx()) / 4f
+                            IntOffset(
+                                (8.dp.toPx() + slotIndex * slotW + slotW / 2f - 26.dp.toPx()).roundToInt(),
+                                8.dp.toPx().roundToInt()
+                            )
+                        }
+                        .size(width = 52.dp, height = 52.dp)
+                        .clip(RoundedCornerShape(26.dp))
+                        .background(Sky500.copy(alpha = 0.16f))
+                )
+            }
+            Row(
+                Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items.forEach { (id, pair) ->
+                    NavItem(pair.first, pair.second, selected == id, Modifier.weight(1f)) { onSelect(id) }
+                }
+            }
         }
         // Centre "+" sits on the bar's top edge with a dark ring and a sky glow.
         Box(
@@ -236,6 +282,7 @@ fun BottomBar(selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
                 .padding(4.dp)
                 .clip(CircleShape)
                 .background(Brush.linearGradient(listOf(Sky400, Sky500, Blue600)))
+                .pressScale()
                 .clickable(onClick = onAdd),
             contentAlignment = Alignment.Center
         ) {
@@ -245,13 +292,27 @@ fun BottomBar(selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
 }
 
 @Composable
-private fun NavItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, active: Boolean, onClick: () -> Unit) {
+private fun NavItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val tint = if (active) Sky400 else Slate500
+    val reduce = rememberReduceMotion()
+    val bounce by animateFloatAsState(
+        if (active || reduce) 1f else 0.92f,
+        if (reduce) tween(0) else spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium),
+        label = "navBounce"
+    )
     Column(
-        Modifier.clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
+        modifier
+            .pressScale()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        M3Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(24.dp))
+        M3Icon(
+            icon,
+            contentDescription = label,
+            tint = tint,
+            modifier = Modifier.size(24.dp).graphicsLayer { scaleX = bounce; scaleY = bounce }
+        )
         Text(label, fontSize = 11.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium, color = tint)
     }
 }
@@ -265,6 +326,7 @@ fun FloatingSmsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .clip(CircleShape)
             .background(Slate950.copy(alpha = 0.9f))
             .border(2.dp, Sky500.copy(alpha = 0.7f), CircleShape)
+            .pressScale()
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {

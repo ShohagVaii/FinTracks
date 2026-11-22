@@ -142,7 +142,6 @@ fun AuthScreen(
     var flipping by remember { mutableStateOf(false) }
     val flip = remember { Animatable(0f) }
     val shake = remember { Animatable(0f) }
-    val stamp = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()
 
     val shownError = localError ?: state.message
@@ -156,13 +155,6 @@ fun AuthScreen(
     LaunchedEffect(shownError) {
         if (shownError != null && !reduce) {
             for (v in listOf(-12f, 12f, -9f, 9f, -5f, 5f, 0f)) shake.animateTo(v, tween(50))
-        }
-    }
-    // Sign-up confirmation stamp pops in.
-    LaunchedEffect(state.notice) {
-        if (state.notice != null && !reduce) {
-            stamp.snapTo(0.6f)
-            stamp.animateTo(1f, tween(300))
         }
     }
 
@@ -220,7 +212,6 @@ fun AuthScreen(
                 notice = state.notice,
                 flipAngle = flip.value,
                 shakeX = shake.value,
-                stampScale = stamp.value,
                 name = name, onName = { name = it },
                 email = email, onEmail = { email = it },
                 password = password, onPassword = { password = it },
@@ -458,7 +449,6 @@ private fun AuthCardScene(
     notice: String?,
     flipAngle: Float,
     shakeX: Float,
-    stampScale: Float,
     name: String, onName: (String) -> Unit,
     email: String, onEmail: (String) -> Unit,
     password: String, onPassword: (String) -> Unit,
@@ -589,24 +579,6 @@ private fun AuthCardScene(
                     onClick = onSubmit
                 )
 
-                if (isSignUp && notice != null) {
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        tr("নতুন অ্যাকাউন্ট", "New account"),
-                        color = auOk,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        modifier = Modifier
-                            .border(2.dp, auOk, RoundedCornerShape(8.dp))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                            .graphicsLayer {
-                                scaleX = stampScale
-                                scaleY = stampScale
-                                rotationZ = -6f
-                            }
-                    )
-                }
-
                 shownError?.let {
                     Spacer(Modifier.height(10.dp))
                     Text(it, color = auErr, fontSize = 13.sp, textAlign = TextAlign.Center)
@@ -664,7 +636,7 @@ private fun AuthCardScene(
 
 /** Logo drawn with shapes: white F with a blue rising arrow. */
 @Composable
-private fun AuLogoMark(modifier: Modifier) {
+internal fun AuLogoMark(modifier: Modifier) {
     Canvas(modifier) {
         val s = size.minDimension / 100f
         val white = Color.White
@@ -853,4 +825,70 @@ private suspend fun googleIdToken(context: Context): String {
     val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
     val result = CredentialManager.create(context).getCredential(context, request)
     return GoogleIdTokenCredential.createFrom(result.credential.data).idToken
+}
+
+
+/**
+ * Splash: the logo draws in, a gold coin sparkles beside it, then the app fades to the next screen.
+ * Tapping it skips the wait, so it never holds the screen.
+ */
+@Composable
+fun SplashScreen(onSkip: () -> Unit) {
+    val reduce = rememberReduceMotion()
+    val draw = remember { Animatable(if (reduce) 1f else 0f) }
+    val coin = remember { Animatable(if (reduce) 1f else 0f) }
+    LaunchedEffect(Unit) {
+        if (!reduce) {
+            draw.animateTo(1f, tween(600, easing = FastOutSlowInEasing))
+            coin.animateTo(1f, tween(400, easing = FastOutSlowInEasing))
+        }
+    }
+    Box(
+        Modifier.fillMaxSize().background(auBg()).clickable(onClick = onSkip),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.size(120.dp), contentAlignment = Alignment.Center) {
+                AuLogoMark(
+                    Modifier
+                        .size(84.dp)
+                        .graphicsLayer {
+                            alpha = draw.value
+                            val k = 0.7f + 0.3f * draw.value
+                            scaleX = k
+                            scaleY = k
+                        }
+                )
+                Canvas(Modifier.size(120.dp)) {
+                    val s = size.minDimension
+                    val c = Offset(s * 0.84f, s * 0.18f)
+                    val k = coin.value
+                    drawCircle(Color(0xFFFBBF24).copy(alpha = k), radius = s * 0.09f * k, center = c)
+                    // Sparkle: four short rays that pulse once as the coin lands.
+                    val pulse = (k * (1f - k) * 4f).coerceIn(0f, 1f)
+                    val len = s * 0.14f * pulse
+                    listOf(Offset(len, 0f), Offset(-len, 0f), Offset(0f, len), Offset(0f, -len)).forEach { d ->
+                        drawLine(Color.White.copy(alpha = pulse), c, Offset(c.x + d.x, c.y + d.y), strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                buildAnnotatedString {
+                    withStyle(SpanStyle(color = auSkyA)) { append("Fin") }
+                    withStyle(SpanStyle(color = Color.White)) { append("Track") }
+                },
+                fontSize = 34.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.graphicsLayer { alpha = draw.value }
+            )
+            Text(
+                "PREMIUM FINANCE",
+                color = auMuted,
+                fontSize = 11.sp,
+                letterSpacing = 4.sp,
+                modifier = Modifier.graphicsLayer { alpha = draw.value }
+            )
+        }
+    }
 }
