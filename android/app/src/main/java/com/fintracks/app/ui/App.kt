@@ -156,7 +156,8 @@ private fun MainScaffold(state: UiState, vm: AppViewModel) {
                     onTogglePrivacy = { vm.saveProfile(row("is_privacy_mode" to !state.privacy)) },
                     onSettings = { overlayName = Overlay.SETTINGS.name }
                 )
-            } else if (overlay != Overlay.CHAT) {
+            } else if (overlay != Overlay.CHAT && overlay != Overlay.DEBTS) {
+                // ধার screen draws its own header (it shows the person's name on the detail page).
                 OverlayHeader(overlay.title) { overlayName = null }
             }
 
@@ -268,7 +269,7 @@ private fun OverlayContent(overlay: Overlay, state: UiState, vm: AppViewModel, o
         Overlay.CURRENCY -> CurrencyScreen()
         Overlay.LOAN -> LoanScreen(state, vm)
         Overlay.CREDIT -> BakiScreen(state, vm)
-        Overlay.DEBTS -> DebtsScreen(state, vm)
+        Overlay.DEBTS -> DebtsScreen(state, vm, onClose)
         Overlay.BUDGETS -> BudgetsScreen(state, vm)
         Overlay.GOALS -> GoalsScreen(state, vm)
         Overlay.INVESTMENTS -> InvestmentsScreen(state, vm)

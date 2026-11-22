@@ -33,6 +33,7 @@ val TABLES: List<Pair<String, String>> = listOf(
     "budgets" to "select=*",
     "goals" to "select=*",
     "debts" to "select=*&order=settled.asc",
+    "debt_people" to "select=*&order=name.asc",
     "debt_payments" to "select=*&order=paid_on.desc",
     "loans" to "select=*",
     "subscriptions" to "select=*",
@@ -60,14 +61,14 @@ data class GoalCelebration(val goalName: String, val percent: Int, val saved: Do
 
 private val UNDO_BN = mapOf(
     "transactions" to "লেনদেন", "accounts" to "অ্যাকাউন্ট", "budgets" to "বাজেট", "goals" to "লক্ষ্য",
-    "debts" to "ধার", "debt_payments" to "ধার পরিশোধ", "loans" to "লোন", "subscriptions" to "সাবস্ক্রিপশন", "investments" to "বিনিয়োগ",
+    "debts" to "ধার", "debt_people" to "ধার ব্যক্তি", "debt_payments" to "ধার পরিশোধ", "loans" to "লোন", "subscriptions" to "সাবস্ক্রিপশন", "investments" to "বিনিয়োগ",
     "credit_entries" to "কেনা", "credit_payments" to "পরিশোধ", "shopping_items" to "শপিং আইটেম",
     "bill_splits" to "বিল ভাগ", "mess_bazaars" to "বাজার", "mess_meals" to "মিল", "mess_deposits" to "জমা",
     "categories" to "ক্যাটাগরি", "cash_counts" to "গণনা"
 )
 private val UNDO_EN = mapOf(
     "transactions" to "transaction", "accounts" to "account", "budgets" to "budget", "goals" to "goal",
-    "debts" to "debt", "debt_payments" to "debt payment", "loans" to "loan", "subscriptions" to "subscription", "investments" to "investment",
+    "debts" to "debt", "debt_people" to "debt person", "debt_payments" to "debt payment", "loans" to "loan", "subscriptions" to "subscription", "investments" to "investment",
     "credit_entries" to "purchase", "credit_payments" to "payment", "shopping_items" to "shopping item",
     "bill_splits" to "bill split", "mess_bazaars" to "bazaar", "mess_meals" to "meal", "mess_deposits" to "deposit",
     "categories" to "category", "cash_counts" to "count"
@@ -334,12 +335,45 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    /** Records a partial or full repayment of a personal debt (ধার/পাওনা). Creates no transaction. */
-    fun recordPersonalDebtPayment(debtId: String, amount: Double, date: String, note: String) {
-        save(
-            "debt_payments",
-            row("id" to java.util.UUID.randomUUID().toString(), "debt_id" to debtId, "amount" to amount, "paid_on" to date, "note" to note),
-            null
+    /** Adds or updates a person. Renaming a person also updates the name kept on each of their entries. */
+    fun savePerson(id: String?, name: String, phone: String, address: String) = act {
+        val body = row("name" to name, "phone" to phone, "address" to address)
+        if (id == null) {
+            repo.insert("debt_people", body)
+        } else {
+            repo.update("debt_people", id, body)
+            state.value.rows("debts")
+                .filter { it.str("person_id") == id && it.str("person") != name }
+                .forEach { repo.update("debts", it.id(), row("person" to name)) }
+        }
+        refreshTables()
+    }
+
+    /**
+     * Records a partial or full repayment of one personal debt entry, with its transaction in one batch.
+     * Owe (দেনা) payment = Expense; owed (পাওনা) payment = Income. Both are linked by source = personal_debt_payment.
+     * The payment row is written first, so an over-payment rejected by the database creates no transaction.
+     */
+    fun recordPersonalDebtPayment(entry: JsonObject, amount: Double, date: String) {
+        val paymentId = java.util.UUID.randomUUID().toString()
+        val owed = entry.str("direction") == "owed"
+        val person = state.value.rows("debt_people").firstOrNull { it.id() == entry.str("person_id") }?.str("name").orEmpty()
+        val reason = entry.str("note")
+        val label = tr("ধার পরিশোধ", "Debt payment") + " — " + person + (if (reason.isNotBlank()) " ($reason)" else "")
+        batch(
+            listOf(
+                Triple("debt_payments", row("id" to paymentId, "debt_id" to entry.id(), "amount" to amount, "paid_on" to date, "note" to ""), null),
+                Triple(
+                    "transactions",
+                    row(
+                        "type" to (if (owed) "Income" else "Expense"), "amount" to amount, "currency" to state.value.currency,
+                        "category" to (if (owed) "ধার আদায়" else "ধার পরিশোধ"), "note" to label, "tx_date" to date,
+                        "payment_mode" to "Cash", "mood" to "", "is_recurring" to false,
+                        "source" to "personal_debt_payment", "source_ref" to paymentId
+                    ),
+                    null
+                )
+            )
         )
     }
 
@@ -361,7 +395,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         refreshTables()
         // Shops delete their purchases and payments too, so they are not undoable. Linked rows are not undoable either.
         // Shops and members delete their children too (purchases, bazaar and meal rows), so they are not undoable.
-        if (row != null && table != "credit_shops" && table != "mess_members" && linked.isEmpty()) {
+        // Entries, people and payments take their linked rows with them, so an undo would leave them out of step.
+        val undoable = table !in setOf("debts", "debt_people", "debt_payments") &&
+            row?.str("source") != "personal_debt_payment"
+        if (row != null && table != "credit_shops" && table != "mess_members" && linked.isEmpty() && undoable) {
             _state.update { it.copy(undo = UndoEntry(table, row, System.nanoTime())) }
         }
     }

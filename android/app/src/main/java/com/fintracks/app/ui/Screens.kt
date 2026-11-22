@@ -424,7 +424,8 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
     var showCalc by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     // A বাকি-পরিশোধ expense is changed from the বাকি খাতা (delete the payment and add it again), so it cannot drift from the debt.
-    val locked = existing?.str("source") == "debt_payment"
+    val source = existing?.str("source").orEmpty()
+    val locked = source == "debt_payment" || source == "personal_debt_payment"
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var reading by remember { mutableStateOf(false) }
