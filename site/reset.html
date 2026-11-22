@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>FinTrack · নতুন পাসওয়ার্ড</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root { color-scheme: dark; --sky:#38bdf8; --blue:#2563eb; --bg:#020617; --card:rgba(15,23,42,.72); --line:rgba(255,255,255,.10); --muted:#94a3b8; --ok:#34d399; --err:#fb7185; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; font-family: 'Hind Siliguri', system-ui, sans-serif; color: #fff; background: var(--bg);
+      background-image: radial-gradient(circle at 15% 0%, rgba(14,165,233,.20), transparent 42%),
+                        radial-gradient(circle at 90% 80%, rgba(37,99,235,.18), transparent 40%);
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .card { width: 100%; max-width: 420px; background: var(--card); border: 1px solid var(--line); border-radius: 28px; padding: 28px 24px; backdrop-filter: blur(10px); }
+    .logo { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 20px; margin-bottom: 18px; }
+    .logo-mark { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; color: #fff; font-weight: 900;
+                 background: linear-gradient(135deg, #38bdf8, #2563eb); }
+    h1 { font-size: 22px; margin: 0 0 6px; }
+    p.lead { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0 0 18px; }
+    label { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 6px; }
+    .field { position: relative; }
+    input[type=password], input[type=text] {
+      width: 100%; padding: 13px 44px 13px 14px; border-radius: 16px; border: 1px solid var(--line);
+      background: rgba(2,6,23,.6); color: #fff; font: inherit; font-size: 16px; outline: none;
+    }
+    input:focus { border-color: var(--sky); box-shadow: 0 0 0 3px rgba(56,189,248,.18); }
+    .eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: 0; color: var(--muted);
+           font: inherit; font-size: 13px; cursor: pointer; padding: 8px; }
+    button.primary {
+      margin-top: 22px; width: 100%; padding: 15px; border: 0; border-radius: 999px; color: #fff; font: inherit; font-weight: 700; font-size: 16px;
+      background: linear-gradient(90deg, #38bdf8, #2563eb); cursor: pointer;
+    }
+    button.primary:disabled { opacity: .6; cursor: default; }
+    .msg { margin-top: 16px; font-size: 14px; line-height: 1.6; padding: 12px 14px; border-radius: 16px; display: none; }
+    .msg.show { display: block; }
+    .msg.ok { background: rgba(16,185,129,.12); border: 1px solid rgba(16,185,129,.4); color: var(--ok); }
+    .msg.err { background: rgba(244,63,94,.10); border: 1px solid rgba(244,63,94,.4); color: var(--err); }
+    .hidden { display: none !important; }
+    .back { display: block; margin-top: 18px; color: var(--sky); font-size: 14px; text-decoration: none; text-align: center; }
+  </style>
+</head>
+<body>
+<main class="card">
+  <div class="logo"><span class="logo-mark">F</span><span><span style="color:#38bdf8">Fin</span>Track</span></div>
+
+  <!-- Form: shown only for a valid password-recovery link -->
+  <section id="form" class="hidden">
+    <h1>নতুন পাসওয়ার্ড</h1>
+    <p class="lead">নতুন পাসওয়ার্ড দিন। কমপক্ষে ৬ অক্ষর, দুটো ঘর একই হতে হবে।</p>
+    <form id="resetForm" novalidate>
+      <label for="pw1">নতুন পাসওয়ার্ড</label>
+      <div class="field">
+        <input id="pw1" type="password" autocomplete="new-password" required />
+        <button type="button" class="eye" data-target="pw1">দেখুন</button>
+      </div>
+      <label for="pw2">পাসওয়ার্ড নিশ্চিত করুন</label>
+      <div class="field">
+        <input id="pw2" type="password" autocomplete="new-password" required />
+        <button type="button" class="eye" data-target="pw2">দেখুন</button>
+      </div>
+      <button id="btn" class="primary" type="submit">পাসওয়ার্ড বদলান</button>
+    </form>
+    <div id="formMsg" class="msg err" role="alert"></div>
+  </section>
+
+  <!-- Success -->
+  <section id="done" class="hidden">
+    <h1>পাসওয়ার্ড বদল হয়েছে</h1>
+    <div class="msg ok show">এখন FinTrack অ্যাপে নতুন পাসওয়ার্ড দিয়ে লগইন করুন।</div>
+  </section>
+
+  <!-- Invalid, expired or missing link -->
+  <section id="invalid" class="hidden">
+    <h1>লিংকটি মেয়াদোত্তীর্ণ বা অবৈধ</h1>
+    <div class="msg err show">অ্যাপ থেকে আবার পাসওয়ার্ড রিসেট চান, তারপর নতুন মেইলের লিংক ব্যবহার করুন।</div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var SUPABASE_URL = 'https://ennkvjmxyjztjszmfaag.supabase.co';
+  // Publishable key: public by design (the same value ships in the app and in verify.html).
+  var PUB_KEY = 'sb_publishable_ZEs8TSPiUzrt8gKmlmOjDw_kkoKr8_h';
+
+  // Read the recovery result from the URL hash, then remove it from the address bar.
+  // The access token is kept only in memory for this one request.
+  var p = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+  var token = p.get('access_token');
+  var type = p.get('type');
+  var failed = !!(p.get('error') || p.get('error_code'));
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+
+  function show(id) {
+    ['form', 'done', 'invalid'].forEach(function (s) {
+      document.getElementById(s).classList.toggle('hidden', s !== id);
+    });
+  }
+
+  if (!token || type !== 'recovery' || failed) {
+    show('invalid');
+    return;
+  }
+  show('form');
+
+  // Eye toggles
+  document.querySelectorAll('.eye').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var input = document.getElementById(b.getAttribute('data-target'));
+      var showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      b.textContent = showing ? 'দেখুন' : 'লুকান';
+    });
+  });
+
+  var form = document.getElementById('resetForm');
+  var btn = document.getElementById('btn');
+  var msg = document.getElementById('formMsg');
+
+  function fail(text) {
+    msg.textContent = text; // textContent: server text is never parsed as HTML
+    msg.className = 'msg err show';
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var pw1 = document.getElementById('pw1').value;
+    var pw2 = document.getElementById('pw2').value;
+    if (pw1.length < 6) return fail('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।');
+    if (pw1 !== pw2) return fail('দুটো পাসওয়ার্ড মিলছে না।');
+
+    btn.disabled = true;
+    btn.textContent = 'পাঠানো হচ্ছে…';
+    msg.className = 'msg';
+
+    fetch(SUPABASE_URL + '/auth/v1/user', {
+      method: 'PUT',
+      headers: {
+        'apikey': PUB_KEY,
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ password: pw1 })
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        var j = {};
+        try { j = JSON.parse(t); } catch (x) { /* non-JSON body: fall through to the status */ }
+        if (r.ok) {
+          token = null; // one-time use
+          show('done');
+          return;
+        }
+        var reason = j.msg || j.error_description || j.message || j.error || t || 'অজানা ত্রুটি';
+        fail('পাসওয়ার্ড বদলানো যায়নি (HTTP ' + r.status + '): ' + reason);
+        btn.disabled = false;
+        btn.textContent = 'পাসওয়ার্ড বদলান';
+      });
+    }).catch(function (err) {
+      fail('নেটওয়ার্ক ত্রুটি: ' + err.message);
+      btn.disabled = false;
+      btn.textContent = 'পাসওয়ার্ড বদলান';
+    });
+  });
+})();
+</script>
+</body>
+</html>

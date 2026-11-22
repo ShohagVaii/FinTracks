@@ -141,10 +141,16 @@
     if (!hash) return;
     var p = new URLSearchParams(hash.replace(/^#/, ''));
     var type = p.get('type');
+    // Password-reset links that still land here (older emails) go to the reset form, hash kept.
+    if (type === 'recovery') {
+      window.location.replace('reset.html' + hash);
+      return;
+    }
+    // The "confirmed" banner is for signup-type returns only, never for any other auth return.
     var confirmTypes = ['signup', 'email', 'magiclink', 'invite', 'email_change'];
     if (p.get('error') || p.get('error_code')) {
       document.getElementById('linkerr').classList.add('show');
-    } else if (p.get('access_token') || confirmTypes.indexOf(type) !== -1) {
+    } else if (confirmTypes.indexOf(type) !== -1) {
       document.getElementById('confirmed').classList.add('show');
     }
     history.replaceState(null, '', window.location.pathname + window.location.search);
