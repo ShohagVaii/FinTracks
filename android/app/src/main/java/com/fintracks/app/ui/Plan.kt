@@ -31,6 +31,8 @@ import kotlinx.serialization.json.JsonObject
 import java.time.YearMonth
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.key
+import androidx.compose.runtime.LaunchedEffect
 
 private val red = Rose500
 private val green = Emerald500
@@ -156,6 +158,11 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
             val target = g.num("target")
             val saved = g.num("saved")
             val pct = if (target > 0) (saved / target * 100) else 0.0
+            // Confetti fires once, at the moment the goal reaches 100% while this screen is open.
+            val goalDone = pct >= 100
+            val goalPrev = remember(g.id()) { mutableStateOf(goalDone) }
+            val goalCelebrate = remember(g.id()) { mutableStateOf(0) }
+            LaunchedEffect(goalDone) { if (goalDone && !goalPrev.value) goalCelebrate.value++; goalPrev.value = goalDone }
             AppCard {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(g.str("name"), fontWeight = FontWeight.Bold)
@@ -163,7 +170,7 @@ fun GoalsScreen(state: UiState, vm: AppViewModel) {
                 }
                 KeyValue(tr("জমা / লক্ষ্য", "Saved / goal"), "${taka(saved, p)} / ${taka(target, p)}")
                 ProgressBar((pct / 100).toFloat(), green)
-                if (pct >= 100) Box(Modifier.fillMaxWidth().height(120.dp)) { ConfettiBurst(Modifier.matchParentSize()) }
+                if (goalCelebrate.value > 0) key(goalCelebrate.value) { Box(Modifier.fillMaxWidth().height(120.dp)) { ConfettiBurst(Modifier.matchParentSize()) } }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     GOAL_MILESTONES.forEach { m ->
                         val reached = pct >= m

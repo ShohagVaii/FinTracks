@@ -41,6 +41,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
+import androidx.compose.runtime.key
+import androidx.compose.runtime.LaunchedEffect
 
 /*
  * বাকি খাতা: দোকান → কেনা (একাধিক আইটেম + ± সমন্বয়) → পরিশোধের কিস্তি।
@@ -218,6 +220,11 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
     val bought = purchases.sumOf { it.num("total") }
     val paid = payments.sumOf { it.num("amount") }
     val balance = bought - paid
+    // Confetti fires once, at the moment the balance reaches zero while this screen is open.
+    val settledNow = balance <= EPS
+    val settledPrev = remember(shop.id()) { mutableStateOf(settledNow) }
+    val settleCelebrate = remember(shop.id()) { mutableStateOf(0) }
+    LaunchedEffect(settledNow) { if (settledNow && !settledPrev.value) settleCelebrate.value++; settledPrev.value = settledNow }
 
     Page {
         OutlinedButton(modifier = Modifier.pressScale(), onClick = onBack) { Text(tr("← সব দোকান", "← All shops")) }
@@ -229,7 +236,7 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
                 AnimatedRing(if (bought > 0) (paid / bought).toFloat().coerceIn(0f, 1f) else 0f, BakiGreen, 56.dp, 6.dp)
                 if (balance <= EPS) Box(Modifier.popIn()) { Text(tr("পরিশোধ সম্পূর্ণ", "Fully paid"), color = readableOn(BakiGreen), fontWeight = FontWeight.Bold) }
             }
-            if (balance <= EPS) Box(Modifier.fillMaxWidth().height(120.dp)) { ConfettiBurst(Modifier.matchParentSize()) }
+            if (settleCelebrate.value > 0) key(settleCelebrate.value) { Box(Modifier.fillMaxWidth().height(120.dp)) { ConfettiBurst(Modifier.matchParentSize()) } }
             KeyValue(tr("মোট কেনা", "Total bought"), taka(bought, p))
             KeyValue(tr("মোট পরিশোধ", "Total paid"), taka(paid, p))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
