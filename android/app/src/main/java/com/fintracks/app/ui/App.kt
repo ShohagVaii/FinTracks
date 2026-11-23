@@ -236,8 +236,12 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
     val snackbar = remember { SnackbarHostState() }
     var showCalc by remember { mutableStateOf(false) }
     var smsOpen by remember { mutableStateOf(false) }
-    var receipt by remember { mutableStateOf<JsonObject?>(null) }
-    var txAction by remember { mutableStateOf<JsonObject?>(null) }
+    // Receipt and action dialogs are routes on the stack (rcpt:<id>, act:<id>); the transaction comes from the live rows.
+    val dialogRoute = stack.last()
+    val receipt = dialogRoute.takeIf { it.startsWith("rcpt:") }
+        ?.let { r -> state.rows("transactions").firstOrNull { it.id() == r.removePrefix("rcpt:") } }
+    val txAction = dialogRoute.takeIf { it.startsWith("act:") }
+        ?.let { r -> state.rows("transactions").firstOrNull { it.id() == r.removePrefix("act:") } }
 
     LaunchedEffect(state.message) { state.message?.let { snackbar.showSnackbar(it) } }
     LaunchedEffect(state.notice) { state.notice?.let { snackbar.showSnackbar(it) } }
@@ -334,8 +338,8 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
                     label = "tabs"
                 ) { current ->
                     when (current) {
-                        "dashboard" -> DashboardScreen(state, vm, openTx, { receipt = it }, { txAction = it }) { go("ov:${it.name}") }
-                        "transactions" -> TransactionsScreen(state, vm, openTx, { receipt = it }, { txAction = it })
+                        "dashboard" -> DashboardScreen(state, vm, openTx, { go("rcpt:${it.id()}") }, { go("act:${it.id()}") }) { go("ov:${it.name}") }
+                        "transactions" -> TransactionsScreen(state, vm, openTx, { go("rcpt:${it.id()}") }, { go("act:${it.id()}") })
                         "shared" -> SharedScreen(state, vm)
                         else -> ToolsScreen { go("ov:${it.name}") }
                     }
@@ -370,16 +374,16 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
     receipt?.let { r ->
         ReceiptDialog(
             r, state,
-            onEdit = { receipt = null; openTx(r) },
-            onDelete = { receipt = null; vm.remove("transactions", r.id()) }
-        ) { receipt = null }
+            onEdit = { goBack(); openTx(r) },
+            onDelete = { goBack(); vm.remove("transactions", r.id()) }
+        ) { goBack() }
     }
     txAction?.let { a ->
         TxActionDialog(
             a,
-            onEdit = { txAction = null; openTx(a) },
-            onDelete = { txAction = null; vm.remove("transactions", a.id()) },
-            onDismiss = { txAction = null }
+            onEdit = { goBack(); openTx(a) },
+            onDelete = { goBack(); vm.remove("transactions", a.id()) },
+            onDismiss = { goBack() }
         )
     }
 
@@ -508,8 +512,8 @@ private fun OverlayContent(
         Overlay.TAX -> TaxScreen(state)
         Overlay.CURRENCY -> CurrencyScreen()
         Overlay.LOAN -> LoanScreen(state, vm)
-        Overlay.CREDIT -> BakiScreen(state, vm)
-        Overlay.DEBTS -> DebtsScreen(state, vm, onClose)
+        Overlay.CREDIT -> BakiScreen(state, vm, subPage, go, onClose)
+        Overlay.DEBTS -> DebtsScreen(state, vm, subPage.ifEmpty { null }, go, onClose, onClose)
         Overlay.BUDGETS -> BudgetsScreen(state, vm)
         Overlay.GOALS -> GoalsScreen(state, vm)
         Overlay.INVESTMENTS -> InvestmentsScreen(state, vm)
@@ -519,7 +523,7 @@ private fun OverlayContent(
         Overlay.SETTINGS -> SettingsScreen(state, vm, subPage, { go("ov:SETTINGS/$it") }, onClose)
         Overlay.COUNTER -> MoneyCounterScreen(vm, counterHistory) { on -> if (on) go("ov:COUNTER/hist") else onClose() }
         Overlay.AGE -> AgeCalcScreen()
-        Overlay.NOTES -> NotesScreen(vm, onClose)
+        Overlay.NOTES -> NotesScreen(vm, subPage, go, onClose)
         Overlay.INBOX -> Unit // shown by InboxScreen in MainScaffold
     }
 }

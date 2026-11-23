@@ -63,6 +63,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -321,14 +322,29 @@ private fun shareNote(ctx: Context, title: String, body: String) {
 /** Which note is open: id (null = new note) and whether it starts in edit mode. */
 private class NoteRoute(val id: String?, val edit: Boolean)
 
+/** Sub-page text on the back stack: "" list, "new" editor, "<id>" note, "<id>/e" note editor. */
+private fun parseNoteRoute(sub: String): NoteRoute? = when {
+    sub.isEmpty() -> null
+    sub == "new" -> NoteRoute(null, true)
+    sub.endsWith("/e") -> NoteRoute(sub.removeSuffix("/e"), true)
+    else -> NoteRoute(sub, false)
+}
+
+private fun encodeNoteRoute(r: NoteRoute): String {
+    val id = r.id ?: return "new"
+    return if (r.edit) "$id/e" else id
+}
+
 /** Notepad: a list of note cards, a floating "add" pill, and a note view with copy and share. Works offline; syncs when online. */
 @Composable
-fun NotesScreen(vm: AppViewModel, onClose: () -> Unit) {
+fun NotesScreen(vm: AppViewModel, subPage: String, go: (String) -> Unit, onClose: () -> Unit) {
     val ctx = LocalContext.current
     val notes by vm.notes.notes.collectAsState()
     val pendingCount by vm.notes.pendingCount.collectAsState()
     var query by remember { mutableStateOf("") }
-    var route by remember { mutableStateOf<NoteRoute?>(null) }
+    // The open note (or the editor) is an entry on the app's back stack, so it comes from the route.
+    val route = parseNoteRoute(subPage)
+    val setRoute: (NoteRoute?) -> Unit = { r -> if (r == null) onClose() else go("ov:NOTES/" + encodeNoteRoute(r)) }
     var confirmDelete by remember { mutableStateOf<String?>(null) }
     var removingNote by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -337,7 +353,9 @@ fun NotesScreen(vm: AppViewModel, onClose: () -> Unit) {
 
     val open = route
     if (open != null) {
-        NoteView(initial = notes.firstOrNull { it.id() == open.id }, vm = vm, startEditing = open.edit, onClose = { route = null })
+        key(subPage) {
+            NoteView(initial = notes.firstOrNull { it.id() == open.id }, vm = vm, startEditing = open.edit, onClose = { setRoute(null) })
+        }
         return
     }
 
@@ -377,9 +395,9 @@ fun NotesScreen(vm: AppViewModel, onClose: () -> Unit) {
                     AnimatedVisibility(visible = removingNote != n.id(), exit = fadeOut(tween(250)) + slideOutHorizontally(tween(250)) { -it / 3 }) {
                     NoteCard(
                         n = n,
-                        onOpen = { route = NoteRoute(n.id(), false) },
+                        onOpen = { setRoute(NoteRoute(n.id(), false)) },
                         onShare = { shareNote(ctx, n.str("title"), n.str("body")) },
-                        onEdit = { route = NoteRoute(n.id(), true) },
+                        onEdit = { setRoute(NoteRoute(n.id(), true)) },
                         onDelete = { confirmDelete = n.id() }
                     )
                     }
@@ -387,7 +405,7 @@ fun NotesScreen(vm: AppViewModel, onClose: () -> Unit) {
             }
         }
         ExtendedFloatingActionButton(
-            onClick = { route = NoteRoute(null, true) },
+            onClick = { setRoute(NoteRoute(null, true)) },
             icon = { Icon(Icons.Default.Add, contentDescription = null) },
             text = { Text(tr("নোট যোগ করুন", "Add note"), fontWeight = FontWeight.Bold) },
             containerColor = Tok_FFFACC15,

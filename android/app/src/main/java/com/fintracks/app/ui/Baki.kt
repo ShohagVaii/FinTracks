@@ -142,12 +142,12 @@ fun CreditDueCard(state: UiState, onOpen: () -> Unit) {
 // ---------- Shop list ----------
 
 @Composable
-fun BakiScreen(state: UiState, vm: AppViewModel) {
-    var selected by remember { mutableStateOf<String?>(null) }
+fun BakiScreen(state: UiState, vm: AppViewModel, subPage: String, go: (String) -> Unit, onBack: () -> Unit) {
+    val selectedId = subPage.ifEmpty { null }
     var addingShop by remember { mutableStateOf(false) }
-    val shop = selected?.let { id -> state.rows("credit_shops").firstOrNull { it.id() == id } }
+    val shop = selectedId?.let { id -> state.rows("credit_shops").firstOrNull { it.id() == id } }
     if (shop != null) {
-        ShopDetail(shop, state, vm) { selected = null }
+        ShopDetail(shop, state, vm) { onBack() }
         return
     }
     val p = state.privacy
@@ -166,7 +166,7 @@ fun BakiScreen(state: UiState, vm: AppViewModel) {
         if (shops.isEmpty()) EmptyHint(tr("কোনো দোকান নেই। দোকান যোগ করে কেনা ও বাকি তুলুন।", "No shops yet. Add a shop to record purchases and credit."))
         shops.forEach { s ->
             val open = settle(s.id(), state).values.count { it.status != BakiStatus.SETTLED }
-            AppCard(onClick = { selected = s.id() }) {
+            AppCard(onClick = { go("ov:CREDIT/${s.id()}") }) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text(s.str("name"), fontWeight = FontWeight.Bold)

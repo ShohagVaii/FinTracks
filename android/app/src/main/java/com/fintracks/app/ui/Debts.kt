@@ -412,10 +412,9 @@ private fun PaymentDialog(entry: JsonObject, balance: Double, vm: AppViewModel, 
 
 /** Main ধার screen: totals, people list, and the add-person button. Tapping a person opens their detail. */
 @Composable
-fun DebtsScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit) {
+fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) -> Unit, onBack: () -> Unit, onClose: () -> Unit) {
     val p = state.privacy
     val people = state.rows("debt_people").sortedBy { it.str("name") }
-    var openId by remember { mutableStateOf<String?>(null) }
     var addingPerson by remember { mutableStateOf(false) }
     var editingPerson by remember { mutableStateOf<JsonObject?>(null) }
     var deletingPerson by remember { mutableStateOf<JsonObject?>(null) }
@@ -425,11 +424,10 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit) {
     val pendingCount by vm.outbox.pendingCount.collectAsState()
 
     // Back inside a person's page returns to the list; back on the list closes the screen.
-    BackHandler(enabled = openId != null) { openId = null }
 
     Column(Modifier.fillMaxSize()) {
         DebtHeader(open?.str("name") ?: tr("দেনা ও পাওনা", "Debts & dues")) {
-            if (open != null) openId = null else onClose()
+            if (open != null) onBack() else onClose()
         }
         if (pendingCount > 0) {
             Text(
@@ -462,7 +460,7 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit) {
                             PersonCard(
                                 person = person,
                                 state = state,
-                                onOpen = { openId = person.id() },
+                                onOpen = { go("ov:DEBTS/${person.id()}") },
                                 onContact = { sms -> requestContact(ctx, person.str("phone"), sms) { contact = it } },
                                 onEdit = { editingPerson = person },
                                 onDelete = { deletingPerson = person }
@@ -495,7 +493,7 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, onClose: () -> Unit) {
             cancelText = tr("বাতিল", "Cancel"),
             onConfirm = {
                 vm.remove("debt_people", person.id())
-                if (openId == person.id()) openId = null
+                if (openId == person.id()) onBack()
                 deletingPerson = null
             },
             onDismiss = { deletingPerson = null }
