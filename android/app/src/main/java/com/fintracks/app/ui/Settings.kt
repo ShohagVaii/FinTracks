@@ -4,7 +4,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.draw.rotate
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.text.font.FontFamily
@@ -185,7 +184,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
     fun rowHit(t: String) = q.isEmpty() || t.contains(q, ignoreCase = true)
     fun sectionHit(vararg t: String) = q.isEmpty() || t.any { rowHit(it) }
     fun toggle(key: String) { openSection = if (openSection == key) "" else key }
-    fun open(key: String) = q.isNotEmpty() || openSection == key
+    fun isOpen(key: String) = q.isNotEmpty() || openSection == key
 
     val tTheme = tr("থিম", "Theme")
     val tAccent = tr("অ্যাকসেন্ট কালার", "Accent colour")
@@ -219,7 +218,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
         ProfileHero(state, email, emailLoaded, uid, lastSync) { editProfile = true }
 
         if (sectionHit(tr("চেহারা", "Appearance"), tTheme, tAccent, tFull)) {
-            SettingsAccordion(tr("চেহারা", "Appearance"), themeName, open("look"), { toggle("look") }) {
+            SettingsAccordion(tr("চেহারা", "Appearance"), themeName, isOpen("look"), { toggle("look") }) {
                 if (rowHit(tTheme)) {
                     FieldLabel(tTheme)
                     ChoiceChips(
@@ -254,7 +253,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
         }
 
         if (sectionHit(tLang, tr("ভাষা", "Language"), tr("মুদ্রা", "Currency"), tr("তারিখের ধরন", "Date format"))) {
-            SettingsAccordion(tLang, langName + " · " + currencyText, open("lang"), { toggle("lang") }) {
+            SettingsAccordion(tLang, langName + " · " + currencyText, isOpen("lang"), { toggle("lang") }) {
                 if (rowHit(tr("ভাষা", "Language"))) {
                     FieldLabel(tr("ভাষা", "Language"))
                     ChoiceChips(listOf("bn" to "বাংলা", "en" to "English"), langStyle) { vm.saveProfile(row("language" to it)) }
@@ -278,7 +277,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
             SettingsAccordion(
                 tr("গোপনীয়তা ও নিরাপত্তা", "Privacy & security"),
                 if (lockOn) tr("লক চালু", "Lock on") else tr("লক বন্ধ", "Lock off"),
-                open("security"), { toggle("security") }
+                isOpen("security"), { toggle("security") }
             ) {
                 if (rowHit(tPriv)) {
                     SwitchRow(tPriv, state.privacy) { vm.saveProfile(row("is_privacy_mode" to it)) }
@@ -296,7 +295,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
             SettingsAccordion(
                 tr("নোটিফিকেশন", "Notifications"),
                 if (!reminderOn) tr("বন্ধ", "Off") else if (AppPrefs.english) reminderTime else bnDigits(reminderTime),
-                open("notify"), { toggle("notify") }
+                isOpen("notify"), { toggle("notify") }
             ) {
                 if (rowHit(tRemind)) {
                     SwitchRow(tRemind, reminderOn) { on ->
@@ -321,7 +320,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
             SettingsAccordion(
                 tr("ডাটা ও ব্যাকআপ", "Data & backup"),
                 if (AppPrefs.english) "$txCount transactions" else bnDigits(txCount.toString()) + " টি লেনদেন",
-                open("data"), { toggle("data") }
+                isOpen("data"), { toggle("data") }
             ) {
                 if (rowHit(tBackupRow)) {
                     SettingsAccordion(tBackupRow, "", backupOpen || q.isNotEmpty(), { backupOpen = !backupOpen }) {
@@ -468,18 +467,24 @@ private fun ProfileHero(state: UiState, email: String, emailLoaded: Boolean, uid
     val name = state.name.ifBlank { tr("অতিথি ব্যবহারকারী", "Guest user") }
     val username = state.profile?.str("username").orEmpty()
     val pct = completenessPercent(profileChecks(state.profile))
+    val primaryRing = MaterialTheme.colorScheme.primary
     AppCard {
         Box(Modifier.fillMaxWidth()) {
             Column(Modifier.fillMaxWidth().padding(end = 52.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     Box(Modifier.size(78.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
-                            progress = { pct / 100f },
-                            modifier = Modifier.fillMaxSize(),
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = faint(0.1f),
-                            strokeWidth = 4.dp
-                        )
+                        // Completeness ring: a track arc and a progress arc from the top.
+                        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                            val stroke = 4.dp.toPx()
+                            drawArc(
+                                color = faint(0.1f), startAngle = -90f, sweepAngle = 360f, useCenter = false,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
+                            )
+                            drawArc(
+                                color = primaryRing, startAngle = -90f, sweepAngle = 360f * pct / 100f, useCenter = false,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
+                            )
+                        }
                         AvatarImage(url = state.profile?.str("avatar_url").orEmpty(), fallback = name, size = 62.dp)
                         Box(
                             Modifier
