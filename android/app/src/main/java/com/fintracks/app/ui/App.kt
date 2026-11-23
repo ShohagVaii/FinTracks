@@ -247,8 +247,9 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
     // Inbox: load on start and after sign-in changes; a push's target opens its screen.
     LaunchedEffect(state.signedIn) { com.fintracks.app.data.Inbox.refresh(vm.repo) }
     // Push: save this device's FCM token for the signed-in user.
+    val pushContext = LocalContext.current
     LaunchedEffect(state.signedIn) {
-        if (state.signedIn) com.fintracks.app.data.PushSetup.register(ctx, vm.repo)
+        if (state.signedIn) com.fintracks.app.data.PushSetup.register(pushContext, vm.repo)
     }
     val openTarget: (String) -> Unit = { target ->
         val key = target.lowercase()
