@@ -167,6 +167,10 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
         }
         return
     }
+    if (page == "notifs") {
+        NotifPage()
+        return
+    }
     if (page == "categories") {
         CategoriesPage(state, vm, onBack = onBack)
         return
@@ -356,6 +360,9 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
             }
         }
 
+        if (rowHit(tr("নোটিফিকেশন", "Notifications"))) {
+            NavRow(tr("নোটিফিকেশন", "Notifications"), "") { onPage("notifs") }
+        }
         val updCtx = LocalContext.current
         if (rowHit(tr("আপডেট দেখুন", "Check for updates"))) {
             NavRow(tr("আপডেট দেখুন", "Check for updates"), "") { UpdateCenter.manualCheck(updCtx) }

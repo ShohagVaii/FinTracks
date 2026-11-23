@@ -99,6 +99,7 @@ object Sync {
             tables = fetchTables(repo)
         }
         Reminders.check(ctx, tables)
+        SmartAlerts.evaluate(ctx, tables)
         FinTrackWidgetProvider.refresh(ctx, tables, privacy)
         return tables
     }
