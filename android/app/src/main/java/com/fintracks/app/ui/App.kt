@@ -84,6 +84,7 @@ import androidx.compose.ui.text.font.FontWeight
 enum class Overlay(private val bnTitle: String, private val enTitle: String) {
     ZAKAT("যাকাত ক্যালকুলেটর", "Zakat calculator"), TAX("ট্যাক্স ক্যালকুলেটর", "Tax calculator"), CURRENCY("কারেন্সি কনভার্টার", "Currency converter"),
     BIKE("বাইক টুল", "Bike tool"),
+    TRASH("আবর্জনা", "Trash"),
     CHAT("AI সহকারী", "AI assistant"), LOAN("লোন / EMI", "Loan / EMI"), CREDIT("বাকি খাতা", "Credit ledger"), DEBTS("ধার ও পাওনা", "Debts & dues"),
     BUDGETS("বাজেট এনভেলপ", "Budget envelopes"), GOALS("সঞ্চয় লক্ষ্য", "Savings goals"), INVESTMENTS("ইনভেস্টমেন্ট", "Investments"),
     SUBSCRIPTIONS("সাবস্ক্রিপশন", "Subscriptions"), ACCOUNTS("অ্যাকাউন্ট ও ট্রান্সফার", "Accounts & transfers"), REPORTS("পরিসংখ্যান ও রিপোর্ট", "Statistics & reports"), SETTINGS("সেটিংস", "Settings"),
@@ -528,6 +529,7 @@ private fun OverlayContent(
         Overlay.AGE -> AgeCalcScreen()
         Overlay.NOTES -> NotesScreen(vm, subPage, go, onClose)
         Overlay.BIKE -> BikeScreen(state, vm)
+        Overlay.TRASH -> TrashScreen(state, vm)
         Overlay.INBOX -> Unit // shown by InboxScreen in MainScaffold
     }
 }

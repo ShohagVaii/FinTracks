@@ -95,6 +95,8 @@ data class UiState(
     val notice: String? = null,
     val profile: JsonObject? = null,
     val tables: Map<String, List<JsonObject>> = emptyMap(),
+    /** Rows in the Trash (deleted_at set), grouped by table. Not shown in the app's lists. */
+    val trash: Map<String, List<JsonObject>> = emptyMap(),
     val pendingSms: List<SmsSuggestion> = emptyList(),
     val undo: UndoEntry? = null,
     val celebration: GoalCelebration? = null,
@@ -167,7 +169,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update {
             it.copy(
                 signedIn = true,
-                tables = merged,
+                tables = liveTables(merged),
+                trash = trashedTables(merged),
                 profile = merged["profiles"]?.firstOrNull() ?: it.profile,
                 pendingSms = pendingSms ?: it.pendingSms,
                 notice = notice ?: it.notice
@@ -205,7 +208,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             outbox.remember(base)
             publish(base, pendingSms = PendingSmsStore.load(getApplication()))
             _state.update { it.copy(syncError = null) }
-            syncRegistry(profile, fetched["transactions"].orEmpty())
+            syncRegistry(profile, liveTables(fetched)["transactions"].orEmpty())
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -228,7 +231,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         outbox.remember(base)
         publish(base)
         _state.update { it.copy(syncError = null) }
-        syncRegistry(state.value.profile, tables["transactions"].orEmpty())
+        syncRegistry(state.value.profile, liveTables(tables)["transactions"].orEmpty())
+        purgeExpiredTrash()
     }
 
     /**
@@ -608,6 +612,59 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return listOf(LocalOutbox.op("update", table, id, body, JsonObject(existing + body)))
     }
 
+    /** The change that removes one row: a soft delete (moved to the Trash) for trash tables, a hard delete otherwise. */
+    private fun removeOp(table: String, id: String, stamp: String): JsonObject? {
+        if (table !in TRASH_TABLES) return LocalOutbox.op("delete", table, id)
+        val existing = state.value.rows(table).firstOrNull { it.id() == id } ?: return null
+        val body = row("deleted_at" to stamp)
+        return LocalOutbox.op("update", table, id, body, JsonObject(existing + body))
+    }
+
+    /** The change that brings one trashed row back. */
+    private fun restoreOp(table: String, trashed: JsonObject): JsonObject {
+        val body = JsonObject(mapOf("deleted_at" to JsonNull))
+        return LocalOutbox.op("update", table, trashed.id(), body, JsonObject(trashed + body))
+    }
+
+    /** Brings back everything that went to the Trash in the given deletions (one per Trash item). */
+    fun restoreTrash(stamps: Set<String>) {
+        val ops = state.value.trash.flatMap { (t, rows) ->
+            rows.filter { it.str("deleted_at") in stamps }.map { restoreOp(t, it) }
+        }
+        if (ops.isNotEmpty()) localChange(ops)
+        stamps.forEach { notes.restoreStamp(it) }
+        viewModelScope.launch { stamps.forEach { cashCounts.restore(it) } }
+    }
+
+    /** Removes everything from the given deletions for good. Children go first. */
+    fun purgeTrash(stamps: Set<String>) {
+        val hit = state.value.trash.flatMap { (t, rows) ->
+            rows.filter { it.str("deleted_at") in stamps }.map { t to it }
+        }.sortedBy { TRASH_PURGE_ORDER.indexOf(it.first) }
+        val ops = hit.map { (t, r) ->
+            if (t == "transactions") queueAttachmentDelete(r.id(), r)
+            LocalOutbox.op("delete", t, r.id())
+        }
+        if (ops.isNotEmpty()) localChange(ops)
+        notes.trashed.value.filter { it.str("deleted_at") in stamps }.forEach { notes.purge(it.id()) }
+        viewModelScope.launch {
+            cashCounts.trashed.value.filter { it.str("deleted_at") in stamps }.forEach { cashCounts.purge(it.id()) }
+        }
+    }
+
+    /** Removes everything in the Trash for good. */
+    fun emptyTrash() {
+        val all = state.value.trash.values.flatten() + notes.trashed.value + cashCounts.trashed.value
+        purgeTrash(all.map { it.str("deleted_at") }.toSet())
+    }
+
+    /** Removes items that stayed in the Trash for 30 days. Runs on every refresh. */
+    private fun purgeExpiredTrash() {
+        val all = state.value.trash.values.flatten() + notes.trashed.value + cashCounts.trashed.value
+        val stamps = all.map { it.str("deleted_at") }.filter { trashExpired(it) }.toSet()
+        if (stamps.isNotEmpty()) purgeTrash(stamps)
+    }
+
     /** Child tables that are deleted with their parent (same rules as the server's foreign keys). */
     private val CHILDREN: Map<String, List<Pair<String, String>>> = mapOf(
         "credit_shops" to listOf("credit_entries" to "shop_id", "credit_payments" to "shop_id"),
@@ -621,32 +678,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * transaction, an entry takes its payments, a person takes its entries, an account is cleared
      * from its transactions (the server keeps those transactions and empties the account link).
      */
-    private fun deleteOps(table: String, id: String): List<JsonObject> {
+    private fun deleteOps(table: String, id: String, stamp: String): List<JsonObject> {
         val s = state.value
         val out = mutableListOf<JsonObject>()
         CHILDREN[table].orEmpty().forEach { (child, fk) ->
-            s.rows(child).filter { it.str(fk) == id }.forEach { out += deleteOps(child, it.id()) }
+            s.rows(child).filter { it.str(fk) == id }.forEach { out += deleteOps(child, it.id(), stamp) }
         }
         when (table) {
             // A bike entry and its expense go together, in both directions.
             "bike_fuel_entries", "bike_maintenance_entries" -> s.rows("transactions")
                 .filter { it.str("source") == "bike" && it.str("source_ref") == id }
-                .forEach { out += LocalOutbox.op("delete", "transactions", it.id()) }
+                .forEach { removeOp("transactions", it.id(), stamp)?.let { out += it } }
             "credit_payments" -> s.rows("transactions")
                 .filter { it.str("source") == "debt_payment" && it.str("source_ref") == id }
-                .forEach { out += LocalOutbox.op("delete", "transactions", it.id()) }
+                .forEach { removeOp("transactions", it.id(), stamp)?.let { out += it } }
             "debt_payments" -> s.rows("transactions")
                 .filter { it.str("source") == "personal_debt_payment" && it.str("source_ref") == id }
-                .forEach { out += LocalOutbox.op("delete", "transactions", it.id()) }
+                .forEach { removeOp("transactions", it.id(), stamp)?.let { out += it } }
             "transactions" -> {
                 val t = s.rows("transactions").firstOrNull { it.id() == id }
                 val ref = t?.str("source_ref").orEmpty()
                 if (ref.isNotEmpty() && t?.str("source") == "bike") {
-                    out += LocalOutbox.op("delete", "bike_fuel_entries", ref)
-                    out += LocalOutbox.op("delete", "bike_maintenance_entries", ref)
+                    removeOp("bike_fuel_entries", ref, stamp)?.let { out += it }
+                    removeOp("bike_maintenance_entries", ref, stamp)?.let { out += it }
                 }
-                if (ref.isNotEmpty() && t?.str("source") == "debt_payment") out += LocalOutbox.op("delete", "credit_payments", ref)
-                if (ref.isNotEmpty() && t?.str("source") == "personal_debt_payment") out += LocalOutbox.op("delete", "debt_payments", ref)
+                if (ref.isNotEmpty() && t?.str("source") == "debt_payment") removeOp("credit_payments", ref, stamp)?.let { out += it }
+                if (ref.isNotEmpty() && t?.str("source") == "personal_debt_payment") removeOp("debt_payments", ref, stamp)?.let { out += it }
             }
             "accounts" -> s.rows("transactions").forEach { t ->
                 val clearFrom = t.str("account_id") == id
@@ -659,7 +716,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
-        out += LocalOutbox.op("delete", table, id)
+        removeOp(table, id, stamp)?.let { out += it }
         return out
     }
 
@@ -695,13 +752,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    /** Deletes a row with everything that depends on it. Only a plain single row can be undone. */
+    /** Moves a row with everything that depends on it to the Trash. Only a plain single row can be undone. */
     fun remove(table: String, id: String) {
         val row = state.value.rows(table).firstOrNull { it.id() == id }
-        if (table == "transactions") {
-            queueAttachmentDelete(id, row)
-        }
-        val ops = deleteOps(table, id)
+        val ops = deleteOps(table, id, nowIso())
         localChange(ops)
         val plain = ops.size == 1 && table !in setOf("credit_shops", "mess_members", "debts", "debt_people", "debt_payments")
         if (row != null && plain) _state.update { it.copy(undo = UndoEntry(table, row, System.nanoTime())) }
@@ -711,8 +765,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Deletes several rows of one table in one local batch. Mirrored rows (debt / dues payments) follow the same rule as remove. */
     fun removeMany(table: String, ids: List<String>) {
         if (ids.isEmpty()) return
-        if (table == "transactions") ids.forEach { id -> queueAttachmentDelete(id, state.value.rows(table).firstOrNull { it.id() == id }) }
-        localChange(ids.flatMap { deleteOps(table, it) })
+        val stamp = nowIso()
+        localChange(ids.flatMap { deleteOps(table, it, stamp) })
     }
 
     /** Turns demo mode on or off. Only the display changes; the saved data stays the same. */
@@ -724,7 +778,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun undoRemove() {
         val u = state.value.undo ?: return
         _state.update { it.copy(undo = null) }
-        localChange(listOf(LocalOutbox.op("insert", u.table, u.row.id(), u.row, u.row)))
+        localChange(listOf(
+            if (u.table in TRASH_TABLES) restoreOp(u.table, u.row)
+            else LocalOutbox.op("insert", u.table, u.row.id(), u.row, u.row)
+        ))
     }
 
     fun clearUndo() {

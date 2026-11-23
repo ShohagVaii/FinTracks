@@ -112,6 +112,9 @@ class CashCountStore(ctx: Context, private val repo: Repository, private val sco
     val records: StateFlow<List<CountRecord>> = _records.asStateFlow()
     private val _pendingCount = MutableStateFlow(0)
     val pendingCount: StateFlow<Int> = _pendingCount.asStateFlow()
+    private val _trashed = MutableStateFlow<List<JsonObject>>(emptyList())
+    /** Counts in the Trash. */
+    val trashed: StateFlow<List<JsonObject>> = _trashed.asStateFlow()
 
     private fun key(): String = "counter-" + (runCatching { repo.uid() }.getOrDefault("anon"))
 
@@ -145,7 +148,8 @@ class CashCountStore(ctx: Context, private val repo: Repository, private val sco
     }
 
     private fun publish() {
-        _records.value = rows.mapNotNull { countFromRow(it) }.sortedByDescending { it.at }
+        _records.value = rows.filter { it.str("deleted_at").isEmpty() }.mapNotNull { countFromRow(it) }.sortedByDescending { it.at }
+        _trashed.value = rows.filter { it.str("deleted_at").isNotEmpty() }
         _pendingCount.value = pending.size
     }
 
@@ -162,7 +166,34 @@ class CashCountStore(ctx: Context, private val repo: Repository, private val sco
         return sync()
     }
 
+    /** Moves counts to the Trash (or back, when [stamp] is null). Each change is queued for the server. */
+    private fun setTrash(ids: List<String>, stamp: String?) {
+        synchronized(this) {
+            ensureLoaded()
+            for (id in ids) {
+                val old = rows.firstOrNull { it.id() == id } ?: continue
+                val r = JsonObject(old + ("deleted_at" to JsonPrimitive(stamp)))
+                rows = rows.filterNot { it.id() == id } + r
+                pending = pending.filterNot { it.str("id") == id } + row("op" to "upsert", "id" to id, "row" to r)
+            }
+            persist(); publish()
+        }
+    }
+
+    /** Moves a count to the Trash. */
     suspend fun delete(id: String): Boolean {
+        setTrash(listOf(id), OffsetDateTime.now().toString())
+        return sync()
+    }
+
+    /** Brings back every count that went to the Trash at [stamp]. */
+    suspend fun restore(stamp: String): Boolean {
+        setTrash(rows.filter { it.str("deleted_at") == stamp }.map { it.id() }, null)
+        return sync()
+    }
+
+    /** Removes a count for good. */
+    suspend fun purge(id: String): Boolean {
         synchronized(this) {
             ensureLoaded()
             rows = rows.filterNot { it.id() == id }
@@ -209,7 +240,7 @@ class CashCountStore(ctx: Context, private val repo: Repository, private val sco
     fun reset() {
         synchronized(this) {
             rows = emptyList(); pending = emptyList(); loadedKey = null
-            _records.value = emptyList(); _pendingCount.value = 0
+            _records.value = emptyList(); _pendingCount.value = 0; _trashed.value = emptyList()
         }
     }
 }

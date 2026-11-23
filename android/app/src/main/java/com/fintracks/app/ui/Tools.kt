@@ -148,6 +148,7 @@ private fun defaultTools(): List<ToolTile> = listOf(
     ToolTile(Overlay.COUNTER, "টাকা গণক", Icons.Default.Payments, Tok_FF84CC16),
     ToolTile(Overlay.AGE, "বয়স ক্যালকুলেটর", Icons.Default.Cake, Tok_FFE879F9),
     ToolTile(Overlay.BIKE, "বাইক", Icons.Default.Build, Color(0xFF8B5CF6)),
+    ToolTile(Overlay.TRASH, "আবর্জনা", Icons.Default.Delete, Color(0xFF64748B)),
     ToolTile(Overlay.NOTES, "নোটপ্যাড", Icons.Default.Description, Tok_FFFACC15)
 )
 

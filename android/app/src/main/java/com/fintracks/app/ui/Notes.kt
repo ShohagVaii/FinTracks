@@ -130,13 +130,16 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
     val notes: StateFlow<List<JsonObject>> = _notes.asStateFlow()
     private val _pendingCount = MutableStateFlow(0)
     val pendingCount: StateFlow<Int> = _pendingCount.asStateFlow()
+    private val _trashed = MutableStateFlow<List<JsonObject>>(emptyList())
+    /** Notes in the Trash, newest deletion first. */
+    val trashed: StateFlow<List<JsonObject>> = _trashed.asStateFlow()
 
     private fun key(): String = "notes-" + (runCatching { repo.uid() }.getOrDefault("anon"))
 
     /** Clears the in-memory copy (used by the app reset). */
     fun reset() = synchronized(this) {
         cache = emptyList(); pending = emptyList(); photoUploads = emptyList(); photoDeletes = emptyList(); loadedKey = null
-        _notes.value = emptyList(); _pendingCount.value = 0
+        _notes.value = emptyList(); _pendingCount.value = 0; _trashed.value = emptyList()
     }
 
     /** Loads the cache for the signed-in user (once per user). */
@@ -173,7 +176,8 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
     }
 
     private fun publish() {
-        _notes.value = cache.sortedWith(compareByDescending<JsonObject> { it.bool("pinned") }.thenByDescending { timestamp(it) })
+        _notes.value = cache.filter { it.str("deleted_at").isEmpty() }.sortedWith(compareByDescending<JsonObject> { it.bool("pinned") }.thenByDescending { timestamp(it) })
+        _trashed.value = cache.filter { it.str("deleted_at").isNotEmpty() }.sortedByDescending { it.str("deleted_at") }
         _pendingCount.value = pending.size + photoUploads.size + photoDeletes.size
     }
 
@@ -242,7 +246,31 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
         }
     }
 
-    fun delete(id: String) = synchronized(this) {
+    /** Moves a note to the Trash (kept 30 days). Photos stay until the note is removed for good. */
+    fun delete(id: String) {
+        setTrash(id, java.time.OffsetDateTime.now().toString())
+    }
+
+    /** Brings back every note that went to the Trash at [stamp]. */
+    fun restoreStamp(stamp: String) {
+        cache.filter { it.str("deleted_at") == stamp }.forEach { setTrash(it.id(), null) }
+    }
+
+    private fun setTrash(id: String, stamp: String?) {
+        synchronized(this) {
+            ensureLoaded()
+            val old = cache.firstOrNull { it.id() == id } ?: return@synchronized
+            val note = JsonObject(old + ("deleted_at" to JsonPrimitive(stamp)))
+            cache = cache.filterNot { it.id() == id } + note
+            pending = pending.filterNot { it.str("id") == id } + row("op" to "upsert", "id" to id, "note" to note)
+            persist()
+            publish()
+            scope.launch { sync() }
+        }
+    }
+
+    /** Removes a note for good, with its photos. */
+    fun purge(id: String) = synchronized(this) {
         ensureLoaded()
         for (path in photosOf(id)) {
             if (path in photoUploads) { photoUploads = photoUploads - path; notePhotoFile(ctx, path).delete() }

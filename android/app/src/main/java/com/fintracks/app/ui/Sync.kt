@@ -94,14 +94,15 @@ object Sync {
     /** Full sync used by the app after login and by the daily worker. Returns the fresh tables. */
     suspend fun run(ctx: Context, repo: Repository, privacy: Boolean, outbox: LocalOutbox = LocalOutbox(ctx, repo)): Map<String, List<JsonObject>> {
         var tables = fetchTables(repo)
-        if (materializeRecurring(ctx, outbox, tables["transactions"].orEmpty())) {
+        if (materializeRecurring(ctx, outbox, liveTables(tables)["transactions"].orEmpty())) {
             outbox.flush()
             tables = fetchTables(repo)
         }
-        Reminders.check(ctx, tables)
-        SmartAlerts.evaluate(ctx, tables)
-        FinTrackWidgetProvider.refresh(ctx, tables, privacy)
-        return tables
+        val live = liveTables(tables)
+        Reminders.check(ctx, live)
+        SmartAlerts.evaluate(ctx, live)
+        FinTrackWidgetProvider.refresh(ctx, live, privacy)
+        return live
     }
 }
 
