@@ -356,6 +356,10 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
             }
         }
 
+        val updCtx = LocalContext.current
+        if (rowHit(tr("আপডেট দেখুন", "Check for updates"))) {
+            NavRow(tr("আপডেট দেখুন", "Check for updates"), "") { UpdateCenter.manualCheck(updCtx) }
+        }
         if (rowHit(tHelp)) {
             NavRow(tHelp, "") { onPage("help") }
         }

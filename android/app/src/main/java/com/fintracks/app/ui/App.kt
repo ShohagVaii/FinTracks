@@ -96,6 +96,7 @@ class Celebrate(val kind: Int)
 
 @Composable
 fun FinTracksApp(vm: AppViewModel = viewModel()) {
+    UpdateHost()
     // Full-screen mode for the whole app, including the PIN lock screen.
     ImmersiveEffect()
     val state by vm.state.collectAsState()
