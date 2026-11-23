@@ -91,7 +91,7 @@ private val SYNC_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyy
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(state: UiState, vm: AppViewModel) {
+fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (String) -> Unit, onBack: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -138,14 +138,22 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
     val dateStyle = if (state.profile?.str("date_format") == "bn") "bn" else "en"
     val langStyle = if (AppPrefs.english) "en" else "bn"
 
-    // Sub-pages replace this page; their own BackHandler returns here.
-    var page by rememberSaveable { mutableStateOf("") }
+    // Sub-pages are entries on the app's back stack (page comes from the route); back returns here.
     if (page == "login") {
-        LoginSecurityPage(vm, lockOn, hasPin, bioOn, bioHardware, onBack = { page = "" }, onOpenSecurity = { page = "" })
+        LoginSecurityPage(vm, lockOn, hasPin, bioOn, bioHardware, onBack = onBack, onOpenSecurity = onBack)
         return
     }
     if (page == "faq") {
-        FaqPage { page = "" }
+        FaqPage { onBack() }
+        return
+    }
+    if (page == "categories") {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
+            AppCard {
+                SectionTitle(tr("ক্যাটাগরি", "Categories"))
+                CategoryManager(state, vm)
+            }
+        }
         return
     }
     val uid = remember { vm.currentUid() }
@@ -162,7 +170,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
             }
         }
         AppCard {
-            SettingLink(tr("লগইন ও নিরাপত্তা", "Login & security"), tr("ইমেইল, Google, পাসওয়ার্ড, ফোনের লক", "Email, Google, password, phone lock")) { page = "login" }
+            SettingLink(tr("লগইন ও নিরাপত্তা", "Login & security"), tr("ইমেইল, Google, পাসওয়ার্ড, ফোনের লক", "Email, Google, password, phone lock")) { onPage("login") }
         }
 
         // ---- চেহারা ও পছন্দ ----
@@ -226,14 +234,14 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
         // ---- ক্যাটাগরি ----
         AppCard {
             SectionTitle(tr("ক্যাটাগরি", "Categories"))
-            CategoryManager(state, vm)
+            SettingLink(tr("ক্যাটাগরি সাজান", "Manage categories"), tr("যোগ, সম্পাদনা, মুছে ফেলা", "Add, edit, delete")) { onPage("categories") }
         }
 
         // ---- নিরাপত্তা ----
         AppCard {
             SectionTitle(tr("নিরাপত্তা", "Security"))
             // Link to the device-security block (PIN and fingerprint/face status) on the login & security page.
-            SettingLink(tr("PIN ও ফিঙ্গারপ্রিন্ট/ফেস স্ট্যাটাস", "PIN and fingerprint/face status"), tr("লগইন ও নিরাপত্তা পেজে দেখুন", "Shown on Login & security")) { page = "login" }
+            SettingLink(tr("PIN ও ফিঙ্গারপ্রিন্ট/ফেস স্ট্যাটাস", "PIN and fingerprint/face status"), tr("লগইন ও নিরাপত্তা পেজে দেখুন", "Shown on Login & security")) { onPage("login") }
             Text(
                 tr("PIN, ফিঙ্গারপ্রিন্ট বা ফেস দিয়ে অ্যাপ লক করা যায়। ফোনে ফেস/ফিঙ্গারপ্রিন্ট না থাকলে PIN ব্যবহার হবে।",
                     "Lock the app with a PIN, fingerprint or face. Without a fingerprint or face on the phone, the PIN is used."),
@@ -377,7 +385,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
 
         AppCard {
             SectionTitle(tr("সাহায্য ও তথ্য", "Help & info"))
-            SettingLink(tr("প্রশ্ন-উত্তর", "Questions & answers"), tr("অফলাইনেও পড়া যায়", "Readable offline")) { page = "faq" }
+            SettingLink(tr("প্রশ্ন-উত্তর", "Questions & answers"), tr("অফলাইনেও পড়া যায়", "Readable offline")) { onPage("faq") }
             SettingLink(tr("সাপোর্ট ইমেইল", "Support email"), SUPPORT_EMAIL) { sendSupportMail(ctx) }
             SettingLink(tr("প্রাইভেসি পলিসি", "Privacy policy")) { openUrl(ctx, PRIVACY_URL) }
             SettingLink(tr("টার্মস ও শর্তাবলি", "Terms of use")) { openUrl(ctx, TERMS_URL) }

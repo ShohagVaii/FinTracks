@@ -37,6 +37,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import com.fintracks.app.ui.topInsetPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -207,13 +209,30 @@ private fun SyncIndicator(state: UiState) {
 
 @Composable
 private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) {
-    var tab by rememberSaveable { mutableStateOf("dashboard") }
     val reduce = rememberReduceMotion()
-    var overlayName by rememberSaveable { mutableStateOf<String?>(null) }
-    // Money counter: true while its history page is open (that page has its own back link, so the header's back arrow is hidden).
-    var counterHistory by rememberSaveable { mutableStateOf(false) }
+    // The one back stack (see NavHistory). Stored as one string; routes never contain a newline.
+    var navRaw by rememberSaveable { mutableStateOf(NavHistory.HOME) }
+    val stack = navRaw.split("\n")
+    val base = NavHistory.base(stack)
+    val tab = NavHistory.tab(base) ?: "dashboard"
+    val overlayRoute = NavHistory.overlay(base)
+    val overlay = overlayRoute?.let { runCatching { Overlay.valueOf(it.first) }.getOrNull() }
+    val subPage = overlayRoute?.second.orEmpty()
+    // Money counter: its history page is a sub-page of the counter overlay.
+    val counterHistory = overlay == Overlay.COUNTER && subPage == "hist"
+    var exitAsk by remember { mutableStateOf(false) }
+    val exitContext = LocalContext.current
+    fun commit(next: List<String>) { navRaw = next.joinToString("\n") }
+    val go: (String) -> Unit = { commit(NavHistory.push(stack, it)) }
+    // Back: previous entry; else home; else ask before leaving the app.
+    val goBack: () -> Unit = {
+        when {
+            stack.size > 1 -> commit(NavHistory.pop(stack))
+            stack.last() != NavHistory.HOME -> commit(listOf(NavHistory.HOME))
+            else -> exitAsk = true
+        }
+    }
     var txEditor by remember { mutableStateOf<TxEditor?>(null) }
-    val overlay = overlayName?.let { runCatching { Overlay.valueOf(it) }.getOrNull() }
     val snackbar = remember { SnackbarHostState() }
     var showCalc by remember { mutableStateOf(false) }
     var smsOpen by remember { mutableStateOf(false) }
@@ -238,9 +257,7 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
         if (result == SnackbarResult.ActionPerformed) vm.undoRemove() else vm.clearUndo()
     }
 
-    BackHandler(enabled = overlay != null) {
-        if (overlay == Overlay.COUNTER && counterHistory) counterHistory = false else overlayName = null
-    }
+    BackHandler { goBack() }
 
     val openTx: (JsonObject?) -> Unit = { txEditor = TxEditor(it) }
 
@@ -254,15 +271,13 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
     val openTarget: (String) -> Unit = { target ->
         val key = target.lowercase()
         val screen = runCatching { Overlay.valueOf(key.uppercase()) }.getOrNull()?.takeIf { it != Overlay.INBOX }
-        counterHistory = false
         if (screen != null) {
-            overlayName = screen.name
+            go("ov:${screen.name}")
         } else {
-            overlayName = null
-            tab = when (key) {
+            go("tab:" + when (key) {
                 "transactions", "shared", "tools" -> key
                 else -> "dashboard"
-            }
+            })
         }
     }
 
@@ -280,7 +295,7 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
-            if (overlay == null) BottomBar(selected = tab, onSelect = { tab = it }, onAdd = { openTx(null) })
+            if (overlay == null) BottomBar(selected = tab, onSelect = { go("tab:$it") }, onAdd = { openTx(null) })
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
@@ -294,22 +309,19 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
                     onToggleTheme = { vm.saveProfile(row("theme" to if (state.dark) "light" else "dark")) },
                     onTogglePrivacy = { vm.saveProfile(row("is_privacy_mode" to !state.privacy)) },
                     unread = com.fintracks.app.data.Inbox.unread,
-                    onInbox = { overlayName = Overlay.INBOX.name },
-                    onSettings = { overlayName = Overlay.SETTINGS.name }
+                    onInbox = { go("ov:${Overlay.INBOX.name}") },
+                    onSettings = { go("ov:${Overlay.SETTINGS.name}") }
                 )
             } else if (overlay != Overlay.CHAT && overlay != Overlay.DEBTS && overlay != Overlay.NOTES && !(overlay == Overlay.COUNTER && counterHistory)) {
                 // ধার screen draws its own header (it shows the person's name on the detail page).
-                OverlayHeader(overlay.title) { overlayName = null }
+                OverlayHeader(overlay.title) { goBack() }
             }
 
             Box(Modifier.fillMaxSize()) {
                 if (overlay == Overlay.INBOX) {
                     InboxScreen(vm.repo) { item -> openTarget(item.target) }
                 } else if (overlay != null) {
-                    OverlayContent(overlay, state, vm, openTx, counterHistory, { counterHistory = it }) {
-                        counterHistory = false
-                        overlayName = null
-                    }
+                    OverlayContent(overlay, state, vm, openTx, subPage, go, counterHistory) { goBack() }
                 } else AnimatedContent(
                     targetState = tab,
                     transitionSpec = {
@@ -322,10 +334,10 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
                     label = "tabs"
                 ) { current ->
                     when (current) {
-                        "dashboard" -> DashboardScreen(state, vm, openTx, { receipt = it }, { txAction = it }) { overlayName = it.name }
+                        "dashboard" -> DashboardScreen(state, vm, openTx, { receipt = it }, { txAction = it }) { go("ov:${it.name}") }
                         "transactions" -> TransactionsScreen(state, vm, openTx, { receipt = it }, { txAction = it })
                         "shared" -> SharedScreen(state, vm)
-                        else -> ToolsScreen { overlayName = it.name }
+                        else -> ToolsScreen { go("ov:${it.name}") }
                     }
                 }
                 if (overlay == null) {
@@ -340,6 +352,20 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
 
     if (smsOpen) SmsParserDialog(state, vm) { smsOpen = false }
     if (showCalc) CalculatorDialog(onUse = { showCalc = false }, onDismiss = { showCalc = false })
+
+    // Leave the app only after confirming (the back press on home).
+    if (exitAsk) {
+        AlertDialog(
+            onDismissRequest = { exitAsk = false },
+            title = { Text(tr("অ্যাপ থেকে বের হতে চান?", "Exit the app?")) },
+            confirmButton = {
+                TextButton(onClick = { exitAsk = false; (exitContext as? android.app.Activity)?.finish() }) {
+                    Text(tr("বের হবো", "Exit"))
+                }
+            },
+            dismissButton = { TextButton(onClick = { exitAsk = false }) { Text(tr("না", "No")) } }
+        )
+    }
 
     receipt?.let { r ->
         ReceiptDialog(
@@ -471,8 +497,9 @@ private fun OverlayContent(
     state: UiState,
     vm: AppViewModel,
     openTx: (JsonObject?) -> Unit,
+    subPage: String,
+    go: (String) -> Unit,
     counterHistory: Boolean,
-    onCounterHistory: (Boolean) -> Unit,
     onClose: () -> Unit
 ) {
     when (overlay) {
@@ -489,8 +516,8 @@ private fun OverlayContent(
         Overlay.SUBSCRIPTIONS -> SubscriptionsScreen(state, vm)
         Overlay.ACCOUNTS -> AccountsScreen(state, vm)
         Overlay.REPORTS -> ReportsScreen(state)
-        Overlay.SETTINGS -> SettingsScreen(state, vm)
-        Overlay.COUNTER -> MoneyCounterScreen(vm, counterHistory, onCounterHistory)
+        Overlay.SETTINGS -> SettingsScreen(state, vm, subPage, { go("ov:SETTINGS/$it") }, onClose)
+        Overlay.COUNTER -> MoneyCounterScreen(vm, counterHistory) { on -> if (on) go("ov:COUNTER/hist") else onClose() }
         Overlay.AGE -> AgeCalcScreen()
         Overlay.NOTES -> NotesScreen(vm, onClose)
         Overlay.INBOX -> Unit // shown by InboxScreen in MainScaffold
