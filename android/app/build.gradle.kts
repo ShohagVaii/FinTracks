@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.google.gms.google-services")
 }
 
 // Release signing comes from environment variables set by CI (GitHub Secrets). No secret, no release key.
@@ -76,6 +77,9 @@ dependencies {
     // On-device receipt OCR (free, works offline)
     implementation("com.google.mlkit:text-recognition:16.0.1")
     // Unit tests for parsers and backup round-trip (JVM, no device needed)
+    // Firebase Cloud Messaging (push). Versions are pinned by the BoM.
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging")
     testImplementation("junit:junit:4.13.2")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
