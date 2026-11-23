@@ -68,7 +68,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -95,6 +94,9 @@ import kotlin.math.cos
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.PI
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Row
 
 /** A newer signed build on GitHub Releases. [code] is the CI run number, the same number as versionCode. */
 data class UpdateInfo(val versionName: String, val code: Int, val sizeBytes: Long, val notes: List<String>, val apkUrl: String)
