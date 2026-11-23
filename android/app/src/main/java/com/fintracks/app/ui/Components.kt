@@ -245,10 +245,10 @@ fun FormDialog(
     )
 }
 
-/** Glass bottom bar with a blue halo, outlined icons and a raised centre "+". The selected tab's pill slides, and its icon bounces. */
-@Composable
 private val BOTTOM_GAP = 84.dp
 
+/** Glass bottom bar with a blue halo, outlined icons and a raised centre "+". The selected tab's pill slides, and its icon bounces. */
+@Composable
 fun BottomBar(selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
     val items = listOf(
         "dashboard" to (tr("হোম", "Home") to Icons.Outlined.Home),
