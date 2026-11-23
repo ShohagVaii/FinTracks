@@ -1,4 +1,4 @@
-// FinTrack push sender (FCM HTTP v1). Owner only. NOT DEPLOYED YET: needs the FCM_SERVICE_ACCOUNT secret.
+// FinTrack push sender (FCM HTTP v1). Owner only. Sends data-only messages; the app shows them.
 //
 // Request (POST, Authorization: Bearer <owner's login>):
 //   { "campaign_id": "<uuid>" }   send one campaign now
@@ -23,9 +23,6 @@ const TARGETS = new Set([
   "debts", "reports", "subscriptions", "accounts", "loan", "chat", "counter", "zakat", "tax",
   "currency", "age", "credit", "investments",
 ]);
-const SMALL_ICON = "ic_stat_fintrack"; // white silhouette in the app's drawable folders
-const CHANNEL_PUSH = "fintrack_push";
-const CHANNEL_ALERT = "fintrack_alerts";
 const SEND_CONCURRENCY = 10;
 
 type Kind = "text" | "banner" | "alert";
@@ -78,19 +75,21 @@ async function fcmAccessToken(sa: ServiceAccount): Promise<string> {
   return j.access_token;
 }
 
+// Data-only message: the app builds the notification itself (same look everywhere, tap carries the target).
 function buildMessage(token: string, c: Campaign, kind: Kind) {
-  const alert = kind === "alert";
   const image = kind === "banner" && c.image_url?.startsWith("https://") ? c.image_url : undefined;
-  const android: Record<string, unknown> = {
-    priority: alert ? "HIGH" : "NORMAL",
-    notification: { channel_id: alert ? CHANNEL_ALERT : CHANNEL_PUSH, icon: SMALL_ICON, ...(image ? { image } : {}) },
-  };
   return {
     message: {
       token,
-      notification: { title: c.title, body: c.body, ...(image ? { image } : {}) },
-      android,
-      data: { target: TARGETS.has(c.target) ? c.target : "dashboard", campaign_id: c.id, kind },
+      data: {
+        title: c.title,
+        body: c.body,
+        kind,
+        target: TARGETS.has(c.target) ? c.target : "dashboard",
+        campaign_id: c.id,
+        ...(image ? { image_url: image } : {}),
+      },
+      android: { priority: "HIGH" },
     },
   };
 }
