@@ -119,8 +119,6 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
     var showSetPin by remember { mutableStateOf(false) }
     var showDisable by remember { mutableStateOf(false) }
     var showOldPin by remember { mutableStateOf(false) }
-    var showDelete by remember { mutableStateOf(false) }
-    var showReset by remember { mutableStateOf(false) }
     var showTime by remember { mutableStateOf(false) }
     var reminderOn by remember { mutableStateOf(DailyReminder.enabled(ctx)) }
     var reminderTime by remember { mutableStateOf(DailyReminder.time(ctx)) }
@@ -434,24 +432,6 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
             },
             confirmButton = { TextButton(modifier = Modifier.pressScale(), onClick = { vm.restoreBackup(plan); restorePlan = null }) { Text(tr("ফিরিয়ে আনুন", "Restore")) } },
             dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = { restorePlan = null }) { Text(tr("বাতিল", "Cancel")) } }
-        )
-    }
-    if (showDelete) {
-        DeleteAccountDialog(
-            email = email,
-            onDismiss = { showDelete = false },
-            onConfirm = { password -> vm.deleteAccount(password); showDelete = false }
-        )
-    }
-    if (showReset) {
-        ResetDialog(
-            pendingOffline = (vm.notes.pendingCount.value + vm.cashCounts.pendingCount.value),
-            onDismiss = { showReset = false },
-            onConfirm = {
-                showReset = false
-                vm.resetLocal()
-                Toast.makeText(ctx, tr("লোকাল ডেটা মুছে ফেলা হয়েছে", "Local data erased"), Toast.LENGTH_LONG).show()
-            }
         )
     }
 }
@@ -821,7 +801,7 @@ private fun compressAvatar(ctx: Context, uri: Uri): ByteArray? {
 
 /** Typed confirmation for wiping this phone. Warns when offline changes have not reached the server yet. */
 @Composable
-private fun ResetDialog(pendingOffline: Int, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+internal fun ResetDialog(pendingOffline: Int, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     var word by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,

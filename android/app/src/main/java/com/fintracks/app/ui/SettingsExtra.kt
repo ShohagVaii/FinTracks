@@ -1,5 +1,11 @@
 package com.fintracks.app.ui
 
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -260,7 +266,8 @@ fun LogoutRow(onClick: () -> Unit) {
 
 // ---------- Pages ----------
 
-/** Login and security page: email, Google, password, and this phone's lock status. */
+/** Login and security: account box, this phone's lock box, and a collapsed danger zone at the bottom. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn: Boolean, bioHardware: Boolean, onBack: () -> Unit, onOpenSecurity: () -> Unit = {}) {
     val ctx = LocalContext.current
@@ -270,6 +277,16 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
     var reload by remember { mutableStateOf(0) }
     var changing by remember { mutableStateOf(false) }
     var confirmUnlink by remember { mutableStateOf<String?>(null) }
+    var appLock by remember { mutableStateOf(lockOn) }
+    var pinSet by remember { mutableStateOf(hasPin) }
+    var bio by remember { mutableStateOf(bioOn) }
+    var timeout by remember { mutableStateOf(AppLock.timeoutSeconds(ctx).toString()) }
+    var showSetPin by remember { mutableStateOf(false) }
+    var showOldPin by remember { mutableStateOf(false) }
+    var showDisable by remember { mutableStateOf(false) }
+    var showReset by remember { mutableStateOf(false) }
+    var showDelete by remember { mutableStateOf(false) }
+    var dangerOpen by remember { mutableStateOf(false) }
     BackHandler(onBack = onBack)
     LaunchedEffect(reload) {
         try {
@@ -281,75 +298,148 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
     }
     val google = info?.providers?.firstOrNull { it.first == "google" }
     val hasEmailLogin = info?.providers?.any { it.first == "email" } == true
+    val email = info?.email.orEmpty()
+    val verified = info?.verified == true
 
     Column(
-        Modifier.fillMaxSize().padding(16.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         TextButton(modifier = Modifier.pressScale(), onClick = onBack) { Text(tr("‹ ফিরে যান", "‹ Back")) }
         Text(tr("লগইন ও নিরাপত্তা", "Login & security"), fontSize = 22.sp, fontWeight = FontWeight.Bold)
         loadError?.let {
-            Text(tr("লগইন তথ্য আনা যায়নি: $it", "Could not load login details: $it"), color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+            Text(tr("লগইন তথ্য আনা যায়নি: $it", "Could not load login details: $it"), color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
             OutlinedButton(modifier = Modifier.pressScale(), onClick = { reload++ }) { Text(tr("আবার চেষ্টা", "Try again")) }
         }
-        // Email
+
+        // ---- Account ----
         AppCardPlain {
-            Text(tr("ইমেইল", "Email"), fontWeight = FontWeight.Bold)
-            Text(info?.email?.takeIf { it.isNotBlank() } ?: "—", fontSize = 14.sp)
-            val verified = info?.verified == true
-            Text(
-                when {
-                    info == null -> tr("লোড হচ্ছে…", "Loading…")
-                    verified -> tr("✅ যাচাই হয়েছে", "✅ Verified")
-                    else -> tr("❌ যাচাই হয়নি (ইনবক্সের লিংক দেখুন)", "❌ Not verified (check your inbox)")
-                },
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        // Google
-        AppCardPlain {
-            Text("Google", fontWeight = FontWeight.Bold)
-            if (google != null) {
-                Text(tr("✅ যুক্ত আছে", "✅ Linked"), fontSize = 13.sp)
-                if (hasEmailLogin && (info?.providers?.size ?: 0) > 1) {
-                    OutlinedButton(modifier = Modifier.pressScale(), onClick = { confirmUnlink = google.second }) { Text(tr("Google সরান", "Remove Google")) }
-                    Text(tr("সরালে Google দিয়ে আর লগইন হবে না; ইমেইল দিয়ে লগইন চলবে।", "After removal you can't sign in with Google, but email sign-in still works."), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(tr("অ্যাকাউন্ট", "Account"), fontWeight = FontWeight.Bold)
+            Text(tr("ইমেইল", "Email"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(email.ifBlank { "—" }, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
+                if (info != null) {
+                    StatusChip(if (verified) tr("যাচাইকৃত", "Verified") else tr("যাচাই হয়নি", "Not verified"))
                 }
-            } else {
-                Text(tr("যুক্ত নেই", "Not linked"), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(tr("এই অ্যাপ থেকে নতুন Google যুক্ত করার ব্যবস্থা এখন বন্ধ।", "Linking a new Google account from this app is turned off right now."), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            HorizontalDivider(color = faint(0.08f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Google", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        when {
+                            info == null -> tr("লোড হচ্ছে…", "Loading…")
+                            google != null -> tr("যুক্ত আছে", "Linked")
+                            else -> tr("যুক্ত নেই", "Not linked")
+                        },
+                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (google != null && hasEmailLogin && (info?.providers?.size ?: 0) > 1) {
+                    OutlinedButton(modifier = Modifier.pressScale(), onClick = { confirmUnlink = google.second }) {
+                        Text(tr("সরান", "Remove"))
+                    }
+                }
+            }
+            HorizontalDivider(color = faint(0.08f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(tr("পাসওয়ার্ড বদলান", "Change password"), fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                OutlinedButton(modifier = Modifier.pressScale(), onClick = { changing = true }, enabled = info != null) {
+                    Text(tr("বদলান", "Change"))
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(tr("পাসওয়ার্ড রিসেট", "Password reset"), fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                OutlinedButton(
+                    modifier = Modifier.pressScale(),
+                    onClick = {
+                        vm.resetPassword(email)
+                        Toast.makeText(ctx, tr("রিসেট ইমেইল পাঠানো হয়েছে", "Reset email sent"), Toast.LENGTH_SHORT).show()
+                    },
+                    enabled = email.isNotBlank()
+                ) { Text(tr("ইমেইল পাঠান", "Send email")) }
             }
         }
-        // Password
+
+        // ---- This phone's lock ----
         AppCardPlain {
-            Text(tr("পাসওয়ার্ড", "Password"), fontWeight = FontWeight.Bold)
-            Text(tr("বদলাতে বর্তমান পাসওয়ার্ড লাগবে।", "Changing it needs your current password."), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedButton(modifier = Modifier.pressScale(), onClick = { changing = true }, enabled = info != null) { Text(tr("পাসওয়ার্ড বদলান", "Change password")) }
+            Text(tr("এই ফোনের লক", "Phone lock"), fontWeight = FontWeight.Bold)
+            SwitchRow(tr("অ্যাপ লক", "App lock"), appLock) { on ->
+                if (on) {
+                    if (!pinSet) {
+                        Toast.makeText(ctx, tr("আগে PIN সেট করুন", "Set a PIN first"), Toast.LENGTH_SHORT).show()
+                    } else {
+                        appLock = true
+                        AppLock.enable(ctx)
+                    }
+                } else {
+                    showDisable = true
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("PIN", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                OutlinedButton(modifier = Modifier.pressScale(), onClick = { if (pinSet) showOldPin = true else showSetPin = true }) {
+                    Text(if (pinSet) tr("PIN বদলান", "Change PIN") else tr("PIN সেট করুন", "Set PIN"))
+                }
+            }
+            Text(tr("অটো-লক", "Auto-lock"), fontWeight = FontWeight.SemiBold)
+            ChoiceChips(
+                listOf("0" to tr("সাথে সাথে", "Immediately"), "60" to tr("১ মিনিট", "1 minute"), "300" to tr("৫ মিনিট", "5 minutes")),
+                timeout
+            ) {
+                timeout = it
+                AppLock.setTimeout(ctx, it.toInt())
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(tr("ফিঙ্গারপ্রিন্ট / ফেস", "Fingerprint / face"), fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Switch(
+                    checked = bio,
+                    enabled = appLock && bioHardware,
+                    onCheckedChange = {
+                        bio = it
+                        AppLock.setBiometric(ctx, it)
+                    }
+                )
+            }
         }
-        // Device security (PIN / biometric), not two-step verification
-        AppCardPlain {
-            Text(tr("এই ফোনের সুরক্ষা", "Device security on this phone"), fontWeight = FontWeight.Bold)
-            Text(tr("অ্যাপ লক: " + if (lockOn) "চালু" else "বন্ধ", "App lock: " + if (lockOn) "on" else "off"), fontSize = 13.sp)
-            Text(tr("PIN: " + if (hasPin) "সেট করা আছে" else "সেট করা নেই", "PIN: " + if (hasPin) "set" else "not set"), fontSize = 13.sp)
-            Text(
-                tr("ফিঙ্গারপ্রিন্ট/ফেস: " + when {
-                    !bioHardware -> "এই ফোনে নেই"
-                    bioOn -> "চালু"
-                    else -> "বন্ধ"
-                }, "Fingerprint / face: " + when {
-                    !bioHardware -> "not on this phone"
-                    bioOn -> "on"
-                    else -> "off"
-                }),
-                fontSize = 13.sp
-            )
-            SettingLink(tr("PIN ও লক বদলান", "Change PIN and lock"), tr("সেটিংসের নিরাপত্তা অংশে যান", "Go to the Security section of Settings")) { onOpenSecurity() }
+
+        // ---- Danger zone: collapsed by default, at the bottom of the page ----
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(Rose500.copy(alpha = 0.10f))
+                .border(1.dp, Rose500.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                Modifier.fillMaxWidth().clickable { dangerOpen = !dangerOpen },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(tr("বিপজ্জনক এলাকা", "Danger zone"), fontWeight = FontWeight.Bold, color = Rose500, modifier = Modifier.weight(1f))
+                Text(if (dangerOpen) "˄" else "˅", color = Rose500, fontSize = 18.sp)
+            }
+            if (dangerOpen) {
+                Text(tr("লোকাল ডেটা মুছুন", "Erase local data"), fontWeight = FontWeight.SemiBold)
+                Button(
+                    modifier = Modifier.pressScale(),
+                    onClick = { showReset = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text(tr("লোকাল ডেটা মুছুন", "Erase local data")) }
+                Text(tr("অ্যাকাউন্ট মুছুন", "Delete account"), fontWeight = FontWeight.SemiBold)
+                Button(
+                    modifier = Modifier.pressScale(),
+                    onClick = { showDelete = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text(tr("অ্যাকাউন্ট মুছুন", "Delete account")) }
+            }
         }
     }
 
     if (changing) {
         ChangePasswordDialog(
-            email = info?.email.orEmpty(),
+            email = email,
             onDismiss = { changing = false },
             onDone = { changing = false; Toast.makeText(ctx, tr("পাসওয়ার্ড বদলানো হয়েছে", "Password changed"), Toast.LENGTH_SHORT).show() },
             vm = vm
@@ -359,7 +449,7 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
         AlertDialog(
             onDismissRequest = { confirmUnlink = null },
             title = { Text(tr("Google সরাবেন?", "Remove Google?"), fontWeight = FontWeight.Bold) },
-            text = { Text(tr("এই অ্যাকাউন্টে Google দিয়ে আর লগইন করা যাবে না। নিশ্চিত?", "You won't be able to sign in with Google to this account. Continue?")) },
+            text = { Text(tr("এই অ্যাকাউন্টে Google দিয়ে আর লগইন করা যাবে না।", "You will no longer be able to sign in with Google.")) },
             confirmButton = {
                 TextButton(modifier = Modifier.pressScale(), onClick = {
                     confirmUnlink = null
@@ -377,6 +467,56 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
             dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = { confirmUnlink = null }) { Text(tr("বাতিল", "Cancel")) } }
         )
     }
+    if (showSetPin) {
+        PinSetupDialog(onDismiss = { showSetPin = false }) { pin ->
+            AppLock.setPin(ctx, pin)
+            pinSet = true
+            Toast.makeText(ctx, tr("PIN সেভ হয়েছে", "PIN saved"), Toast.LENGTH_SHORT).show()
+            showSetPin = false
+        }
+    }
+    if (showOldPin) {
+        PinVerifyDialog(tr("পুরনো PIN দিন", "Enter current PIN"), onDismiss = { showOldPin = false }) {
+            showOldPin = false
+            showSetPin = true
+        }
+    }
+    if (showDisable) {
+        PinVerifyDialog(tr("লক বন্ধ করতে PIN দিন", "Enter PIN to turn the lock off"), onDismiss = { showDisable = false }) {
+            AppLock.disable(ctx)
+            appLock = false
+            showDisable = false
+        }
+    }
+    if (showReset) {
+        ResetDialog(
+            pendingOffline = vm.notes.pendingCount.value + vm.cashCounts.pendingCount.value,
+            onDismiss = { showReset = false },
+            onConfirm = {
+                showReset = false
+                vm.resetLocal()
+                Toast.makeText(ctx, tr("লোকাল ডেটা মুছে ফেলা হয়েছে", "Local data erased"), Toast.LENGTH_LONG).show()
+            }
+        )
+    }
+    if (showDelete) {
+        DeleteAccountDialog(
+            email = email,
+            onDismiss = { showDelete = false },
+            onConfirm = { password -> vm.deleteAccount(password); showDelete = false }
+        )
+    }
+}
+
+/** Small status label, e.g. the verified state of the email. */
+@Composable
+private fun StatusChip(text: String) {
+    Text(
+        text,
+        fontSize = 11.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.clip(RoundedCornerShape(50)).background(faint(0.08f)).padding(horizontal = 8.dp, vertical = 3.dp)
+    )
 }
 
 @Composable
