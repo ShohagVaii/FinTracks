@@ -3,6 +3,7 @@ package com.fintracks.app
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import com.fintracks.app.ui.BikeStore
 import com.fintracks.app.ui.CatStore
 
 /** App-wide setup: notification channels for push (created before any push can arrive). */

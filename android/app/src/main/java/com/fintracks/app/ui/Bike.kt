@@ -308,7 +308,7 @@ private fun FuelEntryDialog(state: UiState, vm: AppViewModel, onDone: () -> Unit
                 TextIn(tr("পাম্পের নাম", "Station"), station, { station = it })
                 SwitchRow(tr("ফুল ট্যাংক", "Full tank"), full) { full = it }
                 TextIn(tr("নোট", "Note"), note, { note = it })
-                error?.let { Text(it, color = readableOn(expenseRed), fontSize = 12.sp) }
+                error?.let { Text(it, color = readableOn(Rose500), fontSize = 12.sp) }
             }
         },
         confirmButton = {
@@ -361,7 +361,7 @@ private fun MaintEntryDialog(state: UiState, vm: AppViewModel, onDone: () -> Uni
                 TextIn(tr("পরবর্তী সার্ভিস (km, ঐচ্ছিক)", "Next service (km, optional)"), nextKm, { nextKm = it }, number = true)
                 DateField(tr("পরবর্তী সার্ভিস তারিখ", "Next service date"), nextDate, { nextDate = it }, optional = true)
                 TextIn(tr("নোট", "Note"), note, { note = it })
-                error?.let { Text(it, color = readableOn(expenseRed), fontSize = 12.sp) }
+                error?.let { Text(it, color = readableOn(Rose500), fontSize = 12.sp) }
             }
         },
         confirmButton = {
