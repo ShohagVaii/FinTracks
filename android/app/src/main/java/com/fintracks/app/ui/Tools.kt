@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -107,6 +108,7 @@ private data class ToolTile(val overlay: Overlay, val label: String, val icon: I
 
 /** English tile names, keyed by the Bengali label. Unknown labels fall back to themselves. */
 private fun toolEnglishName(bn: String): String = when (bn) {
+    "বাইক" -> "Bike"
     "AI সহকারী" -> "AI assistant"
     "রিপোর্ট" -> "Reports"
     "লোন" -> "Loan"
@@ -145,6 +147,7 @@ private fun defaultTools(): List<ToolTile> = listOf(
     ToolTile(Overlay.ACCOUNTS, "অ্যাকাউন্ট", Icons.Default.Add, Slate400),
     ToolTile(Overlay.COUNTER, "টাকা গণক", Icons.Default.Payments, Tok_FF84CC16),
     ToolTile(Overlay.AGE, "বয়স ক্যালকুলেটর", Icons.Default.Cake, Tok_FFE879F9),
+    ToolTile(Overlay.BIKE, "বাইক", Icons.Default.Build, Color(0xFF8B5CF6)),
     ToolTile(Overlay.NOTES, "নোটপ্যাড", Icons.Default.Description, Tok_FFFACC15)
 )
 

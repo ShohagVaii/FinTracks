@@ -688,7 +688,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Deletes a row with everything that depends on it. Only a plain single row can be undone. */
     fun remove(table: String, id: String) {
         val row = state.value.rows(table).firstOrNull { it.id() == id }
-        if (table == "transactions") queueAttachmentDelete(id, row)
+        if (table == "transactions") {
+            queueAttachmentDelete(id, row)
+            BikeStore.dropByTx(id)
+        }
         val ops = deleteOps(table, id)
         localChange(ops)
         val plain = ops.size == 1 && table !in setOf("credit_shops", "mess_members", "debts", "debt_people", "debt_payments")

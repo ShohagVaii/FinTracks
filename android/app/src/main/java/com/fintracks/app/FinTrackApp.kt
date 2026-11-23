@@ -10,6 +10,7 @@ class FinTrackApp : Application() {
     override fun onCreate() {
         super.onCreate()
         CatStore.init(this)
+        BikeStore.init(this)
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CHANNEL_PUSH, "FinTrack বার্তা", NotificationManager.IMPORTANCE_DEFAULT))
         nm.createNotificationChannel(NotificationChannel(CHANNEL_ALERTS, "FinTrack জরুরি", NotificationManager.IMPORTANCE_HIGH))
