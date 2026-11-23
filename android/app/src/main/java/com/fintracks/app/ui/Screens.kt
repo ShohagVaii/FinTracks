@@ -327,7 +327,14 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
         Column(Modifier.staggerIn(10), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(tr("আয় ও ব্যয়ের ট্রেন্ড", "Income & expense trend"))
         AppCard {
-            DualLineChart(trend.first, incomeTone(), trend.second, expenseTone())
+            val chartLabels = if (span == HomeSpan.YEAR) (1..12).map { bnDigits(it.toString()) } else (1..trend.first.size).map { bnDigits(it.toString()) }
+            DualLineChart(
+                trend.first, incomeTone(), trend.second, expenseTone(),
+                labels = chartLabels,
+                format = { taka(it, p) },
+                firstName = tr("আয়", "Income"),
+                secondName = tr("ব্যয়", "Expense")
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 LegendDot(tr("আয়", "Income"), incomeTone())
                 LegendDot(tr("ব্যয়", "Expense"), expenseTone())

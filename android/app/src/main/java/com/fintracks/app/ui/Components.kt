@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.graphics.graphicsLayer
@@ -188,37 +191,121 @@ fun LineChart(values: List<Double>, color: Color, modifier: Modifier = Modifier)
 }
 
 /**
- * Two series on one canvas with one shared scale (income green, expense red in the home trend).
- * Both lists must have the same length; each point is placed by its index.
+ * Income and expense on one shared day axis. Both lines are smooth curves with a gradient fill.
+ * Missing points are zero, so the lines never break. Tapping a day shows its amounts in a tooltip.
  */
 @Composable
-fun DualLineChart(first: List<Double>, firstColor: Color, second: List<Double>, secondColor: Color, modifier: Modifier = Modifier) {
-    androidx.compose.foundation.Canvas(modifier.fillMaxWidth().height(160.dp)) {
-        val n = maxOf(first.size, second.size)
-        if (n == 0) return@Canvas
-        val max = (maxOf(first.maxOrNull() ?: 0.0, second.maxOrNull() ?: 0.0)).coerceAtLeast(1.0)
-        val stepX = if (n > 1) size.width / (n - 1) else size.width
-        fun drawSeries(values: List<Double>, color: Color, withFill: Boolean) {
-            if (values.isEmpty()) return
-            val points = values.mapIndexed { i, v ->
-                Offset(i * stepX, size.height - (v / max * size.height * 0.9f).toFloat() - 4f)
+fun DualLineChart(
+    first: List<Double>,
+    firstColor: Color,
+    second: List<Double>,
+    secondColor: Color,
+    modifier: Modifier = Modifier,
+    labels: List<String> = emptyList(),
+    format: (Double) -> String = { String.format(java.util.Locale.US, "%.0f", it) },
+    firstName: String = "",
+    secondName: String = ""
+) {
+    val n = maxOf(first.size, second.size)
+    var sel by remember(n) { mutableStateOf(-1) }
+    val axisColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Box(modifier.fillMaxWidth().height(190.dp)) {
+        androidx.compose.foundation.Canvas(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(n) {
+                    detectTapGestures { o ->
+                        if (n > 0) {
+                            val step = if (n > 1) size.width.toFloat() / (n - 1) else size.width.toFloat()
+                            val idx = if (step > 0f) (o.x / step).roundToInt().coerceIn(0, n - 1) else 0
+                            sel = if (sel == idx) -1 else idx
+                        }
+                    }
+                }
+        ) {
+            if (n == 0) return@Canvas
+            val labelH = 20.dp.toPx()
+            val topPad = 10.dp.toPx()
+            val baseline = size.height - labelH
+            val plotH = baseline - topPad
+            val max = maxOf(first.maxOrNull() ?: 0.0, second.maxOrNull() ?: 0.0).coerceAtLeast(1.0)
+            val stepX = if (n > 1) size.width / (n - 1) else 0f
+            fun xOf(i: Int) = if (n > 1) i * stepX else size.width / 2f
+            fun yOf(v: Double) = topPad + plotH * (1f - (v / max).toFloat())
+
+            fun curve(values: List<Double>): Path = Path().apply {
+                if (values.isEmpty()) return@apply
+                moveTo(xOf(0), yOf(values[0]))
+                for (i in 1 until values.size) {
+                    val x0 = xOf(i - 1)
+                    val x1 = xOf(i)
+                    val mx = (x0 + x1) / 2f
+                    cubicTo(mx, yOf(values[i - 1]), mx, yOf(values[i]), x1, yOf(values[i]))
+                }
             }
-            val line = Path().apply {
-                points.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }
-            }
-            if (withFill) {
+
+            fun drawSeries(values: List<Double>, color: Color) {
+                if (values.isEmpty()) return
+                val line = curve(values)
                 val fill = Path().apply {
                     addPath(line)
-                    lineTo(points.last().x, size.height)
-                    lineTo(points.first().x, size.height)
+                    lineTo(xOf(values.size - 1), baseline)
+                    lineTo(xOf(0), baseline)
                     close()
                 }
-                drawPath(fill, Brush.verticalGradient(listOf(color.copy(alpha = 0.22f), Color.Transparent)))
+                drawPath(fill, Brush.verticalGradient(listOf(color.copy(alpha = 0.35f), Color.Transparent), startY = topPad, endY = baseline))
+                drawPath(line, color, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
             }
-            drawPath(line, color, style = Stroke(width = 4f, cap = StrokeCap.Round))
+            drawSeries(second, secondColor)
+            drawSeries(first, firstColor)
+
+            // Day labels on the shared axis, thinned so they fit.
+            if (labels.isNotEmpty()) {
+                val every = maxOf(1, n / 7)
+                val paint = android.graphics.Paint().apply {
+                    color = axisColor.toArgb()
+                    textSize = 10.dp.toPx()
+                    isAntiAlias = true
+                }
+                for (i in 0 until minOf(n, labels.size)) {
+                    if (i % every != 0 && i != n - 1) continue
+                    paint.textAlign = when (i) {
+                        0 -> android.graphics.Paint.Align.LEFT
+                        n - 1 -> android.graphics.Paint.Align.RIGHT
+                        else -> android.graphics.Paint.Align.CENTER
+                    }
+                    drawContext.canvas.nativeCanvas.drawText(labels[i], xOf(i), size.height - 4.dp.toPx(), paint)
+                }
+            }
+
+            // Selected day: a guide line and a dot on each series.
+            if (sel in 0 until n) {
+                val x = xOf(sel)
+                drawLine(axisColor.copy(alpha = 0.4f), Offset(x, topPad), Offset(x, baseline), strokeWidth = 1.dp.toPx())
+                first.getOrNull(sel)?.let { drawCircle(firstColor, 5.dp.toPx(), Offset(x, yOf(it))) }
+                second.getOrNull(sel)?.let { drawCircle(secondColor, 5.dp.toPx(), Offset(x, yOf(it))) }
+            }
         }
-        drawSeries(second, secondColor, withFill = false)
-        drawSeries(first, firstColor, withFill = true)
+        if (sel in 0 until n) {
+            val day = labels.getOrNull(sel) ?: ""
+            val fv = first.getOrNull(sel) ?: 0.0
+            val sv = second.getOrNull(sel) ?: 0.0
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(1.dp, faint(0.12f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    "$day · $firstName ${format(fv)} · $secondName ${format(sv)}",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
     }
 }
 
