@@ -7,6 +7,7 @@ import androidx.fragment.app.FragmentActivity
 import com.fintracks.app.ui.AppLock
 import com.fintracks.app.ui.DailyReminder
 import com.fintracks.app.ui.DailySyncWorker
+import com.fintracks.app.data.PushRouter
 import com.fintracks.app.ui.FinTracksApp
 
 /** FragmentActivity is required by BiometricPrompt. */
@@ -19,6 +20,12 @@ class MainActivity : FragmentActivity() {
         DailySyncWorker.schedule(this)
         DailyReminder.ensureScheduled(this)
         setContent { FinTracksApp() }
+        PushRouter.put(intent?.getStringExtra(PushRouter.EXTRA_TARGET))
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        PushRouter.put(intent.getStringExtra(PushRouter.EXTRA_TARGET))
     }
 
     override fun onStop() {

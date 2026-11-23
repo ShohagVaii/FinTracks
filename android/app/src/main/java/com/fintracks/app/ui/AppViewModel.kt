@@ -434,6 +434,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun signOut() = act {
+        // Remove this device's push token from the account while the session still exists.
+        com.fintracks.app.data.PushTokens.forget(getApplication(), repo)
         repo.signOut()
         _state.value = UiState(checking = false)
     }

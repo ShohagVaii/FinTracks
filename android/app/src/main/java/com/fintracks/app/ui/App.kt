@@ -246,6 +246,10 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
 
     // Inbox: load on start and after sign-in changes; a push's target opens its screen.
     LaunchedEffect(state.signedIn) { com.fintracks.app.data.Inbox.refresh(vm.repo) }
+    // Push: save this device's FCM token for the signed-in user.
+    LaunchedEffect(state.signedIn) {
+        if (state.signedIn) com.fintracks.app.data.PushSetup.register(ctx, vm.repo)
+    }
     val openTarget: (String) -> Unit = { target ->
         val key = target.lowercase()
         val screen = runCatching { Overlay.valueOf(key.uppercase()) }.getOrNull()?.takeIf { it != Overlay.INBOX }
@@ -258,6 +262,16 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
                 "transactions", "shared", "tools" -> key
                 else -> "dashboard"
             }
+        }
+    }
+
+    // A push tap waits here until the user is signed in, then opens its target screen.
+    val pendingPush = com.fintracks.app.data.PushRouter.pending.collectAsState().value
+    LaunchedEffect(pendingPush, state.signedIn) {
+        val target = pendingPush
+        if (target != null && state.signedIn) {
+            openTarget(target)
+            com.fintracks.app.data.PushRouter.clear()
         }
     }
 
