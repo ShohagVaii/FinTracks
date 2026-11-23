@@ -46,6 +46,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -81,7 +83,7 @@ enum class Overlay(private val bnTitle: String, private val enTitle: String) {
     CHAT("AI সহকারী", "AI assistant"), LOAN("লোন / EMI", "Loan / EMI"), CREDIT("বাকি খাতা", "Credit ledger"), DEBTS("ধার ও পাওনা", "Debts & dues"),
     BUDGETS("বাজেট এনভেলপ", "Budget envelopes"), GOALS("সঞ্চয় লক্ষ্য", "Savings goals"), INVESTMENTS("ইনভেস্টমেন্ট", "Investments"),
     SUBSCRIPTIONS("সাবস্ক্রিপশন", "Subscriptions"), ACCOUNTS("অ্যাকাউন্ট ও ট্রান্সফার", "Accounts & transfers"), REPORTS("পরিসংখ্যান ও রিপোর্ট", "Statistics & reports"), SETTINGS("সেটিংস", "Settings"),
-    COUNTER("টাকা গণক", "Money counter"), AGE("বয়স ক্যালকুলেটর", "Age calculator"), NOTES("নোটপ্যাড", "Notepad");
+    COUNTER("টাকা গণক", "Money counter"), AGE("বয়স ক্যালকুলেটর", "Age calculator"), NOTES("নোটপ্যাড", "Notepad"), INBOX("ইনবক্স", "Inbox");
 
     val title: String get() = tr(bnTitle, enTitle)
 }
@@ -241,6 +243,23 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
 
     val openTx: (JsonObject?) -> Unit = { txEditor = TxEditor(it) }
 
+    // Inbox: load on start and after sign-in changes; a push's target opens its screen.
+    LaunchedEffect(state.signedIn) { com.fintracks.app.data.Inbox.refresh(vm.repo) }
+    val openTarget: (String) -> Unit = { target ->
+        val key = target.lowercase()
+        val screen = runCatching { Overlay.valueOf(key.uppercase()) }.getOrNull()?.takeIf { it != Overlay.INBOX }
+        counterHistory = false
+        if (screen != null) {
+            overlayName = screen.name
+        } else {
+            overlayName = null
+            tab = when (key) {
+                "transactions", "shared", "tools" -> key
+                else -> "dashboard"
+            }
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
@@ -258,6 +277,8 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
                     onCalc = { showCalc = true },
                     onToggleTheme = { vm.saveProfile(row("theme" to if (state.dark) "light" else "dark")) },
                     onTogglePrivacy = { vm.saveProfile(row("is_privacy_mode" to !state.privacy)) },
+                    unread = com.fintracks.app.data.Inbox.unread,
+                    onInbox = { overlayName = Overlay.INBOX.name },
                     onSettings = { overlayName = Overlay.SETTINGS.name }
                 )
             } else if (overlay != Overlay.CHAT && overlay != Overlay.DEBTS && overlay != Overlay.NOTES && !(overlay == Overlay.COUNTER && counterHistory)) {
@@ -266,7 +287,9 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
             }
 
             Box(Modifier.fillMaxSize()) {
-                if (overlay != null) {
+                if (overlay == Overlay.INBOX) {
+                    InboxScreen(vm.repo) { item -> openTarget(item.target) }
+                } else if (overlay != null) {
                     OverlayContent(overlay, state, vm, openTx, counterHistory, { counterHistory = it }) {
                         counterHistory = false
                         overlayName = null
@@ -336,6 +359,8 @@ private fun Header(
     demo: Boolean,
     privacy: Boolean,
     dark: Boolean,
+    unread: Int,
+    onInbox: () -> Unit,
     onCalc: () -> Unit,
     onToggleTheme: () -> Unit,
     onTogglePrivacy: () -> Unit,
@@ -364,10 +389,35 @@ private fun Header(
             }
             Text("PREMIUM FINANCE", color = readableOn(Slate400), fontSize = 9.sp, letterSpacing = 3.sp)
         }
+        InboxBell(unread, onInbox)
         HeaderIcon(Icons.Default.Calculate, tr("ক্যালকুলেটর", "Calculator"), onCalc)
         HeaderIcon(Icons.Default.WbSunny, if (dark) tr("লাইট থিম", "Light theme") else tr("ডার্ক থিম", "Dark theme"), onToggleTheme, tint = Amber400)
         HeaderIcon(if (privacy) Icons.Default.VisibilityOff else Icons.Default.Visibility, tr("প্রাইভেসি", "Privacy"), onTogglePrivacy)
         HeaderIcon(Icons.Default.Settings, tr("সেটিংস", "Settings"), onSettings)
+    }
+}
+
+/** Notifications bell with the unread count as a badge. */
+@Composable
+private fun InboxBell(unread: Int, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .padding(start = 8.dp)
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, faint(0.08f), CircleShape)
+            .pressScale()
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        BadgedBox(badge = {
+            if (unread > 0) {
+                Badge { Text(bnDigits(if (unread > 99) "99+" else unread.toString()), fontSize = 9.sp) }
+            }
+        }) {
+            Icon(Icons.Default.Notifications, contentDescription = tr("ইনবক্স", "Inbox"), tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
+        }
     }
 }
 
@@ -427,5 +477,6 @@ private fun OverlayContent(
         Overlay.COUNTER -> MoneyCounterScreen(vm, counterHistory, onCounterHistory)
         Overlay.AGE -> AgeCalcScreen()
         Overlay.NOTES -> NotesScreen(vm, onClose)
+        Overlay.INBOX -> Unit // shown by InboxScreen in MainScaffold
     }
 }

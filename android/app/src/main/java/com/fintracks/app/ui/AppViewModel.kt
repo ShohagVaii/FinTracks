@@ -112,7 +112,8 @@ data class UiState(
 }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = Repository(app)
+    /** Shared with the UI (inbox reads and writes through it). */
+    val repo = Repository(app)
     /** Notepad: server copy plus offline cache and pending queue (see Notes.kt). */
     val notes = NotesStore(app, repo, viewModelScope)
     /** Cash counter history: device first, then the cash_counts table (see Counter.kt). */
