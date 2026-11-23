@@ -101,6 +101,15 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Unarchive
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Color
 
 /**
  * Notes live on the server (RLS: own rows only) and in a local cache for offline use.
@@ -153,13 +162,25 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
         prefs.edit().putString(key(), root.toString()).apply()
     }
 
+    /** Pin, colour and archive. Only the given fields change. */
+    fun setFlags(id: String, pinned: Boolean? = null, color: String? = null, archived: Boolean? = null) {
+        synchronized(this) {
+            ensureLoaded()
+            val old = cache.firstOrNull { it.id() == id } ?: return
+            writeNote(id, old.str("title"), old.str("body"), photosOf(id), pinned, color, archived)
+        }
+    }
+
     private fun publish() {
-        _notes.value = cache.sortedByDescending { timestamp(it) }
+        _notes.value = cache.sortedWith(compareByDescending<JsonObject> { it.bool("pinned") }.thenByDescending { timestamp(it) })
         _pendingCount.value = pending.size + photoUploads.size + photoDeletes.size
     }
 
     /** Writes a note to the cache and the pending queue (attachments are the storage paths of its photos). */
-    private fun writeNote(nid: String, title: String, body: String, attachments: List<String>): String {
+    private fun writeNote(
+        nid: String, title: String, body: String, attachments: List<String>,
+        pinned: Boolean? = null, color: String? = null, archived: Boolean? = null
+    ): String {
         val now = java.time.Instant.now().toString()
         val old = cache.firstOrNull { it.id() == nid }
         val note = row(
@@ -167,6 +188,10 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
             "title" to title,
             "body" to body,
             "attachments" to JsonArray(attachments.map { JsonPrimitive(it) }),
+            // Flags keep their old value unless this write changes them.
+            "pinned" to (pinned ?: old?.bool("pinned") ?: false),
+            "archived" to (archived ?: old?.bool("archived") ?: false),
+            "color" to (color ?: old?.str("color").orEmpty()),
             "created_at" to (old?.str("created_at")?.ifEmpty { null } ?: now),
             "updated_at" to now
         )
@@ -345,6 +370,8 @@ fun NotesScreen(vm: AppViewModel, subPage: String, go: (String) -> Unit, onClose
     // The open note (or the editor) is an entry on the app's back stack, so it comes from the route.
     val route = parseNoteRoute(subPage)
     val setRoute: (NoteRoute?) -> Unit = { r -> if (r == null) onClose() else go("ov:NOTES/" + encodeNoteRoute(r)) }
+    var archiveView by remember { mutableStateOf(false) }
+    var colorFor by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf<String?>(null) }
     var removingNote by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -360,14 +387,25 @@ fun NotesScreen(vm: AppViewModel, subPage: String, go: (String) -> Unit, onClose
     }
 
     val shown = notes.filter {
-        query.isBlank() || it.str("title").contains(query, true) || it.str("body").contains(query, true)
+        it.bool("archived") == archiveView &&
+            (query.isBlank() || it.str("title").contains(query, true) || it.str("body").contains(query, true))
     }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             // Single back arrow for the list: the app header is hidden on this screen.
-            IconButton(modifier = Modifier.pressScale(), onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("ফিরে যান", "Back")) }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(modifier = Modifier.pressScale(), onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("ফিরে যান", "Back")) }
+                Spacer(Modifier.weight(1f))
+                IconButton(modifier = Modifier.pressScale(), onClick = { archiveView = !archiveView }) {
+                    Icon(
+                        if (archiveView) Icons.Default.Unarchive else Icons.Default.Archive,
+                        contentDescription = tr("আর্কাইভ", "Archive")
+                    )
+                }
+            }
             Text(
-                tr("${bnDigits(notes.size.toString())}টি নোট", "${notes.size} notes"),
+                if (archiveView) tr("আর্কাইভ করা নোট", "Archived notes")
+                else tr("${bnDigits(notes.size.toString())}টি নোট", "${notes.size} notes"),
                 fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (pendingCount > 0) {
@@ -398,7 +436,10 @@ fun NotesScreen(vm: AppViewModel, subPage: String, go: (String) -> Unit, onClose
                         onOpen = { setRoute(NoteRoute(n.id(), false)) },
                         onShare = { shareNote(ctx, n.str("title"), n.str("body")) },
                         onEdit = { setRoute(NoteRoute(n.id(), true)) },
-                        onDelete = { confirmDelete = n.id() }
+                        onDelete = { confirmDelete = n.id() },
+                        onPin = { vm.notes.setFlags(n.id(), pinned = !n.bool("pinned")) },
+                        onColor = { colorFor = n.id() },
+                        onArchive = { vm.notes.setFlags(n.id(), archived = !n.bool("archived")) }
                     )
                     }
                 }
@@ -411,6 +452,26 @@ fun NotesScreen(vm: AppViewModel, subPage: String, go: (String) -> Unit, onClose
             containerColor = Tok_FFFACC15,
             contentColor = Tok_FF1F2937,
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).pressScale()
+        )
+    }
+
+    colorFor?.let { id ->
+        val current = notes.firstOrNull { it.id() == id }?.str("color").orEmpty()
+        AlertDialog(
+            onDismissRequest = { colorFor = null },
+            title = { Text(tr("নোটের রং", "Note colour"), fontWeight = FontWeight.Bold) },
+            text = {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    NOTE_COLORS.forEach { (key, c) ->
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape).background(c)
+                                .border(if (key == current) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                .clickable { vm.notes.setFlags(id, color = key); colorFor = null }
+                        )
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { colorFor = null }) { Text(tr("বন্ধ", "Close")) } }
         )
     }
 
@@ -436,22 +497,44 @@ fun NotesScreen(vm: AppViewModel, subPage: String, go: (String) -> Unit, onClose
 
 /** One note in the list: coloured notebook icon, bold title, grey date and time, and the ⋮ menu. */
 @Composable
-private fun NoteCard(n: JsonObject, onOpen: () -> Unit, onShare: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+private val NOTE_COLORS: List<Pair<String, Color>> = listOf(
+    "" to Tok_FFFACC15,
+    "green" to Emerald500,
+    "blue" to Color(0xFF38BDF8),
+    "purple" to Color(0xFFA78BFA),
+    "red" to Rose500
+)
+
+private fun noteTint(key: String): Color = NOTE_COLORS.firstOrNull { it.first == key }?.second ?: Tok_FFFACC15
+
+@Composable
+private fun NoteCard(
+    n: JsonObject, onOpen: () -> Unit, onShare: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit,
+    onPin: () -> Unit, onColor: () -> Unit, onArchive: () -> Unit
+) {
     var menu by remember { mutableStateOf(false) }
+    val tint = noteTint(n.str("color"))
     AppCard(onClick = onOpen) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Tok_FFFACC15.copy(alpha = 0.18f)),
+                Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(tint.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Description, contentDescription = null, tint = readableOn(Tok_FFFACC15))
+                Icon(Icons.Default.Description, contentDescription = null, tint = readableOn(tint))
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(
-                    n.str("title").ifBlank { tr("(শিরোনামহীন)", "(Untitled)") },
-                    fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (n.bool("pinned")) {
+                        Icon(Icons.Default.PushPin, contentDescription = tr("পিন করা", "Pinned"), modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Text(
+                        n.str("title").ifBlank { tr("(শিরোনামহীন)", "(Untitled)") },
+                        fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
                 Text(noteStamp(n), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Box {
@@ -468,6 +551,21 @@ private fun NoteCard(n: JsonObject, onOpen: () -> Unit, onShare: () -> Unit, onE
                         text = { Text(tr("এডিট করুন", "Edit")) },
                         leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
                         onClick = { menu = false; onEdit() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (n.bool("pinned")) tr("পিন খুলুন", "Unpin") else tr("পিন করুন", "Pin")) },
+                        leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) },
+                        onClick = { menu = false; onPin() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(tr("রং বদলান", "Change colour")) },
+                        leadingIcon = { Icon(Icons.Default.Palette, contentDescription = null) },
+                        onClick = { menu = false; onColor() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (n.bool("archived")) tr("আর্কাইভ থেকে ফেরত", "Restore") else tr("আর্কাইভ করুন", "Archive")) },
+                        leadingIcon = { Icon(if (n.bool("archived")) Icons.Default.Unarchive else Icons.Default.Archive, contentDescription = null) },
+                        onClick = { menu = false; onArchive() }
                     )
                     DropdownMenuItem(
                         text = { Text(tr("মুছে ফেলুন", "Delete"), color = readableOn(Rose500)) },
