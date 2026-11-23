@@ -110,6 +110,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.Color
+import com.fintracks.app.data.bool
 
 /**
  * Notes live on the server (RLS: own rows only) and in a local cache for offline use.
@@ -495,8 +496,6 @@ fun NotesScreen(vm: AppViewModel, subPage: String, go: (String) -> Unit, onClose
     }
 }
 
-/** One note in the list: coloured notebook icon, bold title, grey date and time, and the ⋮ menu. */
-@Composable
 private val NOTE_COLORS: List<Pair<String, Color>> = listOf(
     "" to Tok_FFFACC15,
     "green" to Emerald500,
@@ -507,6 +506,7 @@ private val NOTE_COLORS: List<Pair<String, Color>> = listOf(
 
 private fun noteTint(key: String): Color = NOTE_COLORS.firstOrNull { it.first == key }?.second ?: Tok_FFFACC15
 
+/** One note in the list: coloured notebook icon, bold title, grey date and time, and the ⋮ menu. */
 @Composable
 private fun NoteCard(
     n: JsonObject, onOpen: () -> Unit, onShare: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit,
