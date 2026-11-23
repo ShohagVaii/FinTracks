@@ -180,6 +180,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             tr("সার্ভারে যোগ হওয়া যাচ্ছে না। ফোনে সেভ করা ডেটা দেখানো হচ্ছে।", "Cannot reach the server. Showing data saved on this phone.")
         }
 
+    /** Best effort: stamps profiles.last_seen_at for the admin's "active users" count. Failures are ignored. */
+    private suspend fun touchLastSeen() {
+        try {
+            repo.updateProfile(buildJsonObject { put("last_seen_at", java.time.Instant.now().toString()) })
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+        }
+    }
+
     private suspend fun loadAll() {
         outbox.flush()
         try {
@@ -187,6 +197,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val fetched = Sync.run(getApplication<Application>(), repo, profile?.bool("is_privacy_mode") == true, outbox)
             outbox.flush()
             Sync.markOk(getApplication<Application>())
+            touchLastSeen()
             serverProfile = profile
             val base = fetched + ("profiles" to listOfNotNull(profile))
             outbox.remember(base)

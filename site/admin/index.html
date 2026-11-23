@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src https://ennkvjmxyjztjszmfaag.supabase.co; img-src https: data:; base-uri 'none'; form-action 'none'">
+<title>FinTrack অ্যাডমিন</title>
+<style>
+  :root { color-scheme: dark; --bg:#0d112e; --card:#151b3d; --line:#26305c; --text:#e8ecff; --muted:#9aa4cc; --accent:#38bdf8; --bad:#f43f5e; --ok:#10b981; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, "Hind Siliguri", sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:18px; margin:0; flex:1; }
+  nav { display:flex; gap:6px; padding:0 20px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  nav button { background:none; border:0; color:var(--muted); padding:12px 10px; cursor:pointer; border-bottom:2px solid transparent; font:inherit; }
+  nav button.on { color:var(--text); border-color:var(--accent); }
+  main { padding:20px; max-width:1100px; margin:0 auto; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(170px,1fr)); gap:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
+  .card .k { font-size:12px; color:var(--muted); letter-spacing:.5px; }
+  .card .v { font-size:26px; font-weight:700; margin-top:6px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:12px; }
+  input, select, textarea { width:100%; padding:10px 12px; background:#0b1030; color:var(--text); border:1px solid var(--line); border-radius:10px; font:inherit; }
+  textarea { min-height:90px; resize:vertical; }
+  label { display:block; font-size:13px; color:var(--muted); margin:12px 0 6px; }
+  button.primary { background:var(--accent); color:#06203a; border:0; border-radius:10px; padding:11px 16px; font-weight:700; cursor:pointer; font:inherit; }
+  button.ghost { background:none; color:var(--muted); border:1px solid var(--line); border-radius:10px; padding:8px 12px; cursor:pointer; font:inherit; }
+  button:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .muted { color:var(--muted); font-size:13px; }
+  .err { color:var(--bad); font-size:14px; margin-top:10px; }
+  .ok { color:var(--ok); font-size:14px; margin-top:10px; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--line); }
+  .split { display:grid; grid-template-columns: 1fr 300px; gap:20px; }
+  @media (max-width: 800px) { .split { grid-template-columns: 1fr; } }
+  .phone { background:#000; border-radius:28px; padding:14px; border:2px solid #222; }
+  .notif { background:#1f2650; border-radius:16px; padding:12px; color:#f5f7ff; }
+  .notif img { width:100%; border-radius:10px; margin-top:8px; max-height:140px; object-fit:cover; }
+  .notif .t { font-weight:700; font-size:14px; }
+  .notif .b { font-size:13px; color:#d6dcff; margin-top:4px; white-space:pre-wrap; }
+  .hidden { display:none !important; }
+  .login { max-width:360px; margin:12vh auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>FinTrack অ্যাডমিন</h1>
+  <span id="who" class="muted"></span>
+  <button id="logout" class="ghost hidden">লগআউট</button>
+</header>
+
+<section id="loginView" class="login">
+  <div class="card">
+    <h2 style="margin:0 0 4px;font-size:18px">মালিক লগইন</h2>
+    <div class="muted">শুধু মালিকের অ্যাকাউন্ট এই পেজ ব্যবহার করতে পারবে।</div>
+    <form id="loginForm" autocomplete="on">
+      <label for="email">ইমেইল</label>
+      <input id="email" type="email" required autocomplete="username">
+      <label for="password">পাসওয়ার্ড</label>
+      <input id="password" type="password" required autocomplete="current-password">
+      <div class="row" style="margin-top:16px"><button class="primary" id="loginBtn" type="submit">লগইন</button></div>
+      <div id="loginErr" class="err"></div>
+    </form>
+  </div>
+</section>
+
+<div id="appView" class="hidden">
+  <nav>
+    <button data-tab="dash" class="on">ড্যাশবোর্ড</button>
+    <button data-tab="users">ইউজার</button>
+    <button data-tab="push">পুশ</button>
+  </nav>
+  <main>
+    <section id="tab-dash">
+      <div class="grid" id="stats"></div>
+      <h3 style="margin:26px 0 8px;font-size:16px">APK ডাউনলোড (GitHub Releases)</h3>
+      <div class="card" style="overflow-x:auto"><table><thead><tr><th>ভার্সন</th><th>প্রকাশ</th><th>ডাউনলোড</th></tr></thead><tbody id="releases"></tbody></table></div>
+      <div id="dashErr" class="err"></div>
+    </section>
+
+    <section id="tab-users" class="hidden">
+      <div class="row" style="margin-bottom:12px">
+        <input id="search" placeholder="নাম বা ইমেইল খুঁজুন" style="max-width:360px">
+      </div>
+      <div class="muted" style="margin-bottom:10px">শুধু মেটাডাটা ও সংখ্যা দেখানো হয়। কোনো লেনদেনের বিবরণ দেখানো হয় না।</div>
+      <div class="card" style="overflow-x:auto">
+        <table><thead><tr><th>নাম</th><th>ইমেইল</th><th>যোগদান</th><th>শেষ সক্রিয়</th><th>লেনদেন</th></tr></thead><tbody id="users"></tbody></table>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="ghost" id="prev">‹ আগে</button>
+        <span id="pageNo" class="muted"></span>
+        <button class="ghost" id="next">পরে ›</button>
+      </div>
+      <div id="userErr" class="err"></div>
+    </section>
+
+    <section id="tab-push" class="hidden">
+      <div class="split">
+        <div>
+          <div class="card">
+            <h3 style="margin:0 0 4px;font-size:16px">নতুন পুশ</h3>
+            <label for="pTitle">শিরোনাম (সর্বোচ্চ ১২০ অক্ষর)</label>
+            <input id="pTitle" maxlength="120">
+            <label for="pBody">লেখা (সর্বোচ্চ ৫০০ অক্ষর)</label>
+            <textarea id="pBody" maxlength="500"></textarea>
+            <label for="pImage">ব্যানার ছবির URL (ঐচ্ছিক, https://)</label>
+            <input id="pImage" type="url" placeholder="https://...">
+            <label for="pTarget">টার্গেট স্ক্রিন (ট্যাপে যেখানে যাবে)</label>
+            <select id="pTarget">
+              <option value="dashboard">হোম</option><option value="transactions">লেনদেন</option><option value="shared">শেয়ারড</option>
+              <option value="tools">টুলস</option><option value="inbox">ইনবক্স</option><option value="budgets">বাজেট</option>
+              <option value="goals">সঞ্চয় লক্ষ্য</option><option value="debts">ধার ও পাওনা</option><option value="reports">রিপোর্ট</option>
+              <option value="subscriptions">সাবস্ক্রিপশন</option><option value="accounts">অ্যাকাউন্ট</option><option value="notes">নোটপ্যাড</option>
+              <option value="settings">সেটিংস</option>
+            </select>
+            <label>দর্শক</label>
+            <div class="row"><label class="muted" style="margin:0"><input type="radio" name="aud" value="all" checked style="width:auto"> সবাই</label>
+              <label class="muted" style="margin:0"><input type="radio" name="aud" value="user" style="width:auto"> নির্দিষ্ট ইউজার</label></div>
+            <input id="pEmail" type="email" placeholder="ইউজারের ইমেইল" class="hidden" style="margin-top:8px">
+            <label for="pWhen">কখন (ফাঁকা রাখলে এখনই)</label>
+            <input id="pWhen" type="datetime-local">
+            <div class="row" style="margin-top:16px"><button class="primary" id="pSend">পুশ সংরক্ষণ করুন</button></div>
+            <div id="pMsg"></div>
+            <div class="muted" style="margin-top:10px">পুশ সার্ভিস চালু হওয়ার আগ পর্যন্ত এগুলো “অপেক্ষায়” থাকবে। চালু হলে সময় হলেই পাঠানো হবে।</div>
+          </div>
+        </div>
+        <div>
+          <div class="muted" style="margin-bottom:8px">প্রিভিউ</div>
+          <div class="phone"><div class="notif">
+            <div class="t" id="prevTitle">শিরোনাম</div>
+            <div class="b" id="prevBody">লেখা এখানে দেখাবে</div>
+            <img id="prevImg" class="hidden" alt="">
+          </div></div>
+        </div>
+      </div>
+      <h3 style="margin:26px 0 8px;font-size:16px">পাঠানোর ইতিহাস</h3>
+      <div class="card" style="overflow-x:auto"><table><thead><tr><th>শিরোনাম</th><th>টার্গেট</th><th>দর্শক</th><th>অবস্থা</th><th>সময়</th></tr></thead><tbody id="history"></tbody></table></div>
+    </section>
+  </main>
+</div>
+
+<script>
+const SB = "https://ennkvjmxyjztjszmfaag.supabase.co";
+// Public publishable key (same as the app). Every privileged call goes through the admin-api function.
+const KEY = "sb_publishable_ZEs8TSPiUzrt8gKmlmOjDw_kkoKr8_h";
+const $ = (s) => document.querySelector(s);
+const nf = new Intl.NumberFormat("bn-BD");
+const fmtNum = (n) => (n == null ? "—" : nf.format(n));
+const fmtDate = (s) => (s ? new Date(s).toLocaleString("bn-BD", { dateStyle: "medium", timeStyle: "short" }) : "—");
+const fmtDay = (s) => (s ? new Date(s).toLocaleDateString("bn-BD", { dateStyle: "medium" }) : "—");
+
+function el(tag, text, cls) { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
+function cell(text) { return el("td", text == null || text === "" ? "—" : String(text)); }
+function emptyRow(cols, msg) { const tr = el("tr"); const td = el("td", msg, "muted"); td.colSpan = cols; tr.append(td); return tr; }
+
+let session = null; // { token, exp }
+function saveSession(s) { session = s; sessionStorage.setItem("ftAdmin", JSON.stringify(s)); }
+function clearSession() { session = null; sessionStorage.removeItem("ftAdmin"); }
+function loadSession() {
+  try { const s = JSON.parse(sessionStorage.getItem("ftAdmin") || "null"); if (s && s.exp * 1000 > Date.now() + 30000) session = s; else clearSession(); } catch { clearSession(); }
+}
+
+function showLogin(message) {
+  $("#appView").classList.add("hidden"); $("#loginView").classList.remove("hidden");
+  $("#logout").classList.add("hidden"); $("#who").textContent = "";
+  $("#loginErr").textContent = message || "";
+}
+function showApp(email) {
+  $("#loginView").classList.add("hidden"); $("#appView").classList.remove("hidden");
+  $("#logout").classList.remove("hidden"); $("#who").textContent = email || "";
+}
+
+async function login(email, password) {
+  const res = await fetch(`${SB}/auth/v1/token?grant_type=password`, {
+    method: "POST", headers: { apikey: KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.access_token) throw new Error("ইমেইল বা পাসওয়ার্ড ঠিক নেই");
+  saveSession({ token: data.access_token, exp: Math.floor(Date.now() / 1000) + (data.expires_in || 3600), email });
+}
+
+async function api(action, payload = {}) {
+  if (!session) throw new Error("লগইন করা নেই");
+  const res = await fetch(`${SB}/functions/v1/admin-api`, {
+    method: "POST",
+    headers: { apikey: KEY, Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { clearSession(); showLogin("সেশন শেষ হয়েছে, আবার লগইন করুন"); throw new Error("401"); }
+  if (!res.ok) throw new Error(data.error || "সমস্যা হয়েছে");
+  return data;
+}
+
+// ---------- Dashboard ----------
+async function loadDashboard() {
+  $("#dashErr").textContent = "";
+  try {
+    const { stats, downloads } = await api("stats");
+    const cards = [
+      ["মোট ইউজার", fmtNum(stats.total_users)],
+      ["আজ নতুন", fmtNum(stats.new_today)],
+      ["৭ দিনে নতুন", fmtNum(stats.new_week)],
+      ["৩০ দিনে নতুন", fmtNum(stats.new_month)],
+      ["সক্রিয় (২৪ ঘণ্টা)", fmtNum(stats.active_24h)],
+      ["সক্রিয় (৭ দিন)", fmtNum(stats.active_7d)],
+      ["মোট লেনদেন (সংখ্যা)", fmtNum(stats.total_transactions)],
+      ["মোট APK ডাউনলোড", fmtNum(downloads.total)],
+    ];
+    const grid = $("#stats"); grid.textContent = "";
+    for (const [k, v] of cards) { const c = el("div", null, "card"); c.append(el("div", k, "k"), el("div", v, "v")); grid.append(c); }
+    const tb = $("#releases"); tb.textContent = "";
+    for (const r of downloads.releases) { const tr = el("tr"); tr.append(cell(r.name), cell(fmtDay(r.published_at)), cell(fmtNum(r.downloads))); tb.append(tr); }
+  } catch (e) { if (e.message !== "401") $("#dashErr").textContent = e.message; }
+}
+
+// ---------- Users ----------
+let page = 0, searchTimer = null;
+async function loadUsers() {
+  $("#userErr").textContent = "";
+  try {
+    const { users } = await api("users", { search: $("#search").value.trim(), page });
+    const tb = $("#users"); tb.textContent = "";
+    for (const u of users) {
+      const tr = el("tr");
+      tr.append(cell(u.name), cell(u.email), cell(fmtDay(u.joined_at)), cell(fmtDate(u.last_seen_at || u.last_sign_in_at)), cell(fmtNum(u.tx_count)));
+      tb.append(tr);
+    }
+    if (users.length === 0) tb.append(emptyRow(5, "কোনো ইউজার নেই"));
+    $("#pageNo").textContent = `পৃষ্ঠা ${nf.format(page + 1)}`;
+    $("#prev").disabled = page === 0; $("#next").disabled = users.length < 50;
+  } catch (e) { if (e.message !== "401") $("#userErr").textContent = e.message; }
+}
+
+// ---------- Push composer + history ----------
+function previewPush() {
+  $("#prevTitle").textContent = $("#pTitle").value || "শিরোনাম";
+  $("#prevBody").textContent = $("#pBody").value || "লেখা এখানে দেখাবে";
+  const img = $("#pImage").value.trim();
+  const pi = $("#prevImg");
+  if (img.startsWith("https://")) { pi.src = img; pi.classList.remove("hidden"); } else { pi.removeAttribute("src"); pi.classList.add("hidden"); }
+}
+async function loadHistory() {
+  try {
+    const { campaigns } = await api("campaigns");
+    const tb = $("#history"); tb.textContent = "";
+    const statusText = { scheduled: "অপেক্ষায়", sent: "পাঠানো হয়েছে", failed: "ব্যর্থ", draft: "খসড়া" };
+    for (const c of campaigns) {
+      const tr = el("tr");
+      tr.append(cell(c.title), cell(c.target), cell(c.audience === "user" ? "নির্দিষ্ট ইউজার" : "সবাই"),
+        cell(statusText[c.status] || c.status), cell(fmtDate(c.sent_at || c.scheduled_at || c.created_at)));
+      tb.append(tr);
+    }
+    if (campaigns.length === 0) tb.append(emptyRow(5, "এখনো কোনো পুশ নেই"));
+  } catch (e) { if (e.message !== "401") $("#pMsg").textContent = e.message; }
+}
+async function sendCampaign() {
+  const btn = $("#pSend"); const msg = $("#pMsg");
+  msg.className = ""; msg.textContent = "";
+  const aud = document.querySelector('input[name="aud"]:checked').value;
+  const when = $("#pWhen").value;
+  const payload = {
+    title: $("#pTitle").value, body: $("#pBody").value, image_url: $("#pImage").value.trim() || null,
+    target: $("#pTarget").value, audience: aud, audience_email: aud === "user" ? $("#pEmail").value.trim() : null,
+    scheduled_at: when ? new Date(when).toISOString() : null,
+  };
+  btn.disabled = true;
+  try {
+    await api("create_campaign", payload);
+    msg.className = "ok"; msg.textContent = "পুশ সংরক্ষিত হয়েছে";
+    $("#pTitle").value = ""; $("#pBody").value = ""; $("#pImage").value = ""; $("#pWhen").value = ""; previewPush();
+    await loadHistory();
+  } catch (e) {
+    if (e.message !== "401") { msg.className = "err"; msg.textContent = e.message; }
+  } finally { btn.disabled = false; }
+}
+
+// ---------- Wiring ----------
+document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x === b));
+  for (const t of ["dash", "users", "push"]) $("#tab-" + t).classList.toggle("hidden", b.dataset.tab !== t);
+  if (b.dataset.tab === "dash") loadDashboard();
+  if (b.dataset.tab === "users") loadUsers();
+  if (b.dataset.tab === "push") loadHistory();
+}));
+$("#loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault(); $("#loginErr").textContent = ""; $("#loginBtn").disabled = true;
+  try {
+    const email = $("#email").value.trim(), password = $("#password").value;
+    await login(email, password);
+    $("#password").value = "";
+    showApp(session.email);
+    await loadDashboard();
+  } catch (err) { $("#loginErr").textContent = err.message; }
+  finally { $("#loginBtn").disabled = false; }
+});
+$("#logout").addEventListener("click", () => { clearSession(); showLogin(""); });
+$("#search").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { page = 0; loadUsers(); }, 350); });
+$("#prev").addEventListener("click", () => { if (page > 0) { page--; loadUsers(); } });
+$("#next").addEventListener("click", () => { page++; loadUsers(); });
+document.querySelectorAll('input[name="aud"]').forEach((r) => r.addEventListener("change", () => {
+  $("#pEmail").classList.toggle("hidden", document.querySelector('input[name="aud"]:checked').value !== "user");
+}));
+["pTitle", "pBody", "pImage"].forEach((id) => $("#" + id).addEventListener("input", previewPush));
+$("#pSend").addEventListener("click", sendCampaign);
+
+loadSession();
+if (session) { showApp(session.email); loadDashboard(); } else showLogin("");
+</script>
+</body>
+</html>
