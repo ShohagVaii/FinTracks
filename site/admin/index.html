@@ -122,9 +122,9 @@
             <input id="pEmail" type="email" placeholder="ইউজারের ইমেইল" class="hidden" style="margin-top:8px">
             <label for="pWhen">কখন (ফাঁকা রাখলে এখনই)</label>
             <input id="pWhen" type="datetime-local">
-            <div class="row" style="margin-top:16px"><button class="primary" id="pSend">পুশ সংরক্ষণ করুন</button></div>
+            <div class="row" style="margin-top:16px"><button class="primary" id="pSend">এখনই পাঠান / সময়ে পাঠান</button><button class="ghost" id="pTest">টেস্ট পুশ (শুধু আমাকে)</button></div>
             <div id="pMsg"></div>
-            <div class="muted" style="margin-top:10px">পুশ সার্ভিস চালু হওয়ার আগ পর্যন্ত এগুলো “অপেক্ষায়” থাকবে। চালু হলে সময় হলেই পাঠানো হবে।</div>
+            <div class="muted" style="margin-top:10px">নির্ধারিত সময়ের পুশ “অপেক্ষায়” থাকে; আপনি এই পেজ খুললে সময় হয়ে যাওয়া পুশগুলো পাঠানো হয়।</div>
           </div>
         </div>
         <div>
@@ -258,8 +258,32 @@ async function loadHistory() {
     if (campaigns.length === 0) tb.append(emptyRow(5, "এখনো কোনো পুশ নেই"));
   } catch (e) { if (e.message !== "401") $("#pMsg").textContent = e.message; }
 }
+// Sends one campaign now through send-push (owner only). Returns { delivered, failed, ... }.
+async function pushNow(campaignId) {
+  const res = await fetch(`${SB}/functions/v1/send-push`, {
+    method: "POST",
+    headers: { apikey: KEY, Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ campaign_id: campaignId }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { clearSession(); showLogin("সেশন শেষ হয়েছে, আবার লগইন করুন"); throw new Error("401"); }
+  if (!res.ok) throw new Error(data.error || "পাঠানো যায়নি");
+  return (data.results && data.results[0]) || {};
+}
+
+// Creates the campaign, then sends it now or leaves it queued for its time.
+async function createAndMaybeSend(payload, msg) {
+  const { campaign } = await api("create_campaign", payload);
+  const due = !payload.scheduled_at || new Date(payload.scheduled_at) <= new Date();
+  if (!due) return { queued: true };
+  const r = await pushNow(campaign.id);
+  msg.className = "ok";
+  msg.textContent = `পাঠানো হয়েছে: ${r.delivered ?? 0} ডিভাইসে পৌঁছেছে, ব্যর্থ ${r.failed ?? 0}` + (r.devices === 0 ? " (এখনো কোনো ডিভাইস নিবন্ধিত নেই)" : "");
+  return r;
+}
+
 async function sendCampaign() {
-  const btn = $("#pSend"); const msg = $("#pMsg");
+  const btn = $("#pSend"), test = $("#pTest"); const msg = $("#pMsg");
   msg.className = ""; msg.textContent = "";
   const aud = document.querySelector('input[name="aud"]:checked').value;
   const when = $("#pWhen").value;
@@ -268,15 +292,46 @@ async function sendCampaign() {
     target: $("#pTarget").value, audience: aud, audience_email: aud === "user" ? $("#pEmail").value.trim() : null,
     scheduled_at: when ? new Date(when).toISOString() : null,
   };
-  btn.disabled = true;
+  btn.disabled = true; test.disabled = true;
   try {
-    await api("create_campaign", payload);
-    msg.className = "ok"; msg.textContent = "পুশ সংরক্ষিত হয়েছে";
+    const r = await createAndMaybeSend(payload, msg);
+    if (r.queued) { msg.className = "ok"; msg.textContent = "নির্ধারিত সময়ে পাঠানো হবে"; }
     $("#pTitle").value = ""; $("#pBody").value = ""; $("#pImage").value = ""; $("#pWhen").value = ""; previewPush();
     await loadHistory();
   } catch (e) {
     if (e.message !== "401") { msg.className = "err"; msg.textContent = e.message; }
-  } finally { btn.disabled = false; }
+  } finally { btn.disabled = false; test.disabled = false; }
+}
+
+// Test push: only to the owner's own account, sent now, no history clutter beyond one row.
+async function sendTestPush() {
+  const btn = $("#pSend"), test = $("#pTest"); const msg = $("#pMsg");
+  msg.className = ""; msg.textContent = "";
+  const payload = {
+    title: $("#pTitle").value.trim() || "FinTrack টেস্ট পুশ",
+    body: $("#pBody").value.trim() || "এটি একটি টেস্ট পুশ। ট্যাপ করলে হোম খুলবে।",
+    image_url: $("#pImage").value.trim() || null,
+    target: $("#pTarget").value, audience: "user", audience_email: session.email, scheduled_at: null,
+  };
+  btn.disabled = true; test.disabled = true;
+  try {
+    await createAndMaybeSend(payload, msg);
+    await loadHistory();
+  } catch (e) {
+    if (e.message !== "401") { msg.className = "err"; msg.textContent = e.message; }
+  } finally { btn.disabled = false; test.disabled = false; }
+}
+
+// Sends scheduled pushes whose time has come (the owner's visit acts as the scheduler).
+async function sendDue() {
+  try {
+    const res = await fetch(`${SB}/functions/v1/send-push`, {
+      method: "POST",
+      headers: { apikey: KEY, Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ due: true }),
+    });
+    if (res.status === 401) { clearSession(); showLogin("সেশন শেষ হয়েছে, আবার লগইন করুন"); }
+  } catch { /* offline: nothing to send now */ }
 }
 
 // ---------- Wiring ----------
@@ -285,7 +340,7 @@ document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click
   for (const t of ["dash", "users", "push"]) $("#tab-" + t).classList.toggle("hidden", b.dataset.tab !== t);
   if (b.dataset.tab === "dash") loadDashboard();
   if (b.dataset.tab === "users") loadUsers();
-  if (b.dataset.tab === "push") loadHistory();
+  if (b.dataset.tab === "push") { sendDue().then(loadHistory); }
 }));
 $("#loginForm").addEventListener("submit", async (e) => {
   e.preventDefault(); $("#loginErr").textContent = ""; $("#loginBtn").disabled = true;
@@ -307,6 +362,7 @@ document.querySelectorAll('input[name="aud"]').forEach((r) => r.addEventListener
 }));
 ["pTitle", "pBody", "pImage"].forEach((id) => $("#" + id).addEventListener("input", previewPush));
 $("#pSend").addEventListener("click", sendCampaign);
+$("#pTest").addEventListener("click", sendTestPush);
 
 loadSession();
 if (session) { showApp(session.email); loadDashboard(); } else showLogin("");
