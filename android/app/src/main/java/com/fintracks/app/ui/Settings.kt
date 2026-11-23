@@ -651,6 +651,7 @@ private fun loadAvatarBitmap(url: String): ImageBitmap? = runCatching {
 }.getOrNull()
 
 /** Edit name, username, birth date, phone, address and photo. Changes go to the profile on the server. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
