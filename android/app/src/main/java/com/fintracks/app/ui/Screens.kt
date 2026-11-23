@@ -195,7 +195,8 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
         inc.take(last + 1) to exp.take(last + 1)
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    // Bottom padding leaves room for the bottom bar and the floating button.
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 120.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         // Period tabs + timeline navigator, like the video's দৈনিক / মাসিক / বাৎসরিক pill.
         Box(Modifier.staggerIn(0)) {
         Row(
@@ -245,8 +246,11 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
-                Text(tr("অবশিষ্ট ব্যালেন্স (ALL TIME)", "Balance (all time)"), fontSize = 12.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                CountUpText(total, { taka(it, p) }, fontSize = 36.sp, fontWeight = FontWeight.Bold)
+                Text(tr("অবশিষ্ট ব্যালেন্স · ", "Balance · ") + period.label, fontSize = 12.sp, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // The hero follows the selected period; the all-time total is shown on its own line.
+                val periodBalance = income - expense
+                CountUpText(periodBalance, { taka(it, p) }, fontSize = 36.sp, fontWeight = FontWeight.Bold, color = if (periodBalance < 0) Rose500 else Color.Unspecified)
+                Text(tr("সর্বমোট ", "All time ") + taka(total, p), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Box(Modifier.size(64.dp).clip(CircleShape).background(Sky400.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
                 Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = readableOn(Sky400), modifier = Modifier.size(30.dp))
@@ -782,8 +786,8 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
             Modifier.morphIn()
                 .fillMaxWidth(0.94f)
                 .clip(RoundedCornerShape(32.dp))
-                .background(Tok_FF0B1220)
-                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(32.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, faint(0.1f), RoundedCornerShape(32.dp))
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -793,7 +797,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                 IconButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close")) }
             }
             // Segmented toggle: ব্যয় red, আয় green, ট্রান্সফার sky.
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.05f)).padding(4.dp)) {
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(faint(0.05f)).padding(4.dp)) {
                 listOf(Triple("Expense", "ব্যয় (Expense)", expenseRed), Triple("Income", tr("আয় (Income)", "Income"), incomeGreen), Triple("Transfer", "ট্রান্সফার", Sky500)).forEach { (key, label, c) ->
                     val on = type == key
                     Box(
@@ -961,7 +965,7 @@ internal fun StatPill(label: String, value: String, color: Color, modifier: Modi
 }
 
 enum class HomeSpan(private val bnLabel: String, private val enLabel: String) {
-    DAY("দৈনিক", "Daily"), MONTH("মাসিক", "Monthly"), YEAR("বাৎসরিক", "Yearly");
+    DAY("দৈনিক", "Daily"), MONTH("মাসিক", "Monthly"), YEAR("বার্ষিক", "Yearly");
 
     val label: String get() = tr(bnLabel, enLabel)
 }

@@ -132,7 +132,6 @@ fun CreditDueCard(state: UiState, onOpen: () -> Unit) {
             Column {
                 Text(tr("মোট বাকি দেনা", "Total credit due"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 Text(taka(due, p), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = readableOn(BakiRed))
-                Text(tr("দোকানের বাকি · ধার/লোন থেকে আলাদা", "Shop credit · separate from loans"), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (overdue > 0) Text(tr("$overdue টি মেয়াদোত্তীর্ণ", "$overdue overdue"), color = readableOn(BakiRed), fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }

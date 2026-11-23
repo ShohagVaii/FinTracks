@@ -247,6 +247,8 @@ fun FormDialog(
 
 /** Glass bottom bar with a blue halo, outlined icons and a raised centre "+". The selected tab's pill slides, and its icon bounces. */
 @Composable
+private val BOTTOM_GAP = 84.dp
+
 fun BottomBar(selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
     val items = listOf(
         "dashboard" to (tr("হোম", "Home") to Icons.Outlined.Home),
@@ -287,9 +289,11 @@ fun BottomBar(selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
                 Box(
                     Modifier
                         .offset {
-                            val slotW = (barWidth - 16.dp.toPx()) / 4f
+                            val gap = BOTTOM_GAP.toPx()
+                            val slotW = (barWidth - 16.dp.toPx() - gap) / 4f
+                            val afterGap = (slotIndex - 1f).coerceIn(0f, 1f) * gap
                             IntOffset(
-                                (8.dp.toPx() + slotIndex * slotW + slotW / 2f - 26.dp.toPx()).roundToInt(),
+                                (8.dp.toPx() + slotIndex * slotW + afterGap + slotW / 2f - 26.dp.toPx()).roundToInt(),
                                 8.dp.toPx().roundToInt()
                             )
                         }
@@ -302,7 +306,9 @@ fun BottomBar(selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
                 Modifier.fillMaxSize().padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                items.forEach { (id, pair) ->
+                items.forEachIndexed { i, (id, pair) ->
+                    // Gap between Transactions and Shared, where the centre "+" sits.
+                    if (i == 2) Spacer(Modifier.width(BOTTOM_GAP))
                     NavItem(pair.first, pair.second, selected == id, Modifier.weight(1f)) { onSelect(id) }
                 }
             }

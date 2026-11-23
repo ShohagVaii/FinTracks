@@ -50,6 +50,9 @@ val Blue600: Color get() = AppPrefs.accent.gradientEnd
 
 val Emerald500 = Color(0xFF10B981)
 val Rose500 = Color(0xFFF43F5E)
+
+/** The FTB logo's cyan: used for the word "FinTrack" wherever it is written as text. */
+val FinTrackCyan = Color(0xFF39C7E0)
 /** Deeper rose for light-theme charts and heatmap cells (Tailwind rose-700). */
 val Rose700 = Color(0xFFBE123C)
 val Amber500 = Color(0xFFF59E0B)

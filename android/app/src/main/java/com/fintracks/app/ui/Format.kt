@@ -18,8 +18,10 @@ fun taka(value: Double, privacy: Boolean = false): String {
     if (privacy) return AppPrefs.symbol + " ••••"
     val shown = shownAmount(value)
     val whole = shown % 1.0 == 0.0
-    val body = String.format(Locale.US, if (whole) "%,.0f" else "%,.2f", shown)
-    return AppPrefs.symbol + " " + (if (AppPrefs.english) body else bnDigits(body))
+    // Sign before the symbol: -৳ ১৪১
+    val body = String.format(Locale.US, if (whole) "%,.0f" else "%,.2f", Math.abs(shown))
+    val sign = if (shown < 0) "-" else ""
+    return sign + AppPrefs.symbol + " " + (if (AppPrefs.english) body else bnDigits(body))
 }
 
 /** 2 instead of 2.0 for whole numbers. */

@@ -275,7 +275,7 @@ fun ExpenseTrendCard(txs: List<JsonObject>, privacy: Boolean) {
     AppCard {
         Text(tr("ব্যয়ের ট্রেন্ড", "Expense trend"), fontWeight = FontWeight.Bold)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("week" to tr("সাপ্তাহিক", "Weekly"), "month" to tr("মাসিক", "Monthly"), "year" to tr("বাৎসরিক", "Yearly")).forEach { (key, label) ->
+            listOf("week" to tr("সাপ্তাহিক", "Weekly"), "month" to tr("মাসিক", "Monthly"), "year" to tr("বার্ষিক", "Yearly")).forEach { (key, label) ->
                 val on = view == key
                 Box(
                     Modifier

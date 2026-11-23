@@ -416,28 +416,28 @@ private fun Header(
         Modifier
             .fillMaxWidth()
             .topInsetPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("FinTrack", color = MaterialTheme.colorScheme.primary, fontSize = 26.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                Text("FinTrack", color = FinTrackCyan, fontSize = 22.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, maxLines = 1, softWrap = false)
                 if (demo) {
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(6.dp))
                     Text(
                         "DEMO",
                         color = Color.White,
-                        fontSize = 10.sp,
+                        fontSize = 9.sp,
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Rose500).padding(horizontal = 6.dp, vertical = 2.dp)
+                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Rose500).padding(horizontal = 5.dp, vertical = 1.dp)
                     )
                 }
             }
-            Text("PREMIUM FINANCE", color = readableOn(Slate400), fontSize = 9.sp, letterSpacing = 3.sp)
+            Text("PREMIUM FINANCE", color = readableOn(Slate400), fontSize = 8.sp, letterSpacing = 2.sp, maxLines = 1, softWrap = false)
         }
         InboxBell(unread, onInbox)
         HeaderIcon(Icons.Default.Calculate, tr("ক্যালকুলেটর", "Calculator"), onCalc)
-        HeaderIcon(Icons.Default.WbSunny, if (dark) tr("লাইট থিম", "Light theme") else tr("ডার্ক থিম", "Dark theme"), onToggleTheme, tint = Amber400)
+        HeaderIcon(Icons.Default.WbSunny, if (dark) tr("লাইট থিম", "Light theme") else tr("ডার্ক থিম", "Dark theme"), onToggleTheme)
         HeaderIcon(if (privacy) Icons.Default.VisibilityOff else Icons.Default.Visibility, tr("প্রাইভেসি", "Privacy"), onTogglePrivacy)
         HeaderIcon(Icons.Default.Settings, tr("সেটিংস", "Settings"), onSettings)
     }
@@ -448,8 +448,8 @@ private fun Header(
 private fun InboxBell(unread: Int, onClick: () -> Unit) {
     Box(
         Modifier
-            .padding(start = 8.dp)
-            .size(40.dp)
+            .padding(start = 6.dp)
+            .size(36.dp)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, faint(0.08f), CircleShape)
@@ -471,8 +471,8 @@ private fun InboxBell(unread: Int, onClick: () -> Unit) {
 private fun HeaderIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, onClick: () -> Unit, tint: Color = MaterialTheme.colorScheme.onSurface) {
     Box(
         Modifier
-            .padding(start = 8.dp)
-            .size(40.dp)
+            .padding(start = 6.dp)
+            .size(36.dp)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, faint(0.08f), CircleShape)
@@ -480,7 +480,7 @@ private fun HeaderIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, de
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = desc, tint = tint, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = desc, tint = tint, modifier = Modifier.size(18.dp))
     }
 }
 
