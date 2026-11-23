@@ -1,5 +1,11 @@
 package com.fintracks.app.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.rotate
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.runtime.saveable.rememberSaveable
 import android.content.Context
@@ -27,6 +33,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
@@ -147,6 +155,20 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
         FaqPage { onBack() }
         return
     }
+    if (page == "help") {
+        Page {
+            AppCard {
+                SectionTitle(tr("সাহায্য ও অ্যাপ", "Help & app"))
+                SettingLink(tr("প্রশ্ন-উত্তর", "Questions & answers")) { onPage("faq") }
+                SettingLink(tr("সাপোর্ট ইমেইল", "Support email"), SUPPORT_EMAIL) { sendSupportMail(ctx) }
+                SettingLink(tr("প্রাইভেসি পলিসি", "Privacy policy")) { openUrl(ctx, PRIVACY_URL) }
+                SettingLink(tr("টার্মস ও শর্তাবলি", "Terms of use")) { openUrl(ctx, TERMS_URL) }
+                SettingLink(tr("অ্যাপ শেয়ার করুন", "Share the app")) { shareApp(ctx) }
+                SettingLink(tr("রেট দিন", "Rate the app")) { openUrl(ctx, WEBSITE_URL) }
+            }
+        }
+        return
+    }
     if (page == "categories") {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
             AppCard {
@@ -157,174 +179,153 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
         return
     }
     val uid = remember { vm.currentUid() }
+    var query by rememberSaveable { mutableStateOf("") }
+    var openSection by rememberSaveable { mutableStateOf("") }
+    var backupOpen by rememberSaveable { mutableStateOf(false) }
+    val q = query.trim()
+    fun rowHit(t: String) = q.isEmpty() || t.contains(q, ignoreCase = true)
+    fun sectionHit(vararg t: String) = q.isEmpty() || t.any { rowHit(it) }
+    fun toggle(key: String) { openSection = if (openSection == key) "" else key }
+    fun isOpen(key: String) = q.isNotEmpty() || openSection == key
+
+    val tTheme = tr("থিম", "Theme")
+    val tAccent = tr("অ্যাকসেন্ট কালার", "Accent colour")
+    val tFull = tr("পুরো স্ক্রিন মোড (স্ট্যাটাস বার লুকানো)", "Full-screen mode (status bar hidden)")
+    val tLang = tr("ভাষা ও অঞ্চল", "Language & region")
+    val tPriv = tr("প্রাইভেসি মোড (টাকার পরিমাণ লুকানো)", "Privacy mode (hide amounts)")
+    val tFake = tr("ফেক মোড (DEMO): টাকার অঙ্ক বদলে দেখাবে", "Demo mode: show fake amounts")
+    val tLogin = tr("লগইন ও নিরাপত্তা", "Login & security")
+    val tRemind = tr("প্রতিদিন হিসাব লিখতে মনে করিয়ে দিন", "Remind me daily to log transactions")
+    val tCategories = tr("ক্যাটাগরি", "Categories")
+    val tBackupRow = tr("ব্যাকআপ ও রিস্টোর", "Backup & restore")
+    val tHelp = tr("সাহায্য ও অ্যাপ", "Help & app")
+
+    val themeName = if (state.dark) tr("ডার্ক", "Dark") else tr("লাইট", "Light")
+    val langName = if (AppPrefs.english) "English" else "বাংলা"
+    val currencyText = currencySymbol(state.currency) + " " + state.currency
+    val catCount = (EXPENSE_CATS.map { it.name } + INCOME_CATS.map { it.name } + state.rows("categories").map { it.str("name") }).toSet().size
+    val txCount = state.rows("transactions").size
 
     Page {
-        ProfileCard(state, email, emailLoaded) { editProfile = true }
-        AppCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(tr("ইউজার আইডি", "User ID"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(if (uid.isEmpty()) "—" else uid.take(8) + "…", fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            singleLine = true,
+            placeholder = { Text(tr("সেটিংসে খুঁজুন", "Search settings")) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(50)
+        )
+
+        ProfileHero(state, email, emailLoaded, uid, lastSync) { editProfile = true }
+
+        if (sectionHit(tr("চেহারা", "Appearance"), tTheme, tAccent, tFull)) {
+            SettingsAccordion(tr("চেহারা", "Appearance"), themeName, isOpen("look"), { toggle("look") }) {
+                if (rowHit(tTheme)) {
+                    FieldLabel(tTheme)
+                    ChoiceChips(
+                        listOf("dark" to tr("ডার্ক", "Dark"), "light" to tr("লাইট", "Light")),
+                        if (state.dark) "dark" else "light"
+                    ) { vm.saveProfile(row("theme" to it)) }
                 }
-                if (uid.isNotEmpty()) TextButton(modifier = Modifier.pressScale(), onClick = { copyText(ctx, "FinTrack user id", uid) }) { Text(tr("কপি", "Copy")) }
-            }
-        }
-        AppCard {
-            SettingLink(tr("লগইন ও নিরাপত্তা", "Login & security"), tr("ইমেইল, Google, পাসওয়ার্ড, ফোনের লক", "Email, Google, password, phone lock")) { onPage("login") }
-        }
-
-        // ---- চেহারা ও পছন্দ ----
-        AppCard {
-            SectionTitle(tr("চেহারা ও পছন্দ", "Appearance & preferences"))
-            Text(tr("থিম", "Theme"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            ChoiceChips(
-                listOf("dark" to tr("ডার্ক", "Dark"), "light" to tr("লাইট", "Light")),
-                if (state.dark) "dark" else "light"
-            ) { vm.saveProfile(row("theme" to it)) }
-
-            Text(tr("অ্যাকসেন্ট কালার", "Accent colour") + ": " + state.accent.label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                AccentColor.entries.forEach { a ->
-                    val selected = a == state.accent
-                    Box(
-                        Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(a.darkPrimary)
-                            .border(if (selected) 3.dp else 0.dp, if (selected) MaterialTheme.colorScheme.onSurface else Color.Transparent, CircleShape)
-                            .clickable { vm.saveProfile(row("theme_color" to a.key)) }
-                    )
-                }
-            }
-
-            Text(tr("মুদ্রা", "Currency"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            ChoiceChips(
-                listOf("BDT" to "${currencySymbol("BDT")} BDT", "USD" to "${currencySymbol("USD")} USD", "EUR" to "${currencySymbol("EUR")} EUR", "GBP" to "${currencySymbol("GBP")} GBP"),
-                state.currency
-            ) { vm.saveProfile(row("currency" to it)) }
-
-            Text(tr("তারিখ ফরম্যাট", "Date format"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            ChoiceChips(
-                listOf("bn" to tr("বাংলা", "Bangla"), "en" to tr("English", "English")),
-                dateStyle
-            ) { vm.saveProfile(row("date_format" to it)) }
-            Text(
-                tr("নমুনা: ", "Example: ") + displayDate(LocalDate.now().toString()),
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Text(tr("ভাষা", "Language"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            ChoiceChips(listOf("bn" to "বাংলা", "en" to "English"), langStyle) { vm.saveProfile(row("language" to it)) }
-            Text(
-                tr("ভাষা বদলালে সেটিংস, প্রধান মেনু, হোম, লেনদেন, শেয়ার ও টুলস স্ক্রিন ইংরেজিতে দেখাবে। বাকি স্ক্রিন এখনো বাংলায়।",
-                    "Language changes Settings, the main menu, Home, Transactions, Shared and Tools. Other screens are still in Bangla."),
-                fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            SwitchRow(tr("ফেক মোড (DEMO): টাকার অঙ্ক বদলে দেখাবে", "Demo mode: show fake amounts"), state.demo) { vm.setDemo(it) }
-            SwitchRow(tr("প্রাইভেসি মোড (টাকার পরিমাণ লুকানো)", "Privacy mode (hide amounts)"), state.privacy) {
-                vm.saveProfile(row("is_privacy_mode" to it))
-            }
-            // Full-screen mode hides the status bar. Off returns the normal edge-to-edge look with the bar visible.
-            SwitchRow(tr("পুরো স্ক্রিন মোড (স্ট্যাটাস বার লুকানো)", "Full-screen mode (status bar hidden)"), Immersive.on) {
-                Immersive.set(ctx, it)
-            }
-        }
-
-        // ---- ক্যাটাগরি ----
-        AppCard {
-            SectionTitle(tr("ক্যাটাগরি", "Categories"))
-            SettingLink(tr("ক্যাটাগরি সাজান", "Manage categories"), tr("যোগ, সম্পাদনা, মুছে ফেলা", "Add, edit, delete")) { onPage("categories") }
-        }
-
-        // ---- নিরাপত্তা ----
-        AppCard {
-            SectionTitle(tr("নিরাপত্তা", "Security"))
-            // Link to the device-security block (PIN and fingerprint/face status) on the login & security page.
-            SettingLink(tr("PIN ও ফিঙ্গারপ্রিন্ট/ফেস স্ট্যাটাস", "PIN and fingerprint/face status"), tr("লগইন ও নিরাপত্তা পেজে দেখুন", "Shown on Login & security")) { onPage("login") }
-            Text(
-                tr("PIN, ফিঙ্গারপ্রিন্ট বা ফেস দিয়ে অ্যাপ লক করা যায়। ফোনে ফেস/ফিঙ্গারপ্রিন্ট না থাকলে PIN ব্যবহার হবে।",
-                    "Lock the app with a PIN, fingerprint or face. Without a fingerprint or face on the phone, the PIN is used."),
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (!hasPin) {
-                Button(modifier = Modifier.pressScale(), onClick = { showSetPin = true }) { Text(tr("PIN সেট করুন", "Set PIN")) }
-            } else {
-                OutlinedButton(modifier = Modifier.pressScale(), onClick = { showOldPin = true }) { Text(tr("PIN বদলান", "Change PIN")) }
-            }
-            SwitchRow(tr("অ্যাপ লক চালু", "App lock on"), lockOn) {
-                if (it && !hasPin) {
-                    Toast.makeText(ctx, tr("আগে PIN সেট করুন", "Set a PIN first"), Toast.LENGTH_SHORT).show()
-                } else if (it) {
-                    lockOn = true
-                    AppLock.enable(ctx)
-                } else {
-                    showDisable = true
-                }
-            }
-            if (lockOn) {
-                Text(tr("অটো-লক: কতক্ষণ পর লক হবে", "Auto-lock after"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                ChoiceChips(
-                    listOf("0" to tr("সাথে সাথে", "Immediately"), "60" to tr("১ মিনিট", "1 minute"), "300" to tr("৫ মিনিট", "5 minutes")),
-                    timeout
-                ) {
-                    timeout = it
-                    AppLock.setTimeout(ctx, it.toInt())
-                }
-            }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(
-                    tr("ফিঙ্গারপ্রিন্ট / ফেস দিয়ে আনলক", "Unlock with fingerprint / face"),
-                    color = if (lockOn && bioHardware) Color.Unspecified else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Switch(
-                    checked = bioOn,
-                    enabled = lockOn && bioHardware,
-                    onCheckedChange = {
-                        bioOn = it
-                        AppLock.setBiometric(ctx, it)
+                if (rowHit(tAccent)) {
+                    FieldLabel(tAccent + ": " + state.accent.label)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        AccentColor.entries.forEach { a ->
+                            val selected = a == state.accent
+                            Box(
+                                Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(a.darkPrimary)
+                                    .border(
+                                        if (selected) 3.dp else 0.dp,
+                                        if (selected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                                        CircleShape
+                                    )
+                                    .clickable { vm.saveProfile(row("theme_color" to a.key)) }
+                            )
+                        }
                     }
-                )
-            }
-            if (!bioHardware) {
-                Text(tr("এই ফোনে ফিঙ্গারপ্রিন্ট বা ফেস সেটআপ নেই, তাই PIN ব্যবহার হবে।", "This phone has no fingerprint or face set up, so the PIN is used."),
-                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-
-        // ---- রিমাইন্ডার ----
-        AppCard {
-            SectionTitle(tr("দৈনিক রিমাইন্ডার", "Daily reminder"))
-            SwitchRow(tr("প্রতিদিন হিসাব লিখতে মনে করিয়ে দিন", "Remind me daily to log transactions"), reminderOn) { on ->
-                reminderOn = on
-                DailyReminder.set(ctx, on, reminderTime)
-                if (on) vm.saveProfile(row("reminder_time" to reminderTime))
-            }
-            if (reminderOn) {
-                OutlinedButton(modifier = Modifier.pressScale(), onClick = { showTime = true }) {
-                    Text(tr("সময়: ", "Time: ") + if (AppPrefs.english) reminderTime else bnDigits(reminderTime))
                 }
-                Text(
-                    tr("নোটিফিকেশন বন্ধ থাকলে বা ব্যাটারি সেভার চালু থাকলে রিমাইন্ডার দেরিতে আসতে পারে।",
-                        "If notifications are off or battery saver is on, the reminder may arrive late."),
-                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (rowHit(tFull)) {
+                    SwitchRow(tFull, Immersive.on) { Immersive.set(ctx, it) }
+                }
             }
         }
 
-        // ---- ডাটা ও সিঙ্ক ----
-        AppCard {
-            SectionTitle(tr("ডাটা ও সিঙ্ক", "Data & sync"))
-            Text(
-                tr("সর্বশেষ সফল সিঙ্ক: ", "Last successful sync: ") + syncText(lastSync),
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            OutlinedButton(modifier = Modifier.pressScale(), onClick = { vm.syncNow() }) { Text(tr("এখনই সিঙ্ক করুন", "Sync now")) }
+        if (sectionHit(tLang, tr("ভাষা", "Language"), tr("মুদ্রা", "Currency"), tr("তারিখের ধরন", "Date format"))) {
+            SettingsAccordion(tLang, langName + " · " + currencyText, isOpen("lang"), { toggle("lang") }) {
+                if (rowHit(tr("ভাষা", "Language"))) {
+                    FieldLabel(tr("ভাষা", "Language"))
+                    ChoiceChips(listOf("bn" to "বাংলা", "en" to "English"), langStyle) { vm.saveProfile(row("language" to it)) }
+                }
+                if (rowHit(tr("মুদ্রা", "Currency"))) {
+                    FieldLabel(tr("মুদ্রা", "Currency"))
+                    ChoiceChips(
+                        listOf("BDT", "USD", "EUR").map { it to "${currencySymbol(it)} $it" },
+                        state.currency
+                    ) { vm.saveProfile(row("currency" to it)) }
+                }
+                if (rowHit(tr("তারিখের ধরন", "Date format"))) {
+                    FieldLabel(tr("তারিখের ধরন", "Date format"))
+                    ChoiceChips(listOf("bn" to tr("বাংলা", "Bangla"), "en" to "English"), dateStyle) { vm.saveProfile(row("date_format" to it)) }
+                    Text(displayDate(LocalDate.now().toString()), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
 
-            Text(tr("এক্সপোর্ট", "Export"), fontWeight = FontWeight.SemiBold)
-            Text(tr("সব লেনদেন (সময়সীমা অনুযায়ী) Excel, PDF বা CSV হিসেবে শেয়ার করুন। PDF-এ বাংলা লেখা থাকে।",
-                "Share all transactions as Excel, PDF or CSV. The PDF keeps Bangla text."),
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (sectionHit(tr("গোপনীয়তা ও নিরাপত্তা", "Privacy & security"), tPriv, tFake, tLogin)) {
+            SettingsAccordion(
+                tr("গোপনীয়তা ও নিরাপত্তা", "Privacy & security"),
+                if (lockOn) tr("লক চালু", "Lock on") else tr("লক বন্ধ", "Lock off"),
+                isOpen("security"), { toggle("security") }
+            ) {
+                if (rowHit(tPriv)) {
+                    SwitchRow(tPriv, state.privacy) { vm.saveProfile(row("is_privacy_mode" to it)) }
+                }
+                if (rowHit(tFake)) {
+                    SwitchRow(tFake, state.demo) { vm.setDemo(it) }
+                }
+                if (rowHit(tLogin)) {
+                    SettingLink(tLogin) { onPage("login") }
+                }
+            }
+        }
+
+        if (sectionHit(tr("নোটিফিকেশন", "Notifications"), tRemind, tr("সময়", "Time"))) {
+            SettingsAccordion(
+                tr("নোটিফিকেশন", "Notifications"),
+                if (!reminderOn) tr("বন্ধ", "Off") else if (AppPrefs.english) reminderTime else bnDigits(reminderTime),
+                isOpen("notify"), { toggle("notify") }
+            ) {
+                if (rowHit(tRemind)) {
+                    SwitchRow(tRemind, reminderOn) { on ->
+                        reminderOn = on
+                        DailyReminder.set(ctx, on, reminderTime)
+                        if (on) vm.saveProfile(row("reminder_time" to reminderTime))
+                    }
+                }
+                if (reminderOn && rowHit(tr("সময়", "Time"))) {
+                    OutlinedButton(modifier = Modifier.pressScale(), onClick = { showTime = true }) {
+                        Text(tr("সময়: ", "Time: ") + if (AppPrefs.english) reminderTime else bnDigits(reminderTime))
+                    }
+                }
+            }
+        }
+
+        if (rowHit(tCategories)) {
+            NavRow(tCategories, if (AppPrefs.english) "$catCount" else bnDigits(catCount.toString()) + "টি") { onPage("categories") }
+        }
+
+        if (sectionHit(tr("ডাটা ও ব্যাকআপ", "Data & backup"), tBackupRow, tr("এক্সপোর্ট", "Export"), tr("ব্যাকআপ", "Backup"))) {
+            SettingsAccordion(
+                tr("ডাটা ও ব্যাকআপ", "Data & backup"),
+                if (AppPrefs.english) "$txCount transactions" else bnDigits(txCount.toString()) + " টি লেনদেন",
+                isOpen("data"), { toggle("data") }
+            ) {
+                if (rowHit(tBackupRow)) {
+                    SettingsAccordion(tBackupRow, "", backupOpen || q.isNotEmpty(), { backupOpen = !backupOpen }) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(Export.Format.XLSX to "Excel", Export.Format.PDF to "PDF", Export.Format.CSV to "CSV").forEach { (fmt, label) ->
                     OutlinedButton(enabled = !exporting, onClick = {
@@ -344,10 +345,6 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
                 }
             }
 
-            Text(tr("ব্যাকআপ", "Backup"), fontWeight = FontWeight.SemiBold)
-            Text(tr("সব লেনদেন, বাকি, ধার, বাজেট, লক্ষ্য, বিনিয়োগ, ক্যাটাগরি ও অন্য সব ডেটা একটি JSON ফাইলে। PIN ও লক সেটিং ব্যাকআপে থাকে না।",
-                "All transactions, credit, debts, budgets, goals, investments, categories and other data in one JSON file. The PIN and lock settings are not included."),
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedButton(modifier = Modifier.pressScale(), onClick = {
                 scope.launch {
                     try {
@@ -361,43 +358,15 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
             OutlinedButton(modifier = Modifier.pressScale(), onClick = { pickBackup.launch(arrayOf("application/json", "text/plain")) }) {
                 Text(tr("ব্যাকআপ থেকে ফিরিয়ে আনুন", "Restore from backup"))
             }
-
-            Text(tr("অ্যাপ রিসেট", "Reset app"), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.error)
-            Text(tr("এই ফোনের সব লোকাল ডেটা (PIN, লক, অফলাইন নোট, গণনা, পছন্দ, লগইন) মুছবে। সার্ভারের ডেটা মুছবে না।",
-                "Deletes all local data on this phone (PIN, lock, offline notes, counts, preferences, sign-in). Server data is not deleted."),
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedButton(modifier = Modifier.pressScale(), onClick = { showReset = true }) {
-                Text(tr("লোকাল ডেটা মুছুন", "Erase local data"), color = MaterialTheme.colorScheme.error)
+                    }
+                }
             }
         }
 
-        // ---- অ্যাকাউন্ট ----
-        AppCard {
-            SectionTitle(tr("অ্যাকাউন্ট", "Account"))
-            Text(tr("বিপজ্জনক এলাকা", "Danger zone"), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-            Text(tr("অ্যাকাউন্ট মুছলে আপনার সব লেনদেন, বাকি, ধার, বাজেট ও অন্য সব ডেটা স্থায়ীভাবে চলে যাবে। এটি ফিরিয়ে আনা যাবে না।",
-                "Deleting the account permanently removes all your transactions, credit, debts, budgets and other data. This cannot be undone."),
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Button(modifier = Modifier.pressScale(), onClick = { showDelete = true }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
-                Text(tr("অ্যাকাউন্ট স্থায়ীভাবে মুছুন", "Delete account permanently"))
-            }
+        if (rowHit(tHelp)) {
+            NavRow(tHelp, "") { onPage("help") }
         }
 
-        AppCard {
-            SectionTitle(tr("সাহায্য ও তথ্য", "Help & info"))
-            SettingLink(tr("প্রশ্ন-উত্তর", "Questions & answers"), tr("অফলাইনেও পড়া যায়", "Readable offline")) { onPage("faq") }
-            SettingLink(tr("সাপোর্ট ইমেইল", "Support email"), SUPPORT_EMAIL) { sendSupportMail(ctx) }
-            SettingLink(tr("প্রাইভেসি পলিসি", "Privacy policy")) { openUrl(ctx, PRIVACY_URL) }
-            SettingLink(tr("টার্মস ও শর্তাবলি", "Terms of use")) { openUrl(ctx, TERMS_URL) }
-        }
-        AppCard {
-            SectionTitle(tr("শেয়ার ও রেটিং", "Share & rate"))
-            SettingLink(tr("অ্যাপ শেয়ার করুন", "Share the app")) { shareApp(ctx) }
-            SettingLink(
-                tr("রেট দিন", "Rate the app"),
-                tr("এখন ওয়েবসাইটে যাবে; Play Store-এ এখনো নেই", "Opens the website for now; not on Play Store yet")
-            ) { openUrl(ctx, WEBSITE_URL) }
-        }
         AppFooter()
         // Logout is the last row, in its own rose band.
         LogoutRow { vm.signOut() }
@@ -493,33 +462,164 @@ private fun syncText(epochMs: Long): String {
     return if (AppPrefs.english) s else bnDigits(s)
 }
 
-/** Profile summary: photo, name, @username, login email, and the edit button. */
+/** Profile hero: photo inside a completeness ring, name, @username, email, two chips, and the edit-square button. */
 @Composable
-private fun ProfileCard(state: UiState, email: String, emailLoaded: Boolean, onEdit: () -> Unit) {
+private fun ProfileHero(state: UiState, email: String, emailLoaded: Boolean, uid: String, lastSync: Long, onEdit: () -> Unit) {
+    val ctx = LocalContext.current
     val name = state.name.ifBlank { tr("অতিথি ব্যবহারকারী", "Guest user") }
     val username = state.profile?.str("username").orEmpty()
+    val pct = completenessPercent(profileChecks(state.profile))
+    val primaryRing = MaterialTheme.colorScheme.primary
+    val trackRing = faint(0.1f)
     AppCard {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            AvatarImage(url = state.profile?.str("avatar_url").orEmpty(), fallback = name, size = 64.dp)
-            Column(Modifier.weight(1f)) {
-                Text(name, fontWeight = FontWeight.Bold, fontSize = 18.sp, maxLines = 1)
-                Text(
-                    if (username.isEmpty()) tr("ইউজারনেম নেই", "No username") else "@$username",
-                    color = MaterialTheme.colorScheme.primary, fontSize = 13.sp
-                )
-                Text(
-                    when {
-                        email.isNotBlank() -> email
-                        emailLoaded -> tr("ইমেইল পাওয়া যায়নি", "Email not found")
-                        else -> tr("ইমেইল লোড হচ্ছে…", "Loading email…")
-                    },
-                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1
-                )
+        Box(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().padding(end = 52.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Box(Modifier.size(78.dp), contentAlignment = Alignment.Center) {
+                        // Completeness ring: a track arc and a progress arc from the top.
+                        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                            val stroke = 4.dp.toPx()
+                            drawArc(
+                                color = trackRing, startAngle = -90f, sweepAngle = 360f, useCenter = false,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
+                            )
+                            drawArc(
+                                color = primaryRing, startAngle = -90f, sweepAngle = 360f * pct / 100f, useCenter = false,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
+                            )
+                        }
+                        AvatarImage(url = state.profile?.str("avatar_url").orEmpty(), fallback = name, size = 62.dp)
+                        Box(
+                            Modifier
+                                .align(Alignment.BottomCenter)
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.primary)
+                                .padding(horizontal = 6.dp, vertical = 1.dp)
+                        ) {
+                            Text(
+                                "${bnDigits(pct.toString())}%",
+                                fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                                color = readableOn(MaterialTheme.colorScheme.primary)
+                            )
+                        }
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(name, fontWeight = FontWeight.Bold, fontSize = 18.sp, maxLines = 1)
+                        Text(
+                            if (username.isEmpty()) tr("ইউজারনেম নেই", "No username") else "@$username",
+                            color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, maxLines = 1
+                        )
+                        Text(
+                            when {
+                                email.isNotBlank() -> email
+                                emailLoaded -> tr("ইমেইল পাওয়া যায়নি", "Email not found")
+                                else -> tr("ইমেইল লোড হচ্ছে…", "Loading email…")
+                            },
+                            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (uid.isNotEmpty()) {
+                        InfoChip("${uid.take(8)}… · " + tr("কপি", "Copy")) { copyText(ctx, "FinTrack user id", uid) }
+                    }
+                    InfoChip(tr("সিঙ্ক: ", "Sync: ") + syncText(lastSync))
+                }
             }
-            IconButton(modifier = Modifier.pressScale(), onClick = onEdit) { Icon(Icons.Default.Edit, contentDescription = tr("প্রোফাইল এডিট", "Edit profile")) }
+            Box(
+                Modifier
+                    .align(Alignment.CenterEnd)
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(faint(0.08f))
+                    .border(1.dp, faint(0.14f), CircleShape)
+                    .pressScale()
+                    .clickable(onClick = onEdit),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    Modifier.size(20.dp).border(1.5.dp, MaterialTheme.colorScheme.onSurface, RoundedCornerShape(5.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = tr("প্রোফাইল এডিট", "Edit profile"),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
+            }
         }
-        Spacer(Modifier.height(10.dp))
-        CompletenessBar(profileChecks(state.profile), showMissing = false)
+    }
+}
+
+@Composable
+private fun InfoChip(text: String, onClick: (() -> Unit)? = null) {
+    Text(
+        text,
+        fontSize = 11.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(faint(0.06f))
+            .border(1.dp, faint(0.1f), RoundedCornerShape(50))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+    )
+}
+
+@Composable
+private fun FieldLabel(text: String) {
+    Text(text, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+private fun GroupLabel(text: String) {
+    Text(text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+}
+
+/** One collapsible section: title, a status summary on the right, and an animated chevron. */
+@Composable
+private fun SettingsAccordion(
+    title: String,
+    summary: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val turn by animateFloatAsState(if (expanded) 180f else 0f, label = "accordionTurn")
+    AppCard {
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onToggle).padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            if (summary.isNotEmpty()) {
+                Text(summary, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            }
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 6.dp).size(20.dp).rotate(turn)
+            )
+        }
+        androidx.compose.animation.AnimatedVisibility(visible = expanded) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+        }
+    }
+}
+
+/** A single tappable card row with a status summary and a chevron (opens a page). */
+@Composable
+private fun NavRow(title: String, summary: String, onClick: () -> Unit) {
+    AppCard(onClick = onClick) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            if (summary.isNotEmpty()) {
+                Text(summary, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            }
+            Text("›", fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 6.dp))
+        }
     }
 }
 
@@ -559,6 +659,7 @@ private fun loadAvatarBitmap(url: String): ImageBitmap? = runCatching {
 }.getOrNull()
 
 /** Edit name, username, birth date, phone, address and photo. Changes go to the profile on the server. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
@@ -613,26 +714,33 @@ private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () ->
         else -> null
     }
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text(tr("প্রোফাইল এডিট", "Edit profile"), fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(tr("প্রোফাইল এডিট", "Edit profile"), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            GroupLabel(tr("ছবি", "Photo"))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     AvatarImage(url = photoUrl, fallback = name, size = 56.dp)
                     OutlinedButton(enabled = !uploading, onClick = {
                         picker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }) { Text(if (uploading) tr("আপলোড হচ্ছে…", "Uploading…") else tr("গ্যালারি থেকে ছবি", "Photo from gallery")) }
                 }
+                OutlinedTextField(photoUrl, { photoUrl = it.take(500) }, label = { Text(tr("ছবির URL (ঐচ্ছিক)", "Photo URL (optional)")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            GroupLabel(tr("ব্যক্তিগত", "Personal"))
                 OutlinedTextField(name, { name = it.take(60) }, label = { Text(tr("নাম", "Name")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(username, { username = it.take(20) }, label = { Text(tr("ইউজারনেম", "Username")) }, singleLine = true,
                     prefix = { Text("@") }, modifier = Modifier.fillMaxWidth())
                 OutlinedButton(onClick = { pickingDob = true }, modifier = Modifier.fillMaxWidth()) {
                     Text(tr("জন্ম তারিখ: ", "Birth date: ") + (if (dob.isEmpty()) tr("বাছাই করুন", "pick") else displayDate(dob)))
                 }
-                OutlinedTextField(phone, { phone = it.take(20) }, label = { Text(tr("ফোন নম্বর", "Phone")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(address, { address = it.take(200) }, label = { Text(tr("ঠিকানা", "Address")) }, modifier = Modifier.fillMaxWidth().height(90.dp))
-                OutlinedTextField(photoUrl, { photoUrl = it.take(500) }, label = { Text(tr("ছবির URL (ঐচ্ছিক)", "Photo URL (optional)")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedButton(onClick = { pickDistrict = true }, modifier = Modifier.fillMaxWidth()) {
                     Text(tr("জেলা: ", "District: ") + (if (district.isBlank()) tr("বাছাই করুন", "choose") else if (district == OTHER_CAT) tr("অন্যান্য", "Other") else district))
                 }
@@ -645,15 +753,17 @@ private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () ->
                 if (occupation == OTHER_CAT || (occupation.isNotBlank() && OCCUPATIONS.none { it.first == occupation })) {
                     CustomWordField(tr("পেশার নাম লিখুন", "Type the occupation"), if (occupation == OTHER_CAT) "" else occupation) { occupation = it }
                 }
+            GroupLabel(tr("যোগাযোগ", "Contact"))
+                OutlinedTextField(phone, { phone = it.take(20) }, label = { Text(tr("ফোন নম্বর", "Phone")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(address, { address = it.take(200) }, label = { Text(tr("ঠিকানা", "Address")) }, modifier = Modifier.fillMaxWidth().height(90.dp))
                 CompletenessBar(
                     profileChecks(name, username, photoUrl, dob, phone, address, district, occupation),
                     showMissing = true
                 )
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
-            }
-        },
-        confirmButton = {
-            TextButton(enabled = error == null, onClick = {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(modifier = Modifier.weight(1f).pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) }
+                Button(modifier = Modifier.weight(1f).pressScale(), enabled = error == null, onClick = {
                 val body = buildJsonObject {
                     put("name", name.trim())
                     put("username", if (u.isEmpty()) JsonNull else JsonPrimitive(u))
@@ -666,10 +776,10 @@ private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () ->
                 }
                 vm.saveProfile(body)
                 onDismiss()
-            }) { Text(tr("সেভ", "Save")) }
-        },
-        dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
-    )
+                }) { Text(tr("সেভ", "Save")) }
+            }
+        }
+    }
 
     if (pickDistrict) {
         SearchPickerSheet(tr("জেলা বাছাই", "Choose district"), DISTRICTS, district, { pickDistrict = false }) { picked ->
