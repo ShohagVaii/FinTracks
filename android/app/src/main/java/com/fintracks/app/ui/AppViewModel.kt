@@ -38,6 +38,8 @@ import java.time.LocalDate
 /** Every table the app reads, with its PostgREST query. Rows stay as JSON for generic CRUD. */
 val TABLES: List<Pair<String, String>> = listOf(
     "transactions" to "select=*&order=tx_date.desc,created_at.desc",
+    "bike_fuel_entries" to "select=*&order=tx_date.desc",
+    "bike_maintenance_entries" to "select=*&order=tx_date.desc",
     "accounts" to "select=*&order=created_at.asc",
     "budgets" to "select=*",
     "goals" to "select=*",
@@ -626,6 +628,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             s.rows(child).filter { it.str(fk) == id }.forEach { out += deleteOps(child, it.id()) }
         }
         when (table) {
+            // A bike entry and its expense go together, in both directions.
+            "bike_fuel_entries", "bike_maintenance_entries" -> s.rows("transactions")
+                .filter { it.str("source") == "bike" && it.str("source_ref") == id }
+                .forEach { out += LocalOutbox.op("delete", "transactions", it.id()) }
             "credit_payments" -> s.rows("transactions")
                 .filter { it.str("source") == "debt_payment" && it.str("source_ref") == id }
                 .forEach { out += LocalOutbox.op("delete", "transactions", it.id()) }
@@ -635,6 +641,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             "transactions" -> {
                 val t = s.rows("transactions").firstOrNull { it.id() == id }
                 val ref = t?.str("source_ref").orEmpty()
+                if (ref.isNotEmpty() && t?.str("source") == "bike") {
+                    out += LocalOutbox.op("delete", "bike_fuel_entries", ref)
+                    out += LocalOutbox.op("delete", "bike_maintenance_entries", ref)
+                }
                 if (ref.isNotEmpty() && t?.str("source") == "debt_payment") out += LocalOutbox.op("delete", "credit_payments", ref)
                 if (ref.isNotEmpty() && t?.str("source") == "personal_debt_payment") out += LocalOutbox.op("delete", "debt_payments", ref)
             }
@@ -690,7 +700,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val row = state.value.rows(table).firstOrNull { it.id() == id }
         if (table == "transactions") {
             queueAttachmentDelete(id, row)
-            BikeStore.dropByTx(id)
         }
         val ops = deleteOps(table, id)
         localChange(ops)

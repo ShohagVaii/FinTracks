@@ -144,8 +144,10 @@ object SmartAlerts {
         }
 
         // Bike service: 200 km before the due km, or 3 days before the due date.
-        val latestOdo = bikeStats(BikeStore.fuel, BikeStore.maint, todayIso).latestOdo
-        BikeStore.maint.forEach { m ->
+        val bikeFuel = fuelOf(tables["bike_fuel_entries"].orEmpty())
+        val bikeMaint = maintOf(tables["bike_maintenance_entries"].orEmpty())
+        val latestOdo = bikeStats(bikeFuel, bikeMaint, todayIso).latestOdo
+        bikeMaint.forEach { m ->
             m.nextKm?.let { k ->
                 val left = k - latestOdo
                 if (left <= 200) {

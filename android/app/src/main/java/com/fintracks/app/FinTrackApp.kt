@@ -3,7 +3,6 @@ package com.fintracks.app
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import com.fintracks.app.ui.BikeStore
 import com.fintracks.app.ui.LocalInbox
 import com.fintracks.app.ui.CatStore
 
@@ -12,7 +11,6 @@ class FinTrackApp : Application() {
     override fun onCreate() {
         super.onCreate()
         CatStore.init(this)
-        BikeStore.init(this)
         LocalInbox.init(this)
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CHANNEL_PUSH, "FinTrack বার্তা", NotificationManager.IMPORTANCE_DEFAULT))

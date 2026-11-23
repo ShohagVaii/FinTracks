@@ -35,6 +35,14 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import java.util.UUID
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import com.fintracks.app.data.bool
+import com.fintracks.app.data.id
+import com.fintracks.app.data.num
+import com.fintracks.app.data.str
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 
 /** Category name of the expense that a bike entry creates. */
 const val BIKE_CAT = "বাইক"
@@ -78,48 +86,65 @@ fun bikeKinds() = listOf(
     "other" to tr("অন্যান্য", "Other")
 )
 
-/**
- * Bike entries kept on this phone (no new table, so no schema change). Each entry's expense is a normal
- * transaction, so it syncs; [dropByTx] keeps the two in step when the transaction is deleted.
- */
-object BikeStore {
+private fun JsonObject.optNum(k: String): Double? = (this[k] as? JsonPrimitive)?.doubleOrNull
+
+/** Synced rows -> the entry models the screens and alert rules use. */
+fun fuelOf(rows: List<JsonObject>): List<FuelEntry> = rows.map { r ->
+    FuelEntry(
+        id = r.id(), date = r.str("tx_date").take(10), odo = r.num("odo"), total = r.num("total"),
+        liters = r.optNum("liters"), pricePerL = r.optNum("price_per_l"), station = r.str("station"),
+        full = r.bool("full_tank"), note = r.str("note"), txId = r.str("tx_id")
+    )
+}
+
+fun maintOf(rows: List<JsonObject>): List<MaintEntry> = rows.map { r ->
+    MaintEntry(
+        id = r.id(), date = r.str("tx_date").take(10), kind = r.str("kind"), item = r.str("item"),
+        cost = r.num("cost"), odo = r.optNum("odo"), nextKm = r.optNum("next_km"),
+        nextDate = r.str("next_date").take(10), note = r.str("note"), txId = r.str("tx_id")
+    )
+}
+
+fun fuelRow(id: String, date: String, odo: Double, total: Double, liters: Double?, price: Double?,
+            station: String, full: Boolean, note: String, txId: String): JsonObject = row(
+    "id" to id, "tx_date" to date, "odo" to odo, "total" to total,
+    "liters" to (liters ?: JsonNull), "price_per_l" to (price ?: JsonNull),
+    "station" to station, "full_tank" to full, "note" to note,
+    "tx_id" to txId.ifEmpty { null }
+)
+
+fun maintRow(id: String, date: String, kind: String, item: String, cost: Double, odo: Double?,
+             nextKm: Double?, nextDate: String, note: String, txId: String): JsonObject = row(
+    "id" to id, "tx_date" to date, "kind" to kind, "item" to item, "cost" to cost,
+    "odo" to (odo ?: JsonNull), "next_km" to (nextKm ?: JsonNull),
+    "next_date" to (nextDate.takeIf { it.isNotEmpty() } ?: null),
+    "note" to note, "tx_id" to txId.ifEmpty { null }
+)
+
+/** Entries saved on this phone before the sync. Uploaded once, then the local copy is cleared. */
+object BikeLegacy {
     private const val PREFS = "fintrack_bike"
     private val json = Json { ignoreUnknownKeys = true }
-    private val fuelSer = ListSerializer(FuelEntry.serializer())
-    private val maintSer = ListSerializer(MaintEntry.serializer())
-    private var prefs: SharedPreferences? = null
 
-    var fuel by mutableStateOf<List<FuelEntry>>(emptyList())
-        private set
-    var maint by mutableStateOf<List<MaintEntry>>(emptyList())
-        private set
-
-    fun init(ctx: Context) {
+    fun hasAny(ctx: Context): Boolean {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        prefs = p
-        fuel = runCatching { json.decodeFromString(fuelSer, p.getString("fuel", "[]") ?: "[]") }.getOrDefault(emptyList())
-        maint = runCatching { json.decodeFromString(maintSer, p.getString("maint", "[]") ?: "[]") }.getOrDefault(emptyList())
+        return p.getString("fuel", "[]") != "[]" || p.getString("maint", "[]") != "[]"
     }
 
-    private fun persistFuel(list: List<FuelEntry>) {
-        fuel = list
-        prefs?.edit()?.putString("fuel", json.encodeToString(fuelSer, list))?.apply()
+    /** Rows for the synced tables; the expense transactions already reached the server with normal sync. */
+    fun writes(ctx: Context): List<Triple<String, JsonObject, String?>> {
+        val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val f = runCatching { json.decodeFromString(ListSerializer(FuelEntry.serializer()), p.getString("fuel", "[]") ?: "[]") }.getOrDefault(emptyList())
+        val m = runCatching { json.decodeFromString(ListSerializer(MaintEntry.serializer()), p.getString("maint", "[]") ?: "[]") }.getOrDefault(emptyList())
+        return f.map { e ->
+            Triple("bike_fuel_entries", fuelRow(e.id, e.date, e.odo, e.total, e.liters, e.pricePerL, e.station, e.full, e.note, e.txId), null)
+        } + m.map { e ->
+            Triple("bike_maintenance_entries", maintRow(e.id, e.date, e.kind, e.item, e.cost, e.odo, e.nextKm, e.nextDate, e.note, e.txId), null)
+        }
     }
 
-    private fun persistMaint(list: List<MaintEntry>) {
-        maint = list
-        prefs?.edit()?.putString("maint", json.encodeToString(maintSer, list))?.apply()
-    }
-
-    fun addFuel(e: FuelEntry) = persistFuel(fuel + e)
-    fun deleteFuel(id: String) = persistFuel(fuel.filterNot { it.id == id })
-    fun addMaint(e: MaintEntry) = persistMaint(maint + e)
-    fun deleteMaint(id: String) = persistMaint(maint.filterNot { it.id == id })
-
-    /** The transaction was deleted (anywhere): drop the bike entry it came from. */
-    fun dropByTx(txId: String) {
-        if (fuel.any { it.txId == txId }) persistFuel(fuel.filterNot { it.txId == txId })
-        if (maint.any { it.txId == txId }) persistMaint(maint.filterNot { it.txId == txId })
+    fun clear(ctx: Context) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove("fuel").remove("maint").apply()
     }
 }
 
@@ -190,8 +215,16 @@ fun BikeScreen(state: UiState, vm: AppViewModel) {
     var tab by rememberSaveable { mutableStateOf("Fuel") }
     var adding by remember { mutableStateOf(false) }
     val today = todayIso()
-    val fuel = BikeStore.fuel
-    val maint = BikeStore.maint
+    val ctx = LocalContext.current
+    val fuel = fuelOf(state.rows("bike_fuel_entries"))
+    val maint = maintOf(state.rows("bike_maintenance_entries"))
+    // Phone-only entries from before the sync go up once, when the synced tables are there and empty.
+    LaunchedEffect(state.tables.containsKey("bike_fuel_entries")) {
+        if (state.tables.containsKey("bike_fuel_entries") && fuel.isEmpty() && maint.isEmpty() && BikeLegacy.hasAny(ctx)) {
+            vm.batch(BikeLegacy.writes(ctx))
+            BikeLegacy.clear(ctx)
+        }
+    }
     val s = bikeStats(fuel, maint, today)
     val privacy = state.privacy
 
@@ -226,10 +259,7 @@ fun BikeScreen(state: UiState, vm: AppViewModel) {
                             e.station.ifBlank { null },
                             if (e.full) tr("ফুল ট্যাংক", "Full tank") else null
                         ).joinToString(" · "),
-                        onDelete = {
-                            BikeStore.deleteFuel(e.id)
-                            if (e.txId.isNotEmpty()) vm.remove("transactions", e.txId)
-                        }
+                        onDelete = { vm.remove("bike_fuel_entries", e.id) }
                     )
                 }
             }
@@ -245,10 +275,7 @@ fun BikeScreen(state: UiState, vm: AppViewModel) {
                             m.item.ifBlank { null },
                             m.odo?.let { bnDigits("%.0f km".format(it)) }
                         ).joinToString(" · "),
-                        onDelete = {
-                            BikeStore.deleteMaint(m.id)
-                            if (m.txId.isNotEmpty()) vm.remove("transactions", m.txId)
-                        }
+                        onDelete = { vm.remove("bike_maintenance_entries", m.id) }
                     )
                 }
             }
@@ -323,10 +350,10 @@ private fun FuelEntryDialog(state: UiState, vm: AppViewModel, onDone: () -> Unit
                         val id = UUID.randomUUID().toString()
                         val txId = UUID.randomUUID().toString()
                         val noteText = listOf(station.trim(), note.trim()).filter { it.isNotEmpty() }.joinToString(" · ")
-                        vm.save("transactions", bikeTxRow(state, txId, amount, date, noteText, id), null)
-                        BikeStore.addFuel(
-                            FuelEntry(id, date, od!!, amount, effLiters, effPrice, station.trim(), full, note.trim(), txId)
-                        )
+                        vm.batch(listOf(
+                            Triple("transactions", bikeTxRow(state, txId, amount, date, noteText, id), null),
+                            Triple("bike_fuel_entries", fuelRow(id, date, od!!, amount, effLiters, effPrice, station.trim(), full, note.trim(), txId), null)
+                        ))
                         onDone()
                     }
                 }
@@ -375,15 +402,11 @@ private fun MaintEntryDialog(state: UiState, vm: AppViewModel, onDone: () -> Uni
                         val id = UUID.randomUUID().toString()
                         val txId = UUID.randomUUID().toString()
                         val label = item.trim().ifEmpty { bikeKinds().firstOrNull { it.first == kind }?.second.orEmpty() }
-                        vm.save("transactions", bikeTxRow(state, txId, amount, date, label, id), null)
-                        BikeStore.addMaint(
-                            MaintEntry(
-                                id = id, date = date, kind = kind, item = item.trim(), cost = amount,
-                                odo = parseAmount(odo), nextKm = parseAmount(nextKm),
-                                nextDate = if (isValidIsoDate(nextDate)) nextDate else "",
-                                note = note.trim(), txId = txId
-                            )
-                        )
+                        vm.batch(listOf(
+                            Triple("transactions", bikeTxRow(state, txId, amount, date, label, id), null),
+                            Triple("bike_maintenance_entries", maintRow(id, date, kind, item.trim(), amount, parseAmount(odo),
+                                parseAmount(nextKm), if (isValidIsoDate(nextDate)) nextDate else "", note.trim(), txId), null)
+                        ))
                         onDone()
                     }
                 }
