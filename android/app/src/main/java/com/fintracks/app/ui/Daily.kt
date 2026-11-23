@@ -36,14 +36,14 @@ object DailyReminder {
     /** "HH:mm", 24-hour. */
     fun time(ctx: Context): String = prefs(ctx).getString("time", "22:00") ?: "22:00"
 
+    /** Retired: the evening nudge in SmartAlerts replaces it. Kept only to cancel an old queued job. */
     fun set(ctx: Context, on: Boolean, time: String) {
-        prefs(ctx).edit().putBoolean("enabled", on).putString("time", time).apply()
-        if (on) schedule(ctx) else cancel(ctx)
+        cancel(ctx)
     }
 
-    /** Called at app start, so the job survives an app update or reboot when it was on. */
+    /** Called at app start: an old queued job from before the retirement is cancelled. */
     fun ensureScheduled(ctx: Context) {
-        if (enabled(ctx)) schedule(ctx)
+        cancel(ctx)
     }
 
     private fun schedule(ctx: Context) {

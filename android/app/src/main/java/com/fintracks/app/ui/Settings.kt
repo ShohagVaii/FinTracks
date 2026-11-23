@@ -50,8 +50,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -119,9 +117,6 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
     var showSetPin by remember { mutableStateOf(false) }
     var showDisable by remember { mutableStateOf(false) }
     var showOldPin by remember { mutableStateOf(false) }
-    var showTime by remember { mutableStateOf(false) }
-    var reminderOn by remember { mutableStateOf(DailyReminder.enabled(ctx)) }
-    var reminderTime by remember { mutableStateOf(DailyReminder.time(ctx)) }
     var restorePlan by remember { mutableStateOf<BackupPlan?>(null) }
 
     val lastSync = remember(state.tables) { Sync.lastOk(ctx) }
@@ -192,7 +187,6 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
     val tPriv = tr("প্রাইভেসি মোড (টাকার পরিমাণ লুকানো)", "Privacy mode (hide amounts)")
     val tFake = tr("ফেক মোড (DEMO): টাকার অঙ্ক বদলে দেখাবে", "Demo mode: show fake amounts")
     val tLogin = tr("লগইন ও নিরাপত্তা", "Login & security")
-    val tRemind = tr("প্রতিদিন হিসাব লিখতে মনে করিয়ে দিন", "Remind me daily to log transactions")
     val tCategories = tr("ক্যাটাগরি", "Categories")
     val tBackupRow = tr("ব্যাকআপ ও রিস্টোর", "Backup & restore")
     val tHelp = tr("সাহায্য ও অ্যাপ", "Help & app")
@@ -290,27 +284,6 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
             }
         }
 
-        if (sectionHit(tr("নোটিফিকেশন", "Notifications"), tRemind, tr("সময়", "Time"))) {
-            SettingsAccordion(
-                tr("নোটিফিকেশন", "Notifications"),
-                if (!reminderOn) tr("বন্ধ", "Off") else if (AppPrefs.english) reminderTime else bnDigits(reminderTime),
-                isOpen("notify"), { toggle("notify") }
-            ) {
-                if (rowHit(tRemind)) {
-                    SwitchRow(tRemind, reminderOn) { on ->
-                        reminderOn = on
-                        DailyReminder.set(ctx, on, reminderTime)
-                        if (on) vm.saveProfile(row("reminder_time" to reminderTime))
-                    }
-                }
-                if (reminderOn && rowHit(tr("সময়", "Time"))) {
-                    OutlinedButton(modifier = Modifier.pressScale(), onClick = { showTime = true }) {
-                        Text(tr("সময়: ", "Time: ") + if (AppPrefs.english) reminderTime else bnDigits(reminderTime))
-                    }
-                }
-            }
-        }
-
         if (rowHit(tCategories)) {
             NavRow(tCategories, if (AppPrefs.english) "$catCount" else bnDigits(catCount.toString()) + "টি") { onPage("categories") }
         }
@@ -398,29 +371,6 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
             lockOn = false
             showDisable = false
         }
-    }
-    if (showTime) {
-        val parts = reminderTime.split(":")
-        val timeState = rememberTimePickerState(
-            initialHour = parts.getOrNull(0)?.toIntOrNull() ?: 22,
-            initialMinute = parts.getOrNull(1)?.toIntOrNull() ?: 0,
-            is24Hour = true
-        )
-        AlertDialog(
-            onDismissRequest = { showTime = false },
-            title = { Text(tr("রিমাইন্ডারের সময়", "Reminder time"), fontWeight = FontWeight.Bold) },
-            text = { TimePicker(state = timeState) },
-            confirmButton = {
-                TextButton(modifier = Modifier.pressScale(), onClick = {
-                    val t = "%02d:%02d".format(timeState.hour, timeState.minute)
-                    reminderTime = t
-                    DailyReminder.set(ctx, reminderOn, t)
-                    vm.saveProfile(row("reminder_time" to t))
-                    showTime = false
-                }) { Text(tr("ঠিক আছে", "OK")) }
-            },
-            dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = { showTime = false }) { Text(tr("বাতিল", "Cancel")) } }
-        )
     }
     restorePlan?.let { plan ->
         AlertDialog(
