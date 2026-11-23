@@ -19,6 +19,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.TextField
@@ -387,7 +390,7 @@ fun TxItem(t: JsonObject, state: UiState, onClick: () -> Unit, onLongClick: (() 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit, openReceipt: (JsonObject) -> Unit, onTxLongPress: (JsonObject) -> Unit) {
+fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit, openReceipt: (JsonObject) -> Unit, onTxLongPress: (JsonObject) -> Unit, openTransfer: () -> Unit = {}) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var removing by remember { mutableStateOf(emptySet<String>()) }
@@ -522,6 +525,10 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                             enabled = !busy && filtered.isNotEmpty(),
                             onClick = { moreMenu = false; exportVoucher() }
                         )
+                        DropdownMenuItem(
+                            text = { Text(tr("ট্রান্সফার যোগ করুন", "Add transfer")) },
+                            onClick = { moreMenu = false; openTransfer() }
+                        )
                     }
                 }
             }
@@ -640,8 +647,8 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
 
 /** Add or edit a transaction. Transfers pick two accounts. */
 @Composable
-fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Unit, onSave: (JsonObject, String?) -> Unit) {
-    var type by remember { mutableStateOf(existing?.str("type")?.takeIf { it.isNotEmpty() } ?: "Expense") }
+fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean = false, onDismiss: () -> Unit, onSave: (JsonObject, String?) -> Unit) {
+    var type by remember { mutableStateOf(existing?.str("type")?.takeIf { it.isNotEmpty() } ?: if (transfer) "Transfer" else "Expense") }
     var amount by remember { mutableStateOf(existing?.let { fmtNum(it.num("amount")) } ?: "") }
     var category by remember { mutableStateOf(existing?.str("category")?.takeIf { it.isNotEmpty() } ?: "খাদ্য") }
     var note by remember { mutableStateOf(existing?.str("note") ?: "") }
@@ -649,44 +656,22 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
     var mode by remember { mutableStateOf(existing?.str("payment_mode")?.takeIf { it.isNotEmpty() } ?: "Cash") }
     var mood by remember { mutableStateOf(existing?.str("mood") ?: "") }
     var accountId by remember { mutableStateOf(existing?.accountId() ?: "") }
-    var toAccountId by remember { mutableStateOf(existing?.toAccountId() ?: "") }
     var recurring by remember { mutableStateOf(existing?.bool("is_recurring") == true) }
     var tagsText by remember { mutableStateOf(existing?.strList("tags")?.joinToString(", ") ?: "") }
-    var showCalc by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    // A বাকি-পরিশোধ expense is changed from the বাকি খাতা (delete the payment and add it again), so it cannot drift from the debt.
+    // A বাকি-পরিশোধ expense is changed from the বাকি খাতা, so it cannot drift from the debt.
     val source = existing?.str("source").orEmpty()
     val locked = source == "debt_payment" || source == "personal_debt_payment"
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var reading by remember { mutableStateOf(false) }
-    var captureNote by remember { mutableStateOf<String?>(null) }
     var cameraUri by remember { mutableStateOf<Uri?>(null) }
-    // Photo for this transaction. A new one gets its id now, so the photo can be filed under it before the save.
+    // A new entry gets its id now, so a receipt photo can be filed under it before the save.
     val txId = remember { existing?.id() ?: java.util.UUID.randomUUID().toString() }
-    val attachPath = existing?.str("attachment_url").orEmpty()
+    // The receipt photo taken for a new entry, saved as its attachment.
     var attachBytes by remember { mutableStateOf<ByteArray?>(null) }
-    var attachPreview by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
-    var attachRemoved by remember { mutableStateOf(false) }
-    var attachCamUri by remember { mutableStateOf<Uri?>(null) }
-    fun setAttach(bytes: ByteArray?) {
-        attachBytes = bytes
-        attachPreview = bytes?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
-        attachRemoved = false
-    }
-    val attachGallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) setAttach(AttachmentStore.readImage(ctx, uri))
-    }
-    val attachCamera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        val uri = attachCamUri
-        if (ok && uri != null) setAttach(AttachmentStore.readImage(ctx, uri))
-    }
-    fun launchAttachCamera() {
-        val file = File(File(ctx.cacheDir, "exports").apply { mkdirs() }, "photo-${System.currentTimeMillis()}.jpg")
-        val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
-        attachCamUri = uri
-        attachCamera.launch(uri)
-    }
+
+    fun setAttach(bytes: ByteArray?) { attachBytes = bytes }
 
     // Fills the form from a receipt. Nothing is saved until the user presses সেভ.
     fun applyReceipt(r: ReceiptData) {
@@ -694,7 +679,6 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         r.date?.let { date = it }
         if (note.isBlank()) r.shop?.let { note = it }
         if (type != "Income") r.category?.let { category = it }
-        captureNote = if (r.amount == null) tr("রসিদে মোট টাকা পাওয়া যায়নি, হাতে লিখুন", "No total found on the receipt, enter it by hand") else tr("রসিদ থেকে পড়া হয়েছে। যাচাই করে সেভ করুন।", "Read from receipt. Check and save.")
     }
     fun readReceipt(uri: Uri) {
         reading = true
@@ -720,16 +704,15 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                 type = v.type
                 category = v.category ?: if (v.type == "Income") "অন্যান্য" else category
                 note = v.transcript
-                captureNote = tr("ভয়েস থেকে ভরা হয়েছে। যাচাই করে সেভ করুন।", "Filled from voice. Check and save.")
             }
         }
     }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val uri = cameraUri
-        if (ok && uri != null) readReceipt(uri)
-    }
-    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) readReceipt(uri)
+        if (ok && uri != null) {
+            setAttach(AttachmentStore.readImage(ctx, uri))
+            readReceipt(uri)
+        }
     }
     fun launchVoice() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -749,16 +732,12 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
         cameraUri = uri
         cameraLauncher.launch(uri)
     }
+
     val cats = categoriesFor(type)
     var otherOpen by remember { mutableStateOf(category == OTHER_CAT || category !in cats.map { it.name }) }
     val accounts = state.rows("accounts")
-
-    if (showCalc) {
-        CalculatorDialog(
-            onUse = { amount = fmtNum(it); showCalc = false },
-            onDismiss = { showCalc = false }
-        )
-    }
+    // Payment chips come from the সেটিংস list; an old transaction's method stays visible even if it was deleted later.
+    val modes = CatStore.paymentMethods().let { l -> if (mode.isNotEmpty() && l.none { it.first == mode }) l + (mode to mode) else l }
 
     fun trySave() {
         if (locked) return
@@ -767,9 +746,8 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
             amt == null || amt <= 0 -> error = tr("সঠিক পরিমাণ লিখুন", "Enter a valid amount")
             !isValidIsoDate(date) -> error = tr("তারিখ বাছাই করুন", "Pick a date")
             else -> {
-                // Photo first: it is saved on the device, then the row is saved, and the ViewModel uploads it.
+                // Receipt photo first: it is saved on the device, then the row is saved, and the ViewModel uploads it.
                 attachBytes?.let { AttachmentStore.stage(ctx, txId, it) }
-                if (attachRemoved) AttachmentStore.purge(ctx, txId)
                 val body = row(
                     "type" to type, "amount" to amt, "currency" to state.currency,
                     "category" to if (type == "Transfer") "ট্রান্সফার" else category,
@@ -780,75 +758,93 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                     "is_recurring" to recurring,
                     "tags" to JsonArray(tagsText.split(',', '#').map { it.trim() }.filter { it.isNotEmpty() }.distinct().map { JsonPrimitive(it) })
                 )
-                val withPhoto = if (attachRemoved) JsonObject(body + ("attachment_url" to JsonNull)) else body
-                onSave(if (existing == null) JsonObject(withPhoto + ("id" to JsonPrimitive(txId))) else withPhoto, existing?.id())
-                if (attachRemoved && attachPath.isNotEmpty()) AttachmentStore.queueDelete(ctx, attachPath)
+                onSave(if (existing == null) JsonObject(body + ("id" to JsonPrimitive(txId))) else body, existing?.id())
             }
         }
     }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        var tagInput by remember { mutableStateOf("") }
         Column(
             Modifier.morphIn()
                 .fillMaxWidth(0.94f)
-                .clip(RoundedCornerShape(32.dp))
+                .clip(RoundedCornerShape(28.dp))
                 .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, faint(0.1f), RoundedCornerShape(32.dp))
+                .border(1.dp, faint(0.1f), RoundedCornerShape(28.dp))
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Header
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (existing == null) tr("লেনদেন যোগ করুন", "Add transaction") else tr("লেনদেন সম্পাদনা", "Edit transaction"), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text(
+                    when {
+                        existing != null -> tr("লেনদেন সম্পাদনা", "Edit transaction")
+                        transfer -> tr("ট্রান্সফার যোগ করুন", "Add transfer")
+                        else -> tr("নতুন লেনদেন", "New transaction")
+                    },
+                    fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)
+                )
                 IconButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = tr("বন্ধ করুন", "Close")) }
             }
-            // Segmented toggle: ব্যয় red, আয় green, ট্রান্সফার sky.
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(faint(0.05f)).padding(4.dp)) {
-                listOf(Triple("Expense", "ব্যয় (Expense)", expenseRed), Triple("Income", tr("আয় (Income)", "Income"), incomeGreen), Triple("Transfer", "ট্রান্সফার", Sky500)).forEach { (key, label, c) ->
-                    val on = type == key
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(50))
-                            .background(if (on) c else Color.Transparent)
-                            .clickable { type = key; category = if (key == "Income") "বেতন" else "খাদ্য"; otherOpen = false }
-                            .padding(vertical = 10.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(label, color = if (on) Color.White else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+
+            // Expense / income only. Transfer is added from the ⋮ menu and keeps its own type.
+            if (type != "Transfer") {
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(faint(0.05f)).padding(3.dp)) {
+                    listOf(Triple("Expense", tr("ব্যয়", "Expense"), expenseRed), Triple("Income", tr("আয়", "Income"), incomeGreen)).forEach { (key, label, c) ->
+                        val on = type == key
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(50))
+                                .background(if (on) c else Color.Transparent)
+                                .clickable { type = key; category = if (key == "Income") "বেতন" else "খাদ্য"; otherOpen = false }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(label, color = if (on) Color.White else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
                     }
                 }
             }
-            // Amount with camera / mic / image / calculator, like the reference sheet.
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(AppPrefs.symbol, fontSize = 26.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextField(
+
+            // Amount card: ৳ chip, big amount, and on the right the receipt camera and voice buttons (new entries only).
+            Row(
+                Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(faint(0.05f))
+                    .border(1.dp, faint(0.1f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(Sky500.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) { Text(AppPrefs.symbol, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) }
+                BasicTextField(
                     value = amount,
                     onValueChange = { amount = it },
-                    placeholder = { Text("0.00", fontSize = 30.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                    textStyle = TextStyle(fontSize = 30.sp, fontWeight = FontWeight.Bold),
                     singleLine = true,
+                    textStyle = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface),
+                    cursorBrush = SolidColor(Sky500),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    ),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    decorationBox = { inner ->
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+                            if (amount.isEmpty()) Text("0.00", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            inner()
+                        }
+                    }
                 )
                 if (existing == null) {
                     RoundIcon(Icons.Default.PhotoCamera, tr("রসিদ ক্যামেরা", "Receipt camera")) { launchCamera() }
                     RoundIcon(Icons.Default.Mic, tr("ভয়েস", "Voice")) { launchVoice() }
-                    RoundIcon(Icons.Default.Image, tr("ছবি", "Photo")) { galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
                 }
-                RoundIcon(Icons.Default.Calculate, tr("ক্যালকুলেটর", "Calculator")) { showCalc = true }
             }
             if (reading) Text(tr("রসিদ পড়া হচ্ছে…", "Reading receipt…"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            captureNote?.let { Text(it, fontSize = 12.sp, color = readableOn(Sky400)) }
 
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Category | Date side by side (transfer has only the date).
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
                 if (type != "Transfer") {
                     Column(Modifier.weight(1f)) {
                         Text(if (type == "Income") tr("আয়ের উৎস", "Income source") else tr("ক্যাটাগরি", "Category"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -858,95 +854,69 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                         }
                     }
                 }
-                Column(Modifier.weight(1f)) {
-                    DateField(tr("তারিখ", "Date"), date, { date = it })
-                }
+                DateField(tr("তারিখ", "Date"), date, { date = it }, modifier = Modifier.weight(1f))
             }
             if (otherOpen && type != "Transfer") OtherCategoryField(category) { category = it }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (accounts.isNotEmpty() && type != "Transfer") {
-                    Column(Modifier.weight(1f)) {
-                        Text(tr("অ্যাকাউন্ট", "Account"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        PickerField(accountId, listOf("" to "কোনোটি নয়") + accounts.map { it.id() to it.str("name") }) { accountId = it }
-                    }
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(tr("পেমেন্ট মোড", "Payment mode"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    PickerField(mode, CatStore.paymentMethods()) { mode = it }
-                }
-            }
-            if (type == "Transfer") {
-                Text(
-                    tr("ট্রান্সফার শুধু ধরন ও ট্যাগ: অ্যাকাউন্ট ব্যালেন্স বদলায় না, আয় বা ব্যয়ের হিসাবেও ধরা হয় না।", "Transfer is only a type and tag: it does not change account balances or count as income or expense."),
-                    fontSize = 12.sp,
-                    color = Sky400
-                )
-            }
-            Text(tr("ছবি (ঐচ্ছিক)", "Photo (optional)"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            val pv = attachPreview
-            if (pv != null) {
-                Image(
-                    bitmap = pv.asImageBitmap(),
-                    contentDescription = tr("লেনদেনের ছবি", "Transaction photo"),
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).clip(RoundedCornerShape(16.dp))
-                )
-            } else if (attachPath.isNotEmpty() && !attachRemoved) {
-                AttachmentImage(txId, attachPath, Modifier.heightIn(max = 180.dp))
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(modifier = Modifier.weight(1f), onClick = { attachGallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { Text(tr("গ্যালারি", "Gallery"), maxLines = 1) }
-                OutlinedButton(modifier = Modifier.weight(1f), onClick = { launchAttachCamera() }) { Text(tr("ক্যামেরা", "Camera"), maxLines = 1) }
-                if (pv != null || (attachPath.isNotEmpty() && !attachRemoved)) {
-                    OutlinedButton(modifier = Modifier.weight(1f), onClick = { attachBytes = null; attachPreview = null; attachRemoved = true }) {
-                        Text(tr("ছবি সরান", "Remove"), color = readableOn(Rose500), maxLines = 1)
+
+            // Payment chips in one row, cash by default.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                modes.forEach { (key, label) ->
+                    val on = mode == key
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (on) Sky500 else faint(0.06f))
+                            .clickable { mode = key },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            label,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = if (on) Color.White else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 2.dp)
+                        )
                     }
                 }
             }
-            Text(tr("মুড", "Mood"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (accounts.isNotEmpty() && type != "Transfer") {
+                PickerField(accountId, listOf("" to tr("কোনোটি নয়", "None")) + accounts.map { it.id() to it.str("name") }) { accountId = it }
+            }
+
+            // Mood: four faces in one box.
+            Row(
+                Modifier.fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(faint(0.05f))
+                    .border(1.dp, faint(0.1f), RoundedCornerShape(14.dp))
+            ) {
                 MOODS.forEach { m ->
                     val on = mood == m
                     Box(
                         Modifier
                             .weight(1f)
-                            .height(52.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (on) Sky500.copy(alpha = 0.2f) else faint(0.05f))
-                            .border(1.dp, if (on) Sky500 else faint(0.08f), RoundedCornerShape(16.dp))
+                            .fillMaxHeight()
+                            .background(if (on) Sky500.copy(alpha = 0.22f) else Color.Transparent)
                             .clickable { mood = if (on) "" else m },
                         contentAlignment = Alignment.Center
-                    ) { Text(m, fontSize = 22.sp) }
+                    ) { Text(m, fontSize = 20.sp) }
                 }
             }
-            Text(tr("হ্যাশ ট্যাগ", "Hashtag"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextIn(tr("ট্যাগ লিখুন (যেমন: জরুরি)", "Enter a tag (e.g. urgent)"), tagInput, { tagInput = it }, modifier = Modifier.weight(1f))
-                Box(
-                    Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Sky500)
-                        .clickable {
-                            val t = tagInput.trim().trimStart('#')
-                            if (t.isNotEmpty()) {
-                                tagsText = listOf(tagsText, t).filter { it.isNotBlank() }.joinToString(", ")
-                                tagInput = ""
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) { Icon(Icons.Default.Add, contentDescription = tr("ট্যাগ যোগ করুন", "Add tag"), tint = Color.White) }
-            }
-            val tagList = tagsText.split(',').map { it.trim() }.filter { it.isNotEmpty() }
-            if (tagList.isNotEmpty()) Text(tagList.joinToString("  ") { "#$it" }, fontSize = 12.sp, color = readableOn(Sky400))
-            TextIn(tr("নোট", "Note"), note, { note = it })
+
+            CompactInput(note, { note = it }, tr("নোট", "Note"))
+            CompactInput(tagsText, { tagsText = it }, tr("ট্যাগ (কমা দিয়ে)", "Tags (comma separated)"))
             SwitchRow(tr("প্রতি মাসে পুনরাবৃত্ত", "Repeats monthly"), recurring) { recurring = it }
             error?.let { Text(it, color = readableOn(expenseRed), fontSize = 12.sp) }
-            if (locked) Text(tr("এটি বাকি পরিশোধ থেকে তৈরি। পরিবর্তন করতে বাকি খাতা থেকে এই পরিশোধ মুছে আবার যোগ করুন।", "Created from a credit payment. To change it, delete this payment in the credit ledger and add it again."), fontSize = 12.sp, color = readableOn(Sky400))
+
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(54.dp)
+                    .height(50.dp)
                     .clip(RoundedCornerShape(50))
                     .background(Brush.horizontalGradient(listOf(Sky500, Blue600)))
                     .clickable { if (locked) onDismiss() else trySave() },
@@ -954,6 +924,31 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
             ) { Text(if (locked) tr("বন্ধ করুন", "Close") else tr("সেভ করুন", "Save"), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
         }
     }
+}
+
+/** Single-line field with a 46dp box; text colour follows the active theme. */
+@Composable
+private fun CompactInput(value: String, onChange: (String) -> Unit, placeholder: String) {
+    BasicTextField(
+        value = value,
+        onValueChange = onChange,
+        singleLine = true,
+        textStyle = TextStyle(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface),
+        cursorBrush = SolidColor(Sky500),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(46.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(faint(0.05f))
+            .border(1.dp, faint(0.1f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp),
+        decorationBox = { inner ->
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty()) Text(placeholder, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                inner()
+            }
+        }
+    )
 }
 
 @Composable
@@ -1045,7 +1040,7 @@ private fun PickerField(value: String, options: List<Pair<String, String>>, onPi
                 .background(faint(0.05f))
                 .border(1.dp, faint(0.1f), RoundedCornerShape(16.dp))
                 .clickable { open = true }
-                .padding(horizontal = 14.dp, vertical = 14.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(shown, modifier = Modifier.weight(1f), maxLines = 1)

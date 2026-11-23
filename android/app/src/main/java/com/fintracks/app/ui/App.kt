@@ -339,7 +339,7 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
                 ) { current ->
                     when (current) {
                         "dashboard" -> DashboardScreen(state, vm, openTx, { go("rcpt:${it.id()}") }, { go("act:${it.id()}") }) { go("ov:${it.name}") }
-                        "transactions" -> TransactionsScreen(state, vm, openTx, { go("rcpt:${it.id()}") }, { go("act:${it.id()}") })
+                        "transactions" -> TransactionsScreen(state, vm, openTx, { go("rcpt:${it.id()}") }, { go("act:${it.id()}") }, { txEditor = TxEditor(null, transfer = true) })
                         "shared" -> SharedScreen(state, vm)
                         else -> ToolsScreen { go("ov:${it.name}") }
                     }
@@ -391,6 +391,7 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
         TransactionDialog(
             state = state,
             existing = editor.row,
+            transfer = editor.transfer,
             onDismiss = { txEditor = null },
             onSave = { body, id -> vm.save("transactions", body, id); txEditor = null; onSaved() }
         )
@@ -398,7 +399,7 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
 }
 
 /** Holds the transaction being edited; null row means a new entry. */
-class TxEditor(val row: JsonObject?)
+class TxEditor(val row: JsonObject?, val transfer: Boolean = false)
 
 @Composable
 private fun Header(
