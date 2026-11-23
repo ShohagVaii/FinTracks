@@ -364,6 +364,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = UiState(checking = false, notice = tr("আপনার অ্যাকাউন্ট ও সব ডেটা স্থায়ীভাবে মুছে ফেলা হয়েছে।", "Your account and all data have been permanently deleted."))
     }
 
+    /** Sends the reset email. Returns null when it was sent, otherwise the reason it was not. */
+    suspend fun sendResetEmail(email: String): String? = try {
+        repo.sendPasswordReset(email)
+        null
+    } catch (e: SupabaseException) {
+        tr("রিসেট ইমেইল পাঠানো যায়নি (HTTP ${e.code})", "Could not send the reset email (HTTP ${e.code})")
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        tr("রিসেট ইমেইল পাঠানো যায়নি", "Could not send the reset email")
+    }
+
     /** Login email from Auth (profiles has no email column). Used by Settings and account deletion. */
     suspend fun accountEmail(): String = repo.accountEmail()
     suspend fun accountInfo(): AccountInfo = repo.accountInfo()

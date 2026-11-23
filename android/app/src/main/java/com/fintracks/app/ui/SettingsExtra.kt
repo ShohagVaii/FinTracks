@@ -353,8 +353,10 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
                 OutlinedButton(
                     modifier = Modifier.pressScale(),
                     onClick = {
-                        vm.resetPassword(email)
-                        Toast.makeText(ctx, tr("রিসেট ইমেইল পাঠানো হয়েছে", "Reset email sent"), Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            val err = vm.sendResetEmail(email)
+                            Toast.makeText(ctx, err ?: tr("রিসেট ইমেইল পাঠানো হয়েছে", "Reset email sent"), Toast.LENGTH_LONG).show()
+                        }
                     },
                     enabled = email.isNotBlank()
                 ) { Text(tr("ইমেইল পাঠান", "Send email")) }

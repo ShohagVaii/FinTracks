@@ -34,7 +34,8 @@ fun todayIso(): String = LocalDate.now().toString()
 data class Cat(val name: String, val icon: String)
 val EXPENSE_CATS = listOf(Cat("খাদ্য", "🍔"), Cat("যাতায়াত", "🚗"), Cat("শপিং", "🛍️"), Cat("বিল", "📜"), Cat("অন্যান্য", "📦"))
 val INCOME_CATS = listOf(Cat("বেতন", "💰"), Cat("অন্যান্য", "📦"))
-val ALL_CATS = (EXPENSE_CATS + INCOME_CATS).distinctBy { it.name }
+/** Built-in categories as the user has edited them (renamed, re-iconed or hidden), both types. */
+val ALL_CATS: List<Cat> get() = (CatStore.defaultRows("Expense") + CatStore.defaultRows("Income")).map { Cat(it.name, it.icon) }.distinctBy { it.name }
 /**
  * Default category names are stored in the database in Bengali (the same keys as the web app), so the
  * stored value never changes. Only the text shown on screen follows the language switch.
@@ -50,7 +51,8 @@ fun catLabel(name: String): String = if (AppPrefs.english) DEFAULT_CAT_EN[name] 
 fun catIcon(name: String): String =
     (ALL_CATS + AppPrefs.customCats.map { Cat(it.name, it.icon) }).firstOrNull { it.name == name }?.icon ?: "📦"
 
-val PAYMENT_MODES = listOf("Cash", "Card", "Bkash", "Nagad", "Rocket", "Bank")
+/** Stored payment keys, read from [CatStore] so renamed or deleted methods show up in the pickers. */
+val PAYMENT_MODES: List<String> get() = CatStore.paymentMethods().map { it.first }
 val MOODS = listOf("😊", "😐", "😞", "😡")
 
 /** Parses user input like "১২০০" or "1,200.50". Returns null when it is not a number. */

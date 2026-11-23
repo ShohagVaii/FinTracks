@@ -46,7 +46,7 @@ fun tr(bn: String, en: String): String = if (AppPrefs.english) en else bn
 
 /** Default categories plus the user's own ones for one type (Income / Expense). */
 fun categoriesFor(type: String): List<Cat> {
-    val defaults = if (type == "Income") INCOME_CATS else EXPENSE_CATS
+    val defaults = CatStore.defaultRows(type).map { Cat(it.name, it.icon) }
     val custom = AppPrefs.customCats.filter { it.type == type }.map { Cat(it.name, it.icon) }
     return defaults + custom.filter { c -> defaults.none { it.name == c.name } }
 }

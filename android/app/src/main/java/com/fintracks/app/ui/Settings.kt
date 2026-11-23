@@ -168,12 +168,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
         return
     }
     if (page == "categories") {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
-            AppCard {
-                SectionTitle(tr("ক্যাটাগরি", "Categories"))
-                CategoryManager(state, vm)
-            }
-        }
+        CategoriesPage(state, vm, onBack = onBack)
         return
     }
     val uid = remember { vm.currentUid() }
@@ -201,7 +196,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
     val themeName = if (state.dark) tr("ডার্ক", "Dark") else tr("লাইট", "Light")
     val langName = if (AppPrefs.english) "English" else "বাংলা"
     val currencyText = currencySymbol(state.currency) + " " + state.currency
-    val catCount = (EXPENSE_CATS.map { it.name } + INCOME_CATS.map { it.name } + state.rows("categories").map { it.str("name") }).toSet().size
+    val catCount = (CatStore.defaultRows("Expense").map { it.name } + CatStore.defaultRows("Income").map { it.name } + state.rows("categories").map { it.str("name") }).toSet().size
     val txCount = state.rows("transactions").size
 
     Page {

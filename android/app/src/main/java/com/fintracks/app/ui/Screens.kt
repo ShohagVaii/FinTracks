@@ -558,7 +558,7 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                     Text(tr("ধরন", "Type"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     ChoiceChips(listOf("all" to tr("সব", "All"), "income" to tr("আয়", "Income"), "expense" to tr("ব্যয়", "Expense"), "transfer" to tr("ট্রান্সফার", "Transfer")), filter) { filter = it }
                     Text(tr("পেমেন্ট মাধ্যম", "Payment mode"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    ChoiceChips(listOf("" to tr("সব মাধ্যম", "All modes")) + PAYMENT_MODES.map { it to it }, modeFilter) { modeFilter = it }
+                    ChoiceChips(listOf("" to tr("সব মাধ্যম", "All modes")) + CatStore.paymentMethods(), modeFilter) { modeFilter = it }
                     Text(tr("লেনদেনের উৎস", "Source"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     ChoiceChips(listOf("history" to tr("লেনদেনের ইতিহাস", "History"), "auto" to tr("অটো-লেনদেন", "Auto-created")), segment) { segment = it }
                     if (period == Period.CUSTOM) {
@@ -872,7 +872,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, onDismiss: () -> Un
                 }
                 Column(Modifier.weight(1f)) {
                     Text(tr("পেমেন্ট মোড", "Payment mode"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    PickerField(mode, PAYMENT_MODES.map { it to it }) { mode = it }
+                    PickerField(mode, CatStore.paymentMethods()) { mode = it }
                 }
             }
             if (type == "Transfer") {
