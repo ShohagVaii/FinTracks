@@ -585,9 +585,15 @@ private fun ChangePasswordDialog(email: String, vm: AppViewModel, onDismiss: () 
     )
 }
 
-private data class Faq(val q: String, val qEn: String, val a: String, val aEn: String)
+private data class Faq(val q: String, val qEn: String, val a: String, val aEn: String, val images: List<Int> = emptyList())
 
 private val FAQS = listOf(
+    Faq(
+        "ফুলস্ক্রিন মোড কীভাবে অন/অফ করব?", "How do I turn full-screen mode on or off?",
+        "সেটিংস › চেহারা › ফুলস্ক্রিন মোড সুইচ। অন থাকলে স্ট্যাটাস বার লুকানো থাকে; অফ থাকলে স্ট্যাটাস বার দেখা যায়।",
+        "Settings › Appearance › Full-screen mode switch. On hides the status bar; off shows it.",
+        listOf(com.fintracks.app.R.drawable.faq_fullscreen_on, com.fintracks.app.R.drawable.faq_fullscreen_off)
+    ),
     Faq(
         "টুলসের ক্রম বদলাবো কীভাবে?", "How do I change the order of the tools?",
         "১) টুলস স্ক্রিনে যান। ২) যে টাইলটি সরাতে চান সেটি কিছুক্ষণ চেপে ধরুন। ৩) না ছেড়ে পছন্দের জায়গায় টেনে নিয়ে ছাড়ুন। ৪) নতুন ক্রম নিজে থেকেই এই ফোনে সেভ থাকে, অ্যাপ বন্ধ করলেও।",
@@ -644,6 +650,14 @@ fun FaqPage(onBack: () -> Unit) {
             AppCardPlain {
                 Text(tr(f.q, f.qEn), fontWeight = FontWeight.Bold)
                 Text(tr(f.a, f.aEn), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                f.images.forEach { img ->
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(img),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)),
+                        contentScale = androidx.compose.ui.layout.ContentScale.FillWidth
+                    )
+                }
             }
         }
     }
