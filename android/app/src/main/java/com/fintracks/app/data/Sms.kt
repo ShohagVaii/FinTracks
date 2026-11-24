@@ -1,5 +1,11 @@
 package com.fintracks.app.data
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import com.fintracks.app.ui.LocalOutbox
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -211,16 +217,79 @@ object PendingSmsStore {
     }
 }
 
-/** Receives incoming SMS (permission RECEIVE_SMS). Only parsed transaction-like messages are kept. */
+/** SMS auto-add switch (default on once both SMS permissions are granted) and the TrxIDs already added. */
+object SmsAuto {
+    private const val KEY_ON = "sms_auto"
+    private const val KEY_SEEN = "sms_seen_refs"
+
+    private fun prefs(ctx: Context) = ctx.applicationContext.getSharedPreferences("fintracks", Context.MODE_PRIVATE)
+
+    fun hasPermission(ctx: Context): Boolean =
+        ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
+
+    fun enabled(ctx: Context): Boolean = hasPermission(ctx) && prefs(ctx).getBoolean(KEY_ON, true)
+
+    fun setEnabled(ctx: Context, on: Boolean) {
+        prefs(ctx).edit().putBoolean(KEY_ON, on).apply()
+    }
+
+    fun seen(ctx: Context, ref: String): Boolean = prefs(ctx).getStringSet(KEY_SEEN, emptySet()).orEmpty().contains(ref)
+
+    fun markSeen(ctx: Context, ref: String) {
+        val p = prefs(ctx)
+        val all = p.getStringSet(KEY_SEEN, emptySet()).orEmpty().toList() + ref
+        p.edit().putStringSet(KEY_SEEN, all.takeLast(500).toSet()).apply()
+    }
+}
+
+/**
+ * Receives incoming SMS (RECEIVE_SMS + READ_SMS). Only a confirmed match is added: a known method (not Cash),
+ * a type, an amount and a transaction ID that has not been added before. Anything else is dropped silently.
+ */
 class SmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
+        if (!SmsAuto.enabled(context)) return
         val body = Telephony.Sms.Intents.getMessagesFromIntent(intent)
             ?.joinToString("") { it.messageBody.orEmpty() }
             ?: return
-        val suggestion = SmsParser.parse(body) ?: return
-        PendingSmsStore.add(context, suggestion)
-        Notifier.showSuggestion(context, suggestion)
+        val s = (SmsParser.parseResult(body) as? SmsParseResult.Ok)?.suggestion ?: return
+        val ref = s.ref ?: return
+        if (s.provider == "Cash" || SmsAuto.seen(context, ref)) return
+        val pending = goAsync()
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                addTransaction(context, s)
+                SmsAuto.markSeen(context, ref)
+                Notifier.showAdded(context, s)
+            } catch (e: Exception) {
+                // Not added: the TrxID is not marked, so a later copy of this SMS can still be added.
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    /** Queues the insert in the offline outbox (the same path as the app's own save), then sends it. */
+    private suspend fun addTransaction(ctx: Context, s: SmsSuggestion) {
+        val repo = Repository(ctx)
+        val outbox = LocalOutbox(ctx, repo)
+        val id = java.util.UUID.randomUUID().toString()
+        val body = row(
+            "id" to id,
+            "type" to s.type,
+            "amount" to s.amount,
+            "currency" to "BDT",
+            "category" to "অন্যান্য",
+            "note" to s.note,
+            "tx_date" to s.date.ifEmpty { java.time.LocalDate.now().toString() },
+            "payment_mode" to s.provider,
+            "is_recurring" to false,
+            "tags" to JsonArray(emptyList())
+        )
+        outbox.enqueue(listOf(LocalOutbox.op("insert", "transactions", id, body, body)))
+        outbox.flush()
     }
 }
 
@@ -251,5 +320,28 @@ object Notifier {
             .setAutoCancel(true)
             .build()
         nm.notify(s.id.hashCode(), notification)
+    }
+
+    /** Shown after an SMS transaction was added automatically. */
+    fun showAdded(ctx: Context, s: SmsSuggestion) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return
+        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= 26) {
+            nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, "SMS সাজেশন", NotificationManager.IMPORTANCE_DEFAULT))
+        }
+        val launch = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName) ?: return
+        val pending = PendingIntent.getActivity(ctx, 0, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val kind = if (s.type == "Income") "আয়" else "ব্যয়"
+        val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
+            .setSmallIcon(NotifyStyle.SMALL)
+            .setLargeIcon(NotifyStyle.large(ctx))
+            .setContentTitle("SMS থেকে লেনদেন যোগ হয়েছে")
+            .setContentText("${s.provider} · ${"%,.2f".format(s.amount)} টাকা ($kind)")
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .build()
+        nm.notify((s.ref ?: s.id).hashCode(), notification)
     }
 }

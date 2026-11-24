@@ -1,5 +1,7 @@
 package com.fintracks.app.ui
 
+import android.Manifest
+import com.fintracks.app.data.SmsAuto
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.draw.rotate
 import androidx.compose.material.icons.filled.Search
@@ -241,6 +243,9 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
                 }
                 if (rowHit(tFull)) {
                     SwitchRow(tFull, Immersive.on) { Immersive.set(ctx, it) }
+                }
+                if (rowHit(tr("SMS থেকে অটো লেনদেন", "Auto transactions from SMS"))) {
+                    SmsAutoRow(ctx)
                 }
             }
         }
@@ -808,4 +813,38 @@ fun DeleteAccountDialog(email: String, onDismiss: () -> Unit, onConfirm: (String
         },
         dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
+}
+
+/** SMS auto-add switch. Turning it on asks for the SMS permissions after a short consent dialog. */
+@Composable
+private fun SmsAutoRow(ctx: Context) {
+    var on by remember { mutableStateOf(SmsAuto.enabled(ctx)) }
+    var consent by remember { mutableStateOf(false) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { res ->
+        val granted = res.values.all { it }
+        SmsAuto.setEnabled(ctx, granted)
+        on = granted
+    }
+    if (consent) {
+        AlertDialog(
+            onDismissRequest = { consent = false },
+            title = { Text(tr("SMS অনুমতি", "SMS permission")) },
+            text = {
+                Text(tr(
+                    "bKash, Nagad, Rocket ও ব্যাংকের লেনদেনের SMS পড়ে লেনদেন যোগ করতে এই অনুমতি লাগে। SMS শুধু আপনার ফোনে পড়া হয়, কোথাও পাঠানো হয় না।",
+                    "This lets FinTrack read bKash, Nagad, Rocket and bank transaction SMS to add transactions. SMS is read on your phone only and is never sent anywhere."
+                ))
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    consent = false
+                    launcher.launch(arrayOf(Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_SMS))
+                }) { Text(tr("অনুমতি দিন", "Allow")) }
+            },
+            dismissButton = { TextButton(onClick = { consent = false }) { Text(tr("না", "No")) } }
+        )
+    }
+    SwitchRow(tr("SMS থেকে অটো লেনদেন", "Auto transactions from SMS"), on) { checked ->
+        if (checked) consent = true else { SmsAuto.setEnabled(ctx, false); on = false }
+    }
 }
