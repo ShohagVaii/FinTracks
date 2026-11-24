@@ -12,6 +12,10 @@ import androidx.compose.foundation.layout.offset
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.shape.CircleShape
@@ -99,9 +103,9 @@ class Celebrate(val kind: Int)
 @Composable
 fun FinTracksApp(vm: AppViewModel = viewModel()) {
     UpdateHost()
-    // Full-screen mode for the whole app, including the PIN lock screen.
-    ImmersiveEffect()
     val state by vm.state.collectAsState()
+    // Full-screen mode for the whole app, including the PIN lock screen. Status icons follow the app theme.
+    ImmersiveEffect(dark = state.dark)
     val locked by AppLock.locked.collectAsState()
     val ctx = LocalContext.current
     // 1 = sign-in or Google, 2 = sign-up. Set when the user submits; read when the request finishes.
@@ -298,8 +302,10 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
         }
     }
 
+    // The status bar height is added by the header (topInsetPadding) only. The Scaffold must not add it again.
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             if (overlay == null) BottomBar(selected = tab, onSelect = { go("tab:$it") }, onAdd = { openTx(null) })

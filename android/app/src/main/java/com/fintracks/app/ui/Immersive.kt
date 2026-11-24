@@ -45,7 +45,7 @@ object Immersive {
 
 /** Applies [Immersive.on] to the window. Runs after each composition, so the toggle takes effect at once. */
 @Composable
-fun ImmersiveEffect() {
+fun ImmersiveEffect(dark: Boolean) {
     val view = LocalView.current
     val context = LocalContext.current
     val on = Immersive.on
@@ -53,6 +53,9 @@ fun ImmersiveEffect() {
         val activity = context as? Activity ?: return@SideEffect
         val controller = WindowCompat.getInsetsController(activity.window, view)
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        // Light theme: dark status and navigation icons. Dark theme: light icons.
+        controller.isAppearanceLightStatusBars = !dark
+        controller.isAppearanceLightNavigationBars = !dark
         if (on) controller.hide(WindowInsetsCompat.Type.statusBars())
         else controller.show(WindowInsetsCompat.Type.statusBars())
     }
