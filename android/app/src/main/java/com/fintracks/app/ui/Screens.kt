@@ -1,5 +1,20 @@
 package com.fintracks.app.ui
 
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Notes
+import androidx.compose.material.icons.filled.Sell
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.shadow
+import androidx.compose.material3.Switch
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -790,19 +805,25 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
 
             // Expense / income only. Transfer is added from the ⋮ menu and keeps its own type.
             if (type != "Transfer") {
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(faint(0.05f)).padding(3.dp)) {
-                    listOf(Triple("Expense", tr("ব্যয়", "Expense"), expenseRed), Triple("Income", tr("আয়", "Income"), incomeGreen)).forEach { (key, label, c) ->
-                        val on = type == key
-                        Box(
-                            Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(50))
-                                .background(if (on) c else Color.Transparent)
-                                .clickable { type = key; category = if (key == "Income") "বেতন" else "খাদ্য"; otherOpen = false }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(label, color = if (on) Color.White else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                BoxWithConstraints(Modifier.fillMaxWidth().clip(RoundedCornerShape(FIELD_RADIUS)).background(faint(0.05f)).padding(3.dp)) {
+                    val half = maxWidth / 2
+                    // The indicator slides to the chosen side and takes its colour.
+                    val slide by animateDpAsState(if (type == "Income") half else 0.dp, tween(260), label = "segSlide")
+                    val tint by animateColorAsState(if (type == "Income") incomeGreen else expenseRed, tween(260), label = "segTint")
+                    Box(Modifier.offset(x = slide).width(half).height(36.dp).shadow(2.dp, RoundedCornerShape(FIELD_RADIUS - 3.dp)).clip(RoundedCornerShape(FIELD_RADIUS - 3.dp)).background(tint))
+                    Row(Modifier.fillMaxWidth()) {
+                        listOf(Triple("Expense", tr("ব্যয়", "Expense"), expenseRed), Triple("Income", tr("আয়", "Income"), incomeGreen)).forEach { (key, label, _) ->
+                            val on = type == key
+                            Box(
+                                Modifier
+                                    .weight(1f)
+                                    .height(36.dp)
+                                    .clip(RoundedCornerShape(FIELD_RADIUS - 3.dp))
+                                    .clickable { type = key; category = if (key == "Income") "বেতন" else "খাদ্য"; otherOpen = false },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(label, color = if (on) Color.White else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
                         }
                     }
                 }
@@ -811,9 +832,10 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
             // Amount card: ৳ chip, big amount, and on the right the receipt camera and voice buttons (new entries only).
             Row(
                 Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(faint(0.05f))
-                    .border(1.dp, faint(0.1f), RoundedCornerShape(20.dp))
+                    .shadow(3.dp, RoundedCornerShape(FIELD_RADIUS))
+                    .clip(RoundedCornerShape(FIELD_RADIUS))
+                    .background(Brush.horizontalGradient(listOf(Sky500.copy(alpha = 0.16f), Blue600.copy(alpha = 0.06f))))
+                    .border(1.dp, faint(0.1f), RoundedCornerShape(FIELD_RADIUS))
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -848,44 +870,48 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
                 if (type != "Transfer") {
                     Column(Modifier.weight(1f)) {
-                        Text(if (type == "Income") tr("আয়ের উৎস", "Income source") else tr("ক্যাটাগরি", "Category"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        FieldLabel(Icons.Default.Category, if (type == "Income") tr("আয়ের উৎস", "Income source") else tr("ক্যাটাগরি", "Category"))
                         PickerField(category, cats.map { it.name to "${it.icon} ${catLabel(it.name)}" }) { pick ->
                             otherOpen = pick == OTHER_CAT
                             category = pick
                         }
                     }
                 }
-                DateField(tr("তারিখ", "Date"), date, { date = it }, modifier = Modifier.weight(1f))
+                DateField(tr("তারিখ", "Date"), date, { date = it }, icon = Icons.Default.CalendarMonth, modifier = Modifier.weight(1f))
             }
             if (otherOpen && type != "Transfer") OtherCategoryField(category) { category = it }
 
-            // Payment chips in one row, cash by default.
+            // Payment chips in one row, cash by default. Each chip carries its method's icon.
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 modes.forEach { (key, label) ->
                     val on = mode == key
-                    Box(
+                    Row(
                         Modifier
                             .weight(1f)
                             .height(34.dp)
-                            .clip(RoundedCornerShape(50))
+                            .clip(RoundedCornerShape(FIELD_RADIUS))
                             .background(if (on) Sky500 else faint(0.06f))
-                            .clickable { mode = key },
-                        contentAlignment = Alignment.Center
+                            .clickable { mode = key }
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
                     ) {
+                        Icon(payIcon(key), contentDescription = null, modifier = Modifier.size(13.dp), tint = if (on) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.width(3.dp))
                         Text(
                             label,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             color = if (on) Color.White else MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(horizontal = 2.dp)
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                     }
                 }
             }
             if (accounts.isNotEmpty() && type != "Transfer") {
-                PickerField(accountId, listOf("" to tr("কোনোটি নয়", "None")) + accounts.map { it.id() to it.str("name") }) { accountId = it }
+                PickerField(accountId, listOf("" to tr("কোনোটি নয়", "None")) + accounts.map { it.id() to it.str("name") }, icon = Icons.Default.AccountBalanceWallet) { accountId = it }
             }
 
             // Mood: four faces in one box.
@@ -909,15 +935,22 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
                 }
             }
 
-            CompactInput(note, { note = it }, tr("নোট", "Note"))
-            CompactInput(tagsText, { tagsText = it }, tr("ট্যাগ (কমা দিয়ে)", "Tags (comma separated)"))
-            SwitchRow(tr("প্রতি মাসে পুনরাবৃত্ত", "Repeats monthly"), recurring) { recurring = it }
+            CompactInput(note, { note = it }, tr("নোট", "Note"), Icons.Default.Notes)
+            CompactInput(tagsText, { tagsText = it }, tr("ট্যাগ (কমা দিয়ে)", "Tags (comma separated)"), Icons.Default.Sell)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(tr("প্রতি মাসে পুনরাবৃত্ত", "Repeats monthly"))
+                }
+                Switch(checked = recurring, onCheckedChange = { recurring = it })
+            }
             error?.let { Text(it, color = readableOn(expenseRed), fontSize = 12.sp) }
 
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(50.dp)
+                    .shadow(6.dp, RoundedCornerShape(50))
                     .clip(RoundedCornerShape(50))
                     .background(Brush.horizontalGradient(listOf(Sky500, Blue600)))
                     .clickable { if (locked) onDismiss() else trySave() },
@@ -927,9 +960,29 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
     }
 }
 
+/** Shared corner radius for every input field, chip and the amount card. */
+internal val FIELD_RADIUS = 14.dp
+
+/** Field caption with a small leading icon. */
+@Composable
+internal fun FieldLabel(icon: ImageVector?, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        icon?.let { Icon(it, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+        Text(text, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Icon for a payment method: wallets share the phone icon, cash/card/bank have their own. */
+private fun payIcon(key: String): ImageVector = when (key) {
+    "Card" -> Icons.Default.CreditCard
+    "Bank" -> Icons.Default.AccountBalance
+    "Bkash", "Nagad", "Rocket" -> Icons.Default.PhoneAndroid
+    else -> Icons.Default.Payments
+}
+
 /** Single-line field with a 46dp box; text colour follows the active theme. */
 @Composable
-private fun CompactInput(value: String, onChange: (String) -> Unit, placeholder: String) {
+private fun CompactInput(value: String, onChange: (String) -> Unit, placeholder: String, icon: ImageVector? = null) {
     BasicTextField(
         value = value,
         onValueChange = onChange,
@@ -939,14 +992,21 @@ private fun CompactInput(value: String, onChange: (String) -> Unit, placeholder:
         modifier = Modifier
             .fillMaxWidth()
             .height(46.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .shadow(2.dp, RoundedCornerShape(FIELD_RADIUS))
+            .clip(RoundedCornerShape(FIELD_RADIUS))
             .background(faint(0.05f))
-            .border(1.dp, faint(0.1f), RoundedCornerShape(14.dp))
+            .border(1.dp, faint(0.1f), RoundedCornerShape(FIELD_RADIUS))
             .padding(horizontal = 14.dp),
         decorationBox = { inner ->
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
-                if (value.isEmpty()) Text(placeholder, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                inner()
+            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                icon?.let {
+                    Icon(it, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(10.dp))
+                }
+                Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.CenterStart) {
+                    if (value.isEmpty()) Text(placeholder, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    inner()
+                }
             }
         }
     )
@@ -1030,20 +1090,25 @@ private fun RoundIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, des
 
 /** Dropdown-style picker used in the transaction sheet. */
 @Composable
-private fun PickerField(value: String, options: List<Pair<String, String>>, onPick: (String) -> Unit) {
+private fun PickerField(value: String, options: List<Pair<String, String>>, icon: ImageVector? = null, onPick: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val shown = options.firstOrNull { it.first == value }?.second ?: tr("বাছাই করুন", "Choose")
     Box {
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .shadow(2.dp, RoundedCornerShape(FIELD_RADIUS))
+                .clip(RoundedCornerShape(FIELD_RADIUS))
                 .background(faint(0.05f))
-                .border(1.dp, faint(0.1f), RoundedCornerShape(16.dp))
+                .border(1.dp, faint(0.1f), RoundedCornerShape(FIELD_RADIUS))
                 .clickable { open = true }
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            icon?.let {
+                Icon(it, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(8.dp))
+            }
             Text(shown, modifier = Modifier.weight(1f), maxLines = 1)
             Icon(Icons.Default.ArrowDropDown, contentDescription = null)
         }

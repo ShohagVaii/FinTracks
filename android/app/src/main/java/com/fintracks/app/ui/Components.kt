@@ -1,5 +1,7 @@
 package com.fintracks.app.ui
 
+import androidx.compose.material.icons.filled.Label
+import androidx.compose.material3.Icon
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -494,6 +496,7 @@ fun OtherCategoryField(value: String, onChange: (String) -> Unit) {
             onChange(text.trim().ifEmpty { OTHER_CAT })
         },
         label = { Text(tr("অন্যান্য: নিজের খাতের নাম (ঐচ্ছিক)", "Other: your own category name (optional)")) },
+        leadingIcon = { Icon(Icons.Default.Label, contentDescription = null) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
     )

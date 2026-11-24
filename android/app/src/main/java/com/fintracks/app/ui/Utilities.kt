@@ -1,5 +1,6 @@
 package com.fintracks.app.ui
 
+import androidx.compose.ui.graphics.vector.ImageVector
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -201,13 +202,13 @@ fun AgeCalcScreen() {
 /** Date field: shows the date in the chosen format and opens the calendar. Nothing is typed. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DateField(label: String, iso: String, onChange: (String) -> Unit, optional: Boolean = false, modifier: Modifier = Modifier.fillMaxWidth()) {
+fun DateField(label: String, iso: String, onChange: (String) -> Unit, optional: Boolean = false, icon: ImageVector? = null, modifier: Modifier = Modifier.fillMaxWidth()) {
     var open by remember { mutableStateOf(false) }
     val parsed = runCatching { LocalDate.parse(iso.trim().take(10)) }.getOrNull()
     Column(modifier) {
-        Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        FieldLabel(icon, label)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = { open = true }, modifier = Modifier.weight(1f)) {
+            OutlinedButton(onClick = { open = true }, shape = RoundedCornerShape(FIELD_RADIUS), modifier = Modifier.weight(1f)) {
                 Text(parsed?.let { displayDate(it.toString()) } ?: tr("তারিখ বাছাই করুন", "Pick a date"))
             }
             if (optional && parsed != null) TextButton(modifier = Modifier.pressScale(), onClick = { onChange("") }) { Text(tr("মুছুন", "Clear")) }
