@@ -1,5 +1,8 @@
 package com.fintracks.app.ui
 
+import com.fintracks.app.R
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
@@ -830,64 +833,51 @@ private suspend fun googleIdToken(context: Context): String {
 
 
 /**
- * Splash: the logo draws in, a gold coin sparkles beside it, then the app fades to the next screen.
+ * Splash: the final logo asset fades and scales in once. Nothing moves inside the mark, so the arrow stays on the F diagonal.
  * Tapping it skips the wait, so it never holds the screen.
  */
+private val splashSky = Color(0xFF39C7E0)
+
 @Composable
 fun SplashScreen(onSkip: () -> Unit) {
     val reduce = rememberReduceMotion()
-    val draw = remember { Animatable(if (reduce) 1f else 0f) }
-    val coin = remember { Animatable(if (reduce) 1f else 0f) }
+    val show = remember { Animatable(if (reduce) 1f else 0f) }
     LaunchedEffect(Unit) {
-        if (!reduce) {
-            draw.animateTo(1f, tween(600, easing = FastOutSlowInEasing))
-            coin.animateTo(1f, tween(400, easing = FastOutSlowInEasing))
-        }
+        if (!reduce) show.animateTo(1f, tween(600, easing = FastOutSlowInEasing))
     }
     Box(
         Modifier.fillMaxSize().background(auBg()).clickable(onClick = onSkip),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(120.dp), contentAlignment = Alignment.Center) {
-                AuLogoMark(
-                    Modifier
-                        .size(84.dp)
-                        .graphicsLayer {
-                            alpha = draw.value
-                            val k = 0.7f + 0.3f * draw.value
-                            scaleX = k
-                            scaleY = k
-                        }
-                )
-                Canvas(Modifier.size(120.dp)) {
-                    val s = size.minDimension
-                    val c = Offset(s * 0.84f, s * 0.18f)
-                    // Transient sparkle only: rays pulse once while the coin lands, then vanish (the still logo has none).
-                    val k = coin.value
-                    val pulse = (k * (1f - k) * 4f).coerceIn(0f, 1f)
-                    val len = s * 0.14f * pulse
-                    listOf(Offset(len, 0f), Offset(-len, 0f), Offset(0f, len), Offset(0f, -len)).forEach { d ->
-                        drawLine(Color.White.copy(alpha = pulse), c, Offset(c.x + d.x, c.y + d.y), strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
+            Image(
+                painter = painterResource(R.drawable.notif_large_logo),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(120.dp)
+                    .graphicsLayer {
+                        alpha = show.value
+                        val k = 0.85f + 0.15f * show.value
+                        scaleX = k
+                        scaleY = k
                     }
-                }
-            }
+            )
             Spacer(Modifier.height(12.dp))
             Text(
                 buildAnnotatedString {
-                    withStyle(SpanStyle(color = auSkyA)) { append("Fin") }
+                    withStyle(SpanStyle(color = splashSky)) { append("Fin") }
                     withStyle(SpanStyle(color = Color.White)) { append("Track") }
                 },
                 fontSize = 34.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.graphicsLayer { alpha = draw.value }
+                modifier = Modifier.graphicsLayer { alpha = show.value }
             )
             Text(
                 "PREMIUM FINANCE",
                 color = auMuted,
                 fontSize = 11.sp,
                 letterSpacing = 4.sp,
-                modifier = Modifier.graphicsLayer { alpha = draw.value }
+                modifier = Modifier.graphicsLayer { alpha = show.value }
             )
         }
     }
