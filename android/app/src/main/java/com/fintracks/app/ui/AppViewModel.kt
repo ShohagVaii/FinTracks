@@ -336,6 +336,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         try {
             repo.sendPasswordReset(email)
         } catch (e: SupabaseException) {
+            if (e.code == 429) {
+                // Cooldown: say how long to wait, in Bangla or English, instead of the raw server error.
+                val secs = Regex("\"retry_after_seconds\"\\s*:\\s*(\\d+)").find(e.body)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+                val h = secs / 3600
+                val m = (secs % 3600 + 59) / 60
+                _state.update {
+                    it.copy(message = tr(
+                        "এই ইমেইলে প্রতি ৫ ঘণ্টায় একবার রিসেট মেইল যায়। ${bnDigits("$h")} ঘণ্টা ${bnDigits("$m")} মিনিট পরে আবার চেষ্টা করুন।",
+                        "A reset mail can be sent once every 5 hours. Try again in ${h}h ${m}m."
+                    ))
+                }
+                return@act
+            }
             // Show the real failure (HTTP code and server reason), never the success notice.
             _state.update {
                 it.copy(message = tr("পাসওয়ার্ড রিসেট মেইল পাঠানো যায়নি (HTTP ${e.code}): ", "Could not send the reset email (HTTP ${e.code}): ") + e.message.orEmpty())

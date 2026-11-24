@@ -132,12 +132,12 @@ class SupabaseApi {
         return if ("access_token" in obj) codec.decodeFromString(Session.serializer(), text) else null
     }
 
-    /** Asks Supabase to email a password-reset link. */
+    /**
+     * Asks the server to email a password-reset link. The Edge Function checks the last send time on the server
+     * and allows one mail per email every 5 hours; a blocked request comes back as HTTP 429 with retry_after_seconds.
+     */
     suspend fun recover(email: String) {
-        // GoTrue reads the return address from the redirect_to query parameter (a body field is ignored).
-        // The link then opens the reset page, not the landing page.
-        val redirect = java.net.URLEncoder.encode(PASSWORD_RESET_URL, "UTF-8")
-        call("POST", "/auth/v1/recover?redirect_to=$redirect", buildJsonObject { put("email", email) })
+        call("POST", "/functions/v1/request-password-reset", buildJsonObject { put("email", email) })
     }
 
     suspend fun signIn(email: String, password: String): Session {
