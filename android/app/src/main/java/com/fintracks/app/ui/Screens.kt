@@ -284,6 +284,7 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
             StatPill(tr("মোট ব্যয়", "Total expense"), taka(expense, p), expenseTone(), Modifier.weight(1f), countTo = expense, countFmt = { taka(it, p) })
         }
         }
+        Box(Modifier.staggerIn(6)) { TodayStrip(txs, p) }
         Box(Modifier.staggerIn(1)) { CreditDueCard(state) { openOverlay(Overlay.CREDIT) } }
         // Heatmap follows the timeline month; its ‹ › buttons move the timeline too (one shared state).
         val heatMonth = heatmapMonthOf(span, offset, period)
