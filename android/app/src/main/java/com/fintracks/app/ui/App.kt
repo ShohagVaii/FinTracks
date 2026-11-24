@@ -92,7 +92,7 @@ enum class Overlay(private val bnTitle: String, private val enTitle: String) {
     CHAT("AI সহকারী", "AI assistant"), LOAN("লোন / EMI", "Loan / EMI"), CREDIT("বাকি খাতা", "Credit ledger"), DEBTS("ধার ও পাওনা", "Debts & dues"),
     BUDGETS("বাজেট এনভেলপ", "Budget envelopes"), GOALS("সঞ্চয় লক্ষ্য", "Savings goals"), INVESTMENTS("ইনভেস্টমেন্ট", "Investments"),
     SUBSCRIPTIONS("সাবস্ক্রিপশন", "Subscriptions"), ACCOUNTS("অ্যাকাউন্ট ও ট্রান্সফার", "Accounts & transfers"), REPORTS("পরিসংখ্যান ও রিপোর্ট", "Statistics & reports"), SETTINGS("সেটিংস", "Settings"),
-    COUNTER("টাকা গণক", "Money counter"), AGE("বয়স ক্যালকুলেটর", "Age calculator"), NOTES("নোটপ্যাড", "Notepad"), INBOX("ইনবক্স", "Inbox"), DATA("ডাটা ব্যবহার", "Data usage"), MATH("অংক কথায়", "Math words");
+    COUNTER("টাকা গণক", "Money counter"), AGE("বয়স ক্যালকুলেটর", "Age calculator"), NOTES("নোটপ্যাড", "Notepad"), INBOX("ইনবক্স", "Inbox"), DATA("ডাটা ব্যবহার", "Data usage"), MATH("অংক কথায়", "Math words"), EXPORT("এক্সপোর্ট সেন্টার", "Export center");
 
     val title: String get() = tr(bnTitle, enTitle)
 }
@@ -529,6 +529,7 @@ private fun OverlayContent(
         Overlay.TRASH -> TrashScreen(state, vm)
         Overlay.DATA -> DataUsageScreen()
         Overlay.MATH -> MathToolsScreen()
+        Overlay.EXPORT -> ExportCenterScreen(state)
         Overlay.INBOX -> Unit // shown by InboxScreen in MainScaffold
     }
 }

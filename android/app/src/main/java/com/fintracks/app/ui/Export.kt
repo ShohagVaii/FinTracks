@@ -7,6 +7,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import org.json.JSONArray
+import org.json.JSONObject
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
@@ -30,7 +32,8 @@ object Export {
     enum class Format(val ext: String, val mime: String) {
         CSV("csv", "text/csv"),
         XLSX("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-        PDF("pdf", "application/pdf")
+        PDF("pdf", "application/pdf"),
+        JSON("json", "application/json")
     }
 
     private fun header(): List<String> = listOf(tr("তারিখ", "Date"), tr("ধরন", "Type"), tr("ক্যাটাগরি", "Category"), tr("পরিমাণ (৳)", "Amount (৳)"), tr("পেমেন্ট মাধ্যম", "Payment mode"), tr("অ্যাকাউন্ট", "Account"), tr("নোট", "Note"))
@@ -68,6 +71,7 @@ object Export {
             Format.CSV -> writeCsv(file, listOf(header() as List<Any>) + data)
             Format.XLSX -> writeXlsx(file, listOf(header() as List<Any>) + data)
             Format.PDF -> writeListPdf(ctx, file, title, txs, state)
+            Format.JSON -> writeJson(file, state, txs)
         }
         return file
     }
@@ -86,6 +90,18 @@ object Export {
     }
 
     // ---------------- CSV ----------------
+
+    /** Array of objects keyed by the same column names as CSV/Excel. */
+    private fun writeJson(file: File, state: UiState, txs: List<JsonObject>) {
+        val keys = header()
+        val arr = JSONArray()
+        rows(state, txs).forEach { row ->
+            val o = JSONObject()
+            keys.forEachIndexed { i, k -> o.put(k, row.getOrNull(i) ?: "") }
+            arr.put(o)
+        }
+        file.writeText(arr.toString(2), Charsets.UTF_8)
+    }
 
     private fun writeCsv(file: File, table: List<List<Any>>) {
         val text = buildString {
@@ -153,7 +169,7 @@ object Export {
 
     fun font(ctx: Context, bold: Boolean): Typeface = fontCache.getOrPut(bold) {
         runCatching {
-            Typeface.createFromAsset(ctx.applicationContext.assets, if (bold) "fonts/NotoSansBengali-Bold.ttf" else "fonts/NotoSansBengali-Regular.ttf")
+            Typeface.createFromAsset(ctx.applicationContext.assets, if (bold) "fonts/HindSiliguri-Bold.ttf" else "fonts/HindSiliguri-Regular.ttf")
         }.getOrDefault(Typeface.DEFAULT)
     }
 
