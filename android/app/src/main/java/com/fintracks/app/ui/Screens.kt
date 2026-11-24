@@ -65,6 +65,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.saveable.rememberSaveable
+import com.fintracks.app.data.SmsParseResult
 import com.fintracks.app.data.SmsParser
 import com.fintracks.app.data.SmsSuggestion
 import androidx.compose.ui.graphics.Brush
@@ -1137,7 +1138,7 @@ fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
             Modifier
                 .fillMaxWidth(0.94f)
                 .clip(RoundedCornerShape(32.dp))
-                .background(Tok_FF0B1220)
+                .background(MaterialTheme.colorScheme.surface)
                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(32.dp))
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -1156,9 +1157,13 @@ fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
             )
             Button(
                 onClick = {
-                    val parsed = SmsParser.parse(text)
-                    result = parsed
-                    message = if (parsed == null) tr("এই SMS থেকে লেনদেন বোঝা যায়নি", "Couldn't read a transaction from this SMS") else null
+                    when (val r = SmsParser.parseResult(text)) {
+                        is SmsParseResult.Ok -> { result = r.suggestion; message = null }
+                        is SmsParseResult.Fail -> {
+                            result = null
+                            message = tr("এই SMS-এ পাওয়া যায়নি: ", "Not found in this SMS: ") + r.missing.joinToString(", ") { tr(it.bn, it.en) }
+                        }
+                    }
                 },
                 enabled = text.isNotBlank(),
                 modifier = Modifier.fillMaxWidth()
@@ -1171,6 +1176,12 @@ fun SmsParserDialog(state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
                         fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(s.note, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val extra = listOfNotNull(
+                        s.ref?.let { "ID: ${it.substringBefore('|')}" },
+                        s.balance?.let { tr("ব্যালেন্স: ", "Balance: ") + taka(it, state.privacy) },
+                        s.time.takeIf { it.isNotEmpty() }?.let { tr("সময়: ", "Time: ") + it }
+                    ).joinToString(" · ")
+                    if (extra.isNotEmpty()) Text(extra, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Button(modifier = Modifier.pressScale(), onClick = {
                         vm.save("transactions", row(
                             "type" to s.type,

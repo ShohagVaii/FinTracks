@@ -22,6 +22,17 @@ import kotlinx.serialization.json.Json
  * Steps: Bengali digits become ASCII; the amount is the first currency-marked number that is not a
  * balance, fee or charge; the type is the earliest income or expense word; the date is read from the text.
  */
+/** A field the parser could not find in an SMS. */
+enum class SmsPart(val bn: String, val en: String) {
+    PROVIDER("মাধ্যম", "Method"), TYPE("ধরন", "Type"), AMOUNT("পরিমাণ", "Amount"), REF("আইডি", "ID")
+}
+
+/** Either a readable transaction, or the list of parts that were not found. */
+sealed class SmsParseResult {
+    data class Ok(val suggestion: SmsSuggestion) : SmsParseResult()
+    data class Fail(val missing: List<SmsPart>) : SmsParseResult()
+}
+
 object SmsParser {
     private const val BN_DIGITS = "০১২৩৪৫৬৭৮৯"
     private const val CURRENCY = "(?:tk|taka|bdt|৳|টাকা)"
@@ -39,6 +50,11 @@ object SmsParser {
     )
     private val months = listOf("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
     private val isoDate = Regex("""(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})""")
+    private val balanceRe = Regex("""(?i)balance(?:\s+is)?\s*:?\s*(?:$CURRENCY\.?\s*)?([0-9][0-9,]*(?:\.[0-9]{1,2})?)""")
+    // TrxID (bKash), TxnID (Nagad) and Txn ID (Rocket) all share this shape.
+    private val refRe = Regex("""(?i)(?:trx|txn)\s*id\s*:?\s*([A-Z0-9]{4,15})""")
+    private val bankAc = Regex("""(?i)a/c\s*\**\s*(\d{3,6})""")
+    private val timeRe = Regex("""(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?""")
     private val numDate = Regex("""(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})""")
     private val wordDate = Regex("""(?i)(\d{1,2})[- ]?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[- ,]?(\d{2,4})""")
 
@@ -50,28 +66,78 @@ object SmsParser {
         }
     }
 
-    fun parse(body: String): SmsSuggestion? {
-        val text = normalizeDigits(body.trim())
-        if (text.isEmpty()) return null
-        val amount = findAmount(text) ?: return null
-        val type = findType(text.lowercase()) ?: return null
+    /** The transaction, or null when the SMS is not a readable transaction. */
+    fun parse(body: String): SmsSuggestion? = (parseResult(body) as? SmsParseResult.Ok)?.suggestion
+
+    /** Full parse with the reason when it fails: which of method, type, amount or ID was not found. */
+    fun parseResult(body: String): SmsParseResult {
+        val raw = body.trim()
+        val text = normalizeDigits(raw)
+        val amount = findAmount(text)
+        val type = findType(text.lowercase())
+        val provider = findProvider(text)
+        if (amount == null || type == null || provider == null) {
+            return SmsParseResult.Fail(buildList {
+                if (provider == null) add(SmsPart.PROVIDER)
+                if (type == null) add(SmsPart.TYPE)
+                if (amount == null) add(SmsPart.AMOUNT)
+            })
+        }
+        val date = findDate(text) ?: ""
+        val balance = findBalance(text)
+        return SmsParseResult.Ok(
+            SmsSuggestion(
+                amount = amount,
+                type = type,
+                provider = provider,
+                note = "SMS: ${raw.take(80)}",
+                raw = raw.take(200),
+                date = date,
+                time = findTime(text) ?: "",
+                balance = balance,
+                ref = findRef(text, provider, amount, date, balance)
+            )
+        )
+    }
+
+    /** Method from its name in the text. bKash receipts often have no name, so the TrxID label identifies them. */
+    internal fun findProvider(text: String): String? {
         val lower = text.lowercase()
-        val provider = when {
-            lower.contains("bkash") || text.contains("বিকাশ") -> "Bkash"
+        return when {
             lower.contains("nagad") || text.contains("নগদ") -> "Nagad"
             lower.contains("rocket") || text.contains("রকেট") -> "Rocket"
+            lower.contains("bkash") || text.contains("বিকাশ") -> "Bkash"
+            lower.contains("trxid") || lower.contains("trx id") -> "Bkash"
             lower.contains("bank") || lower.contains("a/c") || lower.contains("account") || lower.contains("card") ||
                 text.contains("ব্যাংক") || text.contains("একাউন্ট") -> "Bank"
             else -> "Cash"
         }
-        return SmsSuggestion(
-            amount = amount,
-            type = type,
-            provider = provider,
-            note = "SMS: ${body.trim().take(80)}",
-            raw = body.trim().take(200),
-            date = findDate(text) ?: ""
-        )
+    }
+
+    /** Transaction ID; for a bank SMS the account and the figures that identify the entry. Null when none. */
+    internal fun findRef(text: String, provider: String, amount: Double, date: String, balance: Double?): String? {
+        if (provider == "Bank") {
+            val ac = bankAc.find(text)?.groupValues?.get(1) ?: return null
+            return "A/C $ac|$date|$amount|${balance ?: ""}"
+        }
+        return refRe.find(text)?.groupValues?.get(1)
+    }
+
+    /** Balance after the transaction, when stated. */
+    internal fun findBalance(text: String): Double? =
+        balanceRe.find(text)?.groupValues?.get(1)?.replace(",", "")?.toDoubleOrNull()
+
+    /** Time as HH:mm (24h). Handles AM/PM and plain 24h times. */
+    internal fun findTime(text: String): String? {
+        val m = timeRe.find(text) ?: return null
+        var h = m.groupValues[1].toInt()
+        val min = m.groupValues[2].toInt()
+        if (h > 23 || min > 59) return null
+        when (m.groupValues[3].lowercase()) {
+            "pm" -> if (h < 12) h += 12
+            "am" -> if (h == 12) h = 0
+        }
+        return "%02d:%02d".format(h, min)
     }
 
     /** First currency-marked amount that is not a balance, fee or charge. */

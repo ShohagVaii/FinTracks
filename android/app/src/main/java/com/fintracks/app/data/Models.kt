@@ -30,7 +30,13 @@ data class SmsSuggestion(
     val note: String,
     val raw: String,
     /** Date found in the SMS as yyyy-MM-dd; empty when the SMS has no readable date (then today is used). */
-    val date: String = ""
+    val date: String = "",
+    /** Time found in the SMS as HH:mm (24h); empty when absent. */
+    val time: String = "",
+    /** Balance after the transaction, when the SMS states it. */
+    val balance: Double? = null,
+    /** Transaction ID (TrxID / TxnID), or the bank account key; null when the SMS has none. */
+    val ref: String? = null
 )
 
 /** Helper to build a JsonObject from pairs, skipping nulls. */
