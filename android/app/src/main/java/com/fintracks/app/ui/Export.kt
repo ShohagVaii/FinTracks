@@ -36,7 +36,7 @@ object Export {
         JSON("json", "application/json")
     }
 
-    private fun header(): List<String> = listOf(tr("তারিখ", "Date"), tr("ধরন", "Type"), tr("ক্যাটাগরি", "Category"), tr("পরিমাণ (৳)", "Amount (৳)"), tr("পেমেন্ট মাধ্যম", "Payment mode"), tr("অ্যাকাউন্ট", "Account"), tr("নোট", "Note"))
+    internal fun header(): List<String> = listOf(tr("তারিখ", "Date"), tr("ধরন", "Type"), tr("ক্যাটাগরি", "Category"), tr("পরিমাণ (৳)", "Amount (৳)"), tr("পেমেন্ট মাধ্যম", "Payment mode"), tr("অ্যাকাউন্ট", "Account"), tr("নোট", "Note"))
 
     fun typeBn(t: String): String = when (t) {
         "Income" -> tr("আয়", "Income"); "Expense" -> tr("ব্যয়", "Expense"); "Transfer" -> tr("ট্রান্সফার", "Transfer"); else -> t
@@ -50,7 +50,7 @@ object Export {
     fun accountName(state: UiState, t: JsonObject): String =
         state.rows("accounts").firstOrNull { it.id() == t.strOrNull("account_id") }?.str("name").orEmpty()
 
-    private fun rows(state: UiState, txs: List<JsonObject>): List<List<Any>> =
+    internal fun rows(state: UiState, txs: List<JsonObject>): List<List<Any>> =
         txs.sortedBy { dateOf(it, "tx_date") }.map { t ->
             listOf(
                 displayDate(dateOf(t, "tx_date")), typeBn(t.str("type")), catLabel(t.str("category")), t.num("amount"),

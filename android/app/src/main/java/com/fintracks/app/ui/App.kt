@@ -318,7 +318,7 @@ private fun MainScaffold(state: UiState, vm: AppViewModel, onSaved: () -> Unit) 
                 )
             } else if (overlay != Overlay.CHAT && overlay != Overlay.DEBTS && overlay != Overlay.NOTES && !(overlay == Overlay.COUNTER && counterHistory)) {
                 // ধার screen draws its own header (it shows the person's name on the detail page).
-                OverlayHeader(overlay.title) { goBack() }
+                OverlayHeader(overlay.title, if (overlay == Overlay.REPORTS) ({ ReportExportButton { go("ov:EXPORT") } }) else null) { goBack() }
             }
 
             Box(Modifier.fillMaxSize()) {
@@ -486,13 +486,18 @@ private fun HeaderIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, de
 }
 
 @Composable
-private fun OverlayHeader(title: String, onBack: () -> Unit) {
+private fun OverlayHeader(title: String, trailing: (@Composable () -> Unit)? = null, onBack: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().topInsetPadding().padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(modifier = Modifier.pressScale(), onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("ফিরে যান", "Back")) }
         Text(title, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 18.sp)
+        if (trailing != null) {
+            Spacer(Modifier.weight(1f))
+            trailing()
+            Spacer(Modifier.width(8.dp))
+        }
     }
 }
 
@@ -520,7 +525,7 @@ private fun OverlayContent(
         Overlay.INVESTMENTS -> InvestmentsScreen(state, vm)
         Overlay.SUBSCRIPTIONS -> SubscriptionsScreen(state, vm)
         Overlay.ACCOUNTS -> AccountsScreen(state, vm)
-        Overlay.REPORTS -> ReportsScreen(state)
+        Overlay.REPORTS -> ReportsScreen(state) { go("ov:EXPORT") }
         Overlay.SETTINGS -> SettingsScreen(state, vm, subPage, { go("ov:SETTINGS/$it") }, onClose)
         Overlay.COUNTER -> MoneyCounterScreen(vm, counterHistory) { on -> if (on) go("ov:COUNTER/hist") else onClose() }
         Overlay.AGE -> AgeCalcScreen()
@@ -529,7 +534,7 @@ private fun OverlayContent(
         Overlay.TRASH -> TrashScreen(state, vm)
         Overlay.DATA -> DataUsageScreen()
         Overlay.MATH -> MathToolsScreen()
-        Overlay.EXPORT -> ExportCenterScreen(state)
+        Overlay.EXPORT -> ExportCenterScreen(state, vm.notes.notes)
         Overlay.INBOX -> Unit // shown by InboxScreen in MainScaffold
     }
 }
