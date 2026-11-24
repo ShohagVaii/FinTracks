@@ -142,6 +142,7 @@ private fun defaultTools(): List<ToolTile> = listOf(
     ToolTile(Overlay.INVESTMENTS, "সম্পদ", Icons.Default.Landscape, Tok_FF34D399),
     ToolTile(Overlay.TAX, "ট্যাক্স", Icons.Default.Receipt, Tok_FFFB7185),
     ToolTile(Overlay.DATA, "ডাটা", Icons.Default.SignalCellularAlt, Sky400),
+    ToolTile(Overlay.MATH, "অংক কথায়", Icons.Default.Calculate, Color(0xFF14B8A6)),
     ToolTile(Overlay.CURRENCY, "কনভার্টার", Icons.Default.Refresh, Tok_FF60A5FA),
     ToolTile(Overlay.SUBSCRIPTIONS, "সাবস্ক্রিপশন", Icons.Default.Repeat, Tok_FFA78BFA),
     ToolTile(Overlay.CREDIT, "বাকি খাতা", Icons.Default.Receipt, Amber400),
