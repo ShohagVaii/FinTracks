@@ -38,9 +38,9 @@ import java.util.Locale
 
 /** Data usage tool: live speed, totals per period, and per-app usage. Needs Usage Access for the totals. */
 
-private val DuCyan = Color(0xFF38C7E0)
+internal val DuCyan = Color(0xFF38C7E0)
 private val DuPurple = Color(0xFF8B7CF6)
-private val DuGreen = Color(0xFF2ECC71)
+internal val DuGreen = Color(0xFF2ECC71)
 
 enum class DuSpan(val bn: String, val en: String) { DAY("আজ", "Today"), WEEK("সপ্তাহ", "Week"), MONTH("মাস", "Month") }
 
@@ -51,7 +51,7 @@ class DuTotals(val mobile: Long, val wifi: Long, val rx: Long, val tx: Long) {
 class DuApp(val label: String, val pkg: String?, val system: Boolean, val bytes: Long)
 
 /** Start of the period in epoch millis (today, the last 7 days, or this month). */
-private fun duStart(span: DuSpan): Long {
+internal fun duStart(span: DuSpan): Long {
     val zone = ZoneId.systemDefault()
     val today = LocalDate.now(zone)
     val day = when (span) {
@@ -80,7 +80,7 @@ private fun duSummary(nsm: NetworkStatsManager, type: Int, start: Long, end: Lon
     0L to 0L
 }
 
-private fun duTotals(ctx: Context, start: Long, end: Long): DuTotals {
+internal fun duTotals(ctx: Context, start: Long, end: Long): DuTotals {
     val nsm = ctx.getSystemService(NetworkStatsManager::class.java)
     val (mRx, mTx) = duSummary(nsm, ConnectivityManager.TYPE_MOBILE, start, end)
     val (wRx, wTx) = duSummary(nsm, ConnectivityManager.TYPE_WIFI, start, end)
@@ -136,7 +136,7 @@ private fun duParts(bytes: Long, perSecond: Boolean = false): Pair<String, Strin
     return bnDigits(num) to (if (perSecond) "$unit/s" else unit)
 }
 
-private fun duText(bytes: Long, perSecond: Boolean = false): String {
+internal fun duText(bytes: Long, perSecond: Boolean = false): String {
     val (n, u) = duParts(bytes, perSecond)
     return "$n $u"
 }
@@ -289,6 +289,9 @@ fun DataUsageScreen() {
                 DuGreen, Modifier.weight(1f)
             )
         }
+
+        PackCard()
+        CallCard()
 
         // App list
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
