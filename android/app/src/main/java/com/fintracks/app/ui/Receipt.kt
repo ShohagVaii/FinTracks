@@ -35,6 +35,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.AlertDialog
@@ -265,36 +272,67 @@ private fun txTimeLabel(t: JsonObject): String = runCatching {
 }.getOrDefault("")
 
 /** Long-press menu on a transaction row: the only place where edit and delete are offered. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TxActionDialog(t: JsonObject, onEdit: () -> Unit, onDelete: () -> Unit, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var gone by remember { mutableStateOf(false) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(tr("লেনদেন", "Transaction"), fontWeight = FontWeight.Bold) },
-        text = {
-            AnimatedVisibility(visible = !gone, exit = fadeOut(tween(250)) + slideOutHorizontally(tween(250)) { -it / 3 }) {
-            Column {
-                Text(t.str("category").ifEmpty { tr("লেনদেন", "Transaction") }.let { catLabel(it) }, fontSize = 14.sp)
-                TextButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) { Text(tr("এডিট করুন", "Edit")) }
-                TextButton(onClick = {
-                    // Slide and fade the dialog content out, then delete.
+    val tone = if (t.str("type") == "Income") incomeTone() else expenseTone()
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Summary: icon, name and note, amount in the transaction's colour.
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.size(46.dp).clip(CircleShape).background(tone.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+                    Text(catIcon(t.str("category")), fontSize = 20.sp)
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        catLabel(t.str("category")).ifEmpty { tr("লেনদেন", "Transaction") },
+                        fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                    if (t.str("note").isNotEmpty()) {
+                        Text(t.str("note"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                Text(taka(t.num("amount")), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = tone)
+            }
+            Button(
+                modifier = Modifier.fillMaxWidth().pressScale(),
+                onClick = onEdit,
+                colors = ButtonDefaults.buttonColors(containerColor = Emerald500, contentColor = Color.White)
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(tr("এডিট করুন", "Edit"))
+            }
+            Button(
+                modifier = Modifier.fillMaxWidth().pressScale(),
+                enabled = !gone,
+                onClick = {
+                    // The sheet fades out, then the row is deleted (Reduce Motion: at once).
                     if (!gone) {
                         gone = true
                         scope.launch {
-                            kotlinx.coroutines.delay(if (motionReduced(ctx)) 0L else 260L)
+                            kotlinx.coroutines.delay(if (motionReduced(ctx)) 0L else 200L)
                             onDelete()
                         }
                     }
-                }, modifier = Modifier.fillMaxWidth()) {
-                    Text(tr("মুছে ফেলুন", "Delete"), color = readableOn(Rose500))
-                }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Rose500, contentColor = Color.White)
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(tr("মুছে ফেলুন", "Delete"))
             }
+            TextButton(modifier = Modifier.fillMaxWidth().pressScale(), onClick = onDismiss) {
+                Text(tr("বাতিল", "Cancel"))
             }
-        },
-        confirmButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
-    )
+        }
+    }
 }
 
 /**
