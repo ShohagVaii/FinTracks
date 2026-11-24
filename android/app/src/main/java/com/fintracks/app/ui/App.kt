@@ -112,12 +112,6 @@ fun FinTracksApp(vm: AppViewModel = viewModel()) {
     var pendingAuth by rememberSaveable { mutableStateOf(0) }
     var celebration by remember { mutableStateOf<Celebrate?>(null) }
     var holdAuth by remember { mutableStateOf(false) }
-    var splashOn by remember { mutableStateOf(true) }
-
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(if (motionReduced(ctx)) 300L else 1400L)
-        splashOn = false
-    }
     LaunchedEffect(state.busy) {
         if (!state.busy && pendingAuth != 0) {
             val kind = pendingAuth
@@ -168,9 +162,6 @@ fun FinTracksApp(vm: AppViewModel = viewModel()) {
                 else -> MainScaffold(state, vm, onSaved = { celebration = Celebrate(1) })
             }
             celebration?.let { CelebrationOverlay(it.kind) }
-            AnimatedVisibility(visible = splashOn, exit = fadeOut(tween(350))) {
-                SplashScreen(onSkip = { splashOn = false })
-            }
         }
     }
 }

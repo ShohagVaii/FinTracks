@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.FinTracks" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- The single cold-start splash: navy background plus the final logo, then the normal app theme. -->
+    <style name="Theme.FinTracks.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#0D112E</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/notif_large_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.FinTracks</item>
+    </style>
 </resources>
