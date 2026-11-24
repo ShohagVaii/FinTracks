@@ -221,12 +221,6 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onEdit: () -> Unit, onDelete: (
                 }
 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(modifier = Modifier.weight(1f).pressScale(), onClick = onEdit) { Text(tr("এডিট", "Edit")) }
-                    OutlinedButton(modifier = Modifier.weight(1f).pressScale(), onClick = { confirmDelete = true }) {
-                        Text(tr("মুছুন", "Delete"), color = readableOn(Rose500))
-                    }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
                         modifier = Modifier.weight(1f).pressScale(),
                         onClick = { share(false) },
@@ -246,24 +240,6 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onEdit: () -> Unit, onDelete: (
         }
     }
 
-    if (confirmDelete) {
-        ConfirmDialog(
-            text = tr("এই লেনদেনটি মুছবেন?", "Delete this transaction?"),
-            confirmText = tr("মুছে ফেলুন", "Delete"),
-            cancelText = tr("বাতিল", "Cancel"),
-            onConfirm = {
-                confirmDelete = false
-                if (!gone) {
-                    gone = true
-                    scope.launch {
-                        delay(if (motionReduced(ctx)) 0L else 260L)
-                        onDelete()
-                    }
-                }
-            },
-            onDismiss = { confirmDelete = false }
-        )
-    }
 }
 
 /** One label/value line of the receipt. The optional copy button sits at the end of the line. */

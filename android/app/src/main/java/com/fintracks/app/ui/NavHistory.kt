@@ -11,8 +11,12 @@ object NavHistory {
     const val HOME = "tab:dashboard"
 
     /** Going to the screen that is already on top changes nothing. */
-    fun push(stack: List<String>, route: String): List<String> =
-        if (stack.lastOrNull() == route) stack else stack + route
+    fun push(stack: List<String>, route: String): List<String> = when {
+        // Home is the end of every trip: reaching it clears the history (back then asks to exit).
+        route == HOME -> listOf(HOME)
+        stack.lastOrNull() == route -> stack
+        else -> stack + route
+    }
 
     /** Back removes the top entry. The bottom entry (home) is never removed here. */
     fun pop(stack: List<String>): List<String> = if (stack.size > 1) stack.dropLast(1) else stack
