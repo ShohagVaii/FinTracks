@@ -1,6 +1,7 @@
 package com.fintracks.app.ui
 
 import androidx.compose.material.icons.filled.SignalCellularAlt
+import androidx.compose.material.icons.filled.Calculate
 import android.content.Context
 import androidx.compose.animation.core.animateIntOffsetAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
