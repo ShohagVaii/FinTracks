@@ -207,6 +207,7 @@ private fun dayText(d: LocalDate): String =
     if (AppPrefs.english) d.format(DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH))
     else bnDigits(d.dayOfMonth.toString()) + " " + BN_MONTHS[d.monthValue - 1]
 
+@Composable
 private fun Modifier.dataCard(): Modifier = this.fillMaxWidth().clip(RoundedCornerShape(20.dp))
     .background(faint(0.05f)).border(1.dp, faint(0.1f), RoundedCornerShape(20.dp)).padding(18.dp)
 
