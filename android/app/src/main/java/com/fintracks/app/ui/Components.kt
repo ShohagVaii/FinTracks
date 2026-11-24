@@ -245,8 +245,22 @@ fun DualLineChart(
                 }
             }
 
-            fun drawSeries(values: List<Double>, color: Color) {
+            // A single point (one day) has no line to draw: it is shown as a dot with its amount.
+            val valuePaint = android.graphics.Paint().apply {
+                textSize = 11.dp.toPx()
+                isAntiAlias = true
+                isFakeBoldText = true
+                textAlign = android.graphics.Paint.Align.LEFT
+            }
+            fun drawSeries(values: List<Double>, color: Color, labelDy: Float) {
                 if (values.isEmpty()) return
+                if (values.size == 1) {
+                    val p = Offset(xOf(0), yOf(values[0]))
+                    drawCircle(color, 6.dp.toPx(), p)
+                    valuePaint.color = color.toArgb()
+                    drawContext.canvas.nativeCanvas.drawText(format(values[0]), p.x + 10.dp.toPx(), p.y + labelDy, valuePaint)
+                    return
+                }
                 val line = curve(values)
                 val fill = Path().apply {
                     addPath(line)
@@ -257,8 +271,8 @@ fun DualLineChart(
                 drawPath(fill, Brush.verticalGradient(listOf(color.copy(alpha = 0.35f), Color.Transparent), startY = topPad, endY = baseline))
                 drawPath(line, color, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
             }
-            drawSeries(second, secondColor)
-            drawSeries(first, firstColor)
+            drawSeries(second, secondColor, 14.dp.toPx())
+            drawSeries(first, firstColor, 4.dp.toPx())
 
             // Day labels on the shared axis, thinned so they fit.
             if (labels.isNotEmpty()) {
@@ -271,7 +285,7 @@ fun DualLineChart(
                 for (i in 0 until minOf(n, labels.size)) {
                     if (i % every != 0 && i != n - 1) continue
                     paint.textAlign = when (i) {
-                        0 -> android.graphics.Paint.Align.LEFT
+                        0 -> if (n == 1) android.graphics.Paint.Align.CENTER else android.graphics.Paint.Align.LEFT
                         n - 1 -> android.graphics.Paint.Align.RIGHT
                         else -> android.graphics.Paint.Align.CENTER
                     }
