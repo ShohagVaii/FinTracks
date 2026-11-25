@@ -13,6 +13,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CellTower
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.foundation.*
@@ -27,6 +29,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
@@ -99,11 +103,11 @@ internal fun duTotals(ctx: Context, start: Long, end: Long): DuTotals {
 }
 
 /** Usage per app (uid), mobile and Wi-Fi together, largest first. Names come from PackageManager. */
-private fun duApps(ctx: Context, start: Long, end: Long): List<DuApp> {
+private fun duApps(ctx: Context, types: List<Int>, start: Long, end: Long): List<DuApp> {
     val nsm = ctx.getSystemService(NetworkStatsManager::class.java)
     val pm = ctx.packageManager
     val byUid = HashMap<Int, LongArray>() // [rx, tx]
-    for (type in listOf(ConnectivityManager.TYPE_MOBILE, ConnectivityManager.TYPE_WIFI)) {
+    for (type in types) {
         try {
             val stats: NetworkStats = nsm.queryDetails(type, null, start, end)
             val b = NetworkStats.Bucket()
@@ -158,17 +162,86 @@ internal fun duText(bytes: Long, perSecond: Boolean = false): String {
     return "$n $u"
 }
 
+/** Mobile and Wi-Fi download/upload for one window. */
+class DuMedTotals(val mRx: Long, val mTx: Long, val wRx: Long, val wTx: Long) {
+    fun rx(m: DuMedium): Long = when (m) {
+        DuMedium.BOTH -> mRx + wRx
+        DuMedium.WIFI -> wRx
+        DuMedium.MOBILE -> mRx
+    }
+
+    fun tx(m: DuMedium): Long = when (m) {
+        DuMedium.BOTH -> mTx + wTx
+        DuMedium.WIFI -> wTx
+        DuMedium.MOBILE -> mTx
+    }
+
+    fun total(m: DuMedium): Long = rx(m) + tx(m)
+}
+
+private class DuLoad(val total: DuMedTotals, val today: DuMedTotals, val usage: List<DuSlotUsage>, val apps: List<DuApp>)
+
+private fun duMedTotals(ctx: Context, start: Long, end: Long): DuMedTotals {
+    val nsm = ctx.getSystemService(NetworkStatsManager::class.java)
+    val (mRx, mTx) = duSummary(nsm, ConnectivityManager.TYPE_MOBILE, start, end)
+    val (wRx, wTx) = duSummary(nsm, ConnectivityManager.TYPE_WIFI, start, end)
+    return DuMedTotals(mRx, mTx, wRx, wTx)
+}
+
+private fun duTypes(m: DuMedium): List<Int> = when (m) {
+    DuMedium.BOTH -> listOf(ConnectivityManager.TYPE_MOBILE, ConnectivityManager.TYPE_WIFI)
+    DuMedium.WIFI -> listOf(ConnectivityManager.TYPE_WIFI)
+    DuMedium.MOBILE -> listOf(ConnectivityManager.TYPE_MOBILE)
+}
+
+/** Mobile and Wi-Fi bytes for each chart slot. */
+private fun duSlotUsages(ctx: Context, slots: List<DuSlot>): List<DuSlotUsage> {
+    val nsm = ctx.getSystemService(NetworkStatsManager::class.java)
+    return slots.map { s ->
+        val (mRx, mTx) = duSummary(nsm, ConnectivityManager.TYPE_MOBILE, s.start, s.end)
+        val (wRx, wTx) = duSummary(nsm, ConnectivityManager.TYPE_WIFI, s.start, s.end)
+        DuSlotUsage(s, mRx, mTx, wRx, wTx)
+    }
+}
+
+private fun duShort(bytes: Long): String = if (bytes == 0L) (if (AppPrefs.english) "0 B" else "০ B") else duText(bytes)
+
 @Composable
 fun DataUsageScreen() {
     val ctx = LocalContext.current
-    var span by remember { mutableStateOf(DuSpan.MONTH) }
-    var granted by remember { mutableStateOf(duHasUsageAccess(ctx)) }
+    val zone = remember { ZoneId.systemDefault() }
+    val today = remember { LocalDate.now(zone) }
+    var period by remember { mutableStateOf(DuPeriod.MONTH) }
+    var anchor by remember { mutableStateOf(today) }
+    var customFrom by remember { mutableStateOf(today.withDayOfMonth(1)) }
+    var customTo by remember { mutableStateOf(today) }
+    var medium by remember { mutableStateOf(DuMedium.BOTH) }
+    var showFrom by remember { mutableStateOf(false) }
+    var showTo by remember { mutableStateOf(false) }
+    var selected by remember { mutableIntStateOf(-1) }
     var showSystem by remember { mutableStateOf(false) }
     var down by remember { mutableLongStateOf(0L) }
     var up by remember { mutableLongStateOf(0L) }
-    var totals by remember { mutableStateOf<DuTotals?>(null) }
-    var today by remember { mutableStateOf<DuTotals?>(null) }
-    var apps by remember { mutableStateOf<List<DuApp>>(emptyList()) }
+    var granted by remember { mutableStateOf(duHasUsageAccess(ctx)) }
+    var load by remember { mutableStateOf<DuLoad?>(null) }
+    var slotApps by remember { mutableStateOf<List<DuApp>>(emptyList()) }
+
+    val range = duRangeFor(period, anchor, customFrom, customTo)
+    val slots = remember(period, range.from, range.to) { duSlots(period, range, zone) }
+    val canNext = duShift(period, range, 1).from <= today
+    val cardBg = faint(0.05f)
+    val cardBorder = faint(0.1f)
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+
+    fun move(dir: Int) {
+        val next = duShift(period, range, dir)
+        if (period == DuPeriod.CUSTOM) {
+            customFrom = next.from
+            customTo = next.to
+        } else {
+            anchor = next.to
+        }
+    }
 
     // Live speed: TrafficStats sampled every second; stops when the screen leaves.
     LaunchedEffect(Unit) {
@@ -193,24 +266,42 @@ fun DataUsageScreen() {
         }
     }
 
-    // Totals refresh every minute while the screen is open and access is granted.
-    LaunchedEffect(span, granted) {
+    // A new period, range, or network filter clears the selected bar.
+    LaunchedEffect(period, range.from, range.to, medium) { selected = -1 }
+
+    // Totals, chart bars and app list refresh every minute while the screen is open and access is granted.
+    LaunchedEffect(slots, medium, granted) {
         if (!granted) return@LaunchedEffect
         while (isActive) {
             val now = System.currentTimeMillis()
-            val (t, td, a) = withContext(Dispatchers.IO) {
-                Triple(duTotals(ctx, duStart(span), now), duTotals(ctx, duStart(DuSpan.DAY), now), duApps(ctx, duStart(span), now))
+            val result = withContext(Dispatchers.IO) {
+                val rs = range.from.atStartOfDay(zone).toInstant().toEpochMilli()
+                val re = maxOf(rs, minOf(now, range.to.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()))
+                val tod = LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
+                DuLoad(
+                    total = duMedTotals(ctx, rs, re),
+                    today = duMedTotals(ctx, tod, maxOf(tod, now)),
+                    usage = duSlotUsages(ctx, slots),
+                    apps = duApps(ctx, duTypes(medium), rs, re)
+                )
             }
-            totals = t
-            today = td
-            apps = a
+            load = result
             delay(60_000)
         }
     }
 
-    val cardBg = faint(0.05f)
-    val cardBorder = faint(0.1f)
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    // Apps for the selected bar (hour or day).
+    LaunchedEffect(selected, slots, medium, granted) {
+        val slot = slots.getOrNull(selected)
+        slotApps = if (slot == null || !granted) emptyList()
+        else withContext(Dispatchers.IO) {
+            val end = minOf(slot.end, System.currentTimeMillis())
+            duApps(ctx, duTypes(medium), slot.start, maxOf(slot.start, end))
+        }
+    }
+
+    val ld = load
+    val usage = ld?.usage ?: emptyList()
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
@@ -239,14 +330,22 @@ fun DataUsageScreen() {
 
         // Period segment
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(cardBg).padding(4.dp)) {
-            DuSpan.values().forEach { sp ->
-                val on = span == sp
+            listOf(
+                DuPeriod.DAY to tr("আজ", "Today"),
+                DuPeriod.WEEK to tr("সপ্তাহ", "Week"),
+                DuPeriod.MONTH to tr("মাস", "Month"),
+                DuPeriod.CUSTOM to tr("কাস্টম", "Custom")
+            ).forEach { (p, label) ->
+                val on = period == p
                 Box(
                     Modifier.weight(1f).clip(RoundedCornerShape(50)).background(if (on) DuGreen else Color.Transparent)
-                        .clickable { span = sp }.padding(vertical = 10.dp),
+                        .clickable {
+                            period = p
+                            if (p == DuPeriod.CUSTOM) showFrom = true
+                        }.padding(vertical = 10.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(tr(sp.bn, sp.en), color = if (on) Color.White else muted, fontWeight = FontWeight.SemiBold)
+                    Text(label, color = if (on) Color.White else muted, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1)
                 }
             }
         }
@@ -260,7 +359,7 @@ fun DataUsageScreen() {
                 Text(tr("ব্যবহার দেখতে অনুমতি লাগবে", "Usage access is needed"), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Text(
                     tr(
-                        "কোন অ্যাপ কত ডাটা ব্যবহার করল, তা দেখাতে Usage Access অনুমতি লাগে। তথ্য শুধু আপনার ফোনে থাকে।",
+                        "কোন অ্যাপ কত ডাটা ব্যবহার করল, তা দেখাতে Usage Access অনুমতি লাগবে। ডাটা শুধু আপনার ফোনে থাকে।",
                         "Usage access shows how much data each app used. The data stays on your phone."
                     ),
                     color = muted, fontSize = 13.sp
@@ -275,35 +374,63 @@ fun DataUsageScreen() {
             return@Column
         }
 
-        // Hero: total for the period, split into mobile and Wi-Fi.
-        val t = totals
-        val total = t?.total ?: 0L
+        // Custom range: chips open the date pickers, start first, then end.
+        if (period == DuPeriod.CUSTOM) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DuChip(null, tr("শুরু ", "From ") + duRangeLabel(DuPeriod.DAY, DuRange(customFrom, customFrom), AppPrefs.english), false, Modifier.weight(1f)) { showFrom = true }
+                DuChip(null, tr("শেষ ", "To ") + duRangeLabel(DuPeriod.DAY, DuRange(customTo, customTo), AppPrefs.english), false, Modifier.weight(1f)) { showTo = true }
+            }
+        }
+
+        // Period navigation: previous / next, label in Bengali.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            NavArrow(Icons.Default.ChevronLeft, enabled = true) { move(-1) }
+            Text(duRangeLabel(period, range, AppPrefs.english), fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
+            NavArrow(Icons.Default.ChevronRight, enabled = canNext) { move(1) }
+        }
+
+        // Network filter
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DuChip(Icons.Default.DataUsage, tr("ডাটা ও ওয়াইফাই", "Data and Wi-Fi"), medium == DuMedium.BOTH, Modifier.weight(1f)) { medium = DuMedium.BOTH }
+            DuChip(Icons.Default.Wifi, "Wi-Fi", medium == DuMedium.WIFI, Modifier.weight(1f)) { medium = DuMedium.WIFI }
+            DuChip(Icons.Default.CellTower, tr("মোবাইল ডাটা", "Mobile"), medium == DuMedium.MOBILE, Modifier.weight(1f)) { medium = DuMedium.MOBILE }
+        }
+
+        // Hero: total for the period and filter, split into mobile and Wi-Fi.
+        val total = ld?.total?.total(medium) ?: 0L
+        val mob = ld?.total?.total(DuMedium.MOBILE) ?: 0L
+        val wif = ld?.total?.total(DuMedium.WIFI) ?: 0L
         val (num, unit) = duParts(total)
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(cardBg).border(1.dp, cardBorder, RoundedCornerShape(20.dp)).padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(periodTitle(span), color = muted, fontSize = 13.sp)
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(num, fontSize = 44.sp, fontWeight = FontWeight.Bold)
                 Text(unit, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DuCyan)
             }
-            DuBar(Icons.Default.CellTower, tr("মোবাইল ডাটা", "Mobile data"), duText(t?.mobile ?: 0L), fraction(t?.mobile ?: 0L, total), DuCyan)
-            DuBar(Icons.Default.Wifi, "Wi-Fi", duText(t?.wifi ?: 0L), fraction(t?.wifi ?: 0L, total), DuPurple)
+            if (medium != DuMedium.WIFI) {
+                DuBar(Icons.Default.CellTower, tr("মোবাইল ডাটা", "Mobile data"), duShort(mob),
+                    if (medium == DuMedium.BOTH) fraction(mob, mob + wif) else 1f, DuCyan)
+            }
+            if (medium != DuMedium.MOBILE) {
+                DuBar(Icons.Default.Wifi, "Wi-Fi", duShort(wif),
+                    if (medium == DuMedium.BOTH) fraction(wif, mob + wif) else 1f, DuPurple)
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconValue(Icons.Default.ArrowUpward, DuGreen, tr("আপলোড ", "Upload "), duText(t?.tx ?: 0L))
+                IconValue(Icons.Default.ArrowUpward, DuGreen, tr("আপলোড ", "Upload "), duShort(ld?.total?.tx(medium) ?: 0L))
                 Spacer(Modifier.width(16.dp))
-                IconValue(Icons.Default.ArrowDownward, DuCyan, tr("ডাউনলোড ", "Download "), duText(t?.rx ?: 0L))
+                IconValue(Icons.Default.ArrowDownward, DuCyan, tr("ডাউনলোড ", "Download "), duShort(ld?.total?.rx(medium) ?: 0L))
             }
         }
 
         // Today tiles
-        val td = today
+        val td = ld?.today
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatTile(Icons.Default.DataUsage, tr("আজকের ব্যবহার", "Today's usage"), duText(td?.total ?: 0L), DuCyan, Modifier.weight(1f))
+            StatTile(Icons.Default.DataUsage, tr("আজকের ব্যবহার", "Today's usage"), duShort(td?.total(medium) ?: 0L), DuCyan, Modifier.weight(1f))
             StatTile(
                 Icons.Default.ArrowUpward, tr("আজকের আপলোড / ডাউনলোড", "Today upload / download"),
-                duText(td?.tx ?: 0L) + " / " + duText(td?.rx ?: 0L),
+                duShort(td?.tx(medium) ?: 0L) + " / " + duShort(td?.rx(medium) ?: 0L),
                 DuGreen, Modifier.weight(1f)
             )
         }
@@ -311,36 +438,132 @@ fun DataUsageScreen() {
         PackCard()
         CallCard()
 
+        // Usage chart: stacked bars, download (cyan) at the bottom, upload (green) on top.
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(cardBg).border(1.dp, cardBorder, RoundedCornerShape(20.dp)).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconValue(Icons.Default.ArrowDownward, DuCyan, tr("ডাউনলোড", "Download"), "")
+                IconValue(Icons.Default.ArrowUpward, DuGreen, tr("আপলোড", "Upload"), "")
+            }
+            UsageChart(usage, medium, selected) { i -> selected = if (selected == i) -1 else i }
+            AxisLabels(usage.map { it.slot.label })
+
+            val picked = usage.getOrNull(selected)
+            if (picked != null) {
+                Box(Modifier.fillMaxWidth().height(1.dp).background(faint(0.1f)))
+                Text(slotTitle(period, picked.slot), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                val pickedApps = slotApps.filter { showSystem || !it.system }.take(5)
+                val peak = pickedApps.maxOfOrNull { it.bytes } ?: 0L
+                if (pickedApps.isEmpty()) {
+                    Text(tr("এই সময়ে ডাটা ব্যবহারের তথ্য নেই", "No data usage in this period"), color = muted, fontSize = 13.sp)
+                }
+                pickedApps.forEach { app -> AppRow(app, peak) }
+            }
+        }
+
+        // Daily (or hourly) history: mobile and Wi-Fi per row; tap a row to select it.
+        if (usage.isNotEmpty()) {
+            Text(tr("ইতিহাস", "History"), fontWeight = FontWeight.Bold)
+            usage.indices.reversed().forEach { i ->
+                val u = usage[i]
+                val on = selected == i
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                        .background(if (on) DuCyan.copy(alpha = 0.12f) else cardBg)
+                        .border(1.dp, if (on) DuCyan.copy(alpha = 0.5f) else cardBorder, RoundedCornerShape(16.dp))
+                        .clickable { selected = if (on) -1 else i }.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(slotTitle(period, u.slot), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        IconValue(Icons.Default.CellTower, DuCyan, "", duShort(u.mRx + u.mTx))
+                        IconValue(Icons.Default.Wifi, DuPurple, "", duShort(u.wRx + u.wTx))
+                    }
+                }
+            }
+        }
+
         // App list
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(tr("অ্যাপভিত্তিক ব্যবহার — ", "Usage by app — ") + tr(span.bn, span.en), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text(tr("অ্যাপভিত্তিক ব্যবহার — ", "Usage by app — ") + duRangeLabel(period, range, AppPrefs.english), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             Text(tr("সিস্টেম", "System"), color = muted, fontSize = 12.sp)
             Switch(checked = showSystem, onCheckedChange = { showSystem = it })
         }
-        val shown = apps.filter { showSystem || !it.system }
+        val shown = (ld?.apps ?: emptyList()).filter { showSystem || !it.system }
         val max = shown.maxOfOrNull { it.bytes } ?: 0L
         if (shown.isEmpty()) {
             Text(tr("এই সময়ে ডাটা ব্যবহারের তথ্য নেই", "No data usage in this period"), color = muted, fontSize = 13.sp)
         }
-        shown.forEach { app ->
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(cardBg).border(1.dp, cardBorder, RoundedCornerShape(16.dp)).padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+        shown.forEach { app -> AppRow(app, max) }
+    }
+
+    if (showFrom) {
+        DatePickerSheet(customFrom, tr("শুরুর তারিখ", "Start date"), onDismiss = { showFrom = false }, onPick = {
+            customFrom = it
+            showFrom = false
+            showTo = true
+        })
+    }
+    if (showTo) {
+        DatePickerSheet(customTo, tr("শেষ তারিখ", "End date"), onDismiss = { showTo = false }, onPick = {
+            customTo = it
+            showTo = false
+        })
+    }
+}
+
+/** Header label for a slot: the hour for the day view, the date otherwise. */
+@Composable
+private fun slotTitle(period: DuPeriod, slot: DuSlot): String =
+    if (period == DuPeriod.DAY) slot.label + ":" + (if (AppPrefs.english) "00" else "০০")
+    else duRangeLabel(DuPeriod.DAY, DuRange(slot.day, slot.day), AppPrefs.english)
+
+@Composable
+private fun AppRow(app: DuApp, max: Long) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(faint(0.05f)).border(1.dp, faint(0.1f), RoundedCornerShape(16.dp)).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        AppIcon(app.pkg, app.label)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(app.label, maxLines = 1, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            StackedBar(app.rx, app.tx, max)
+        }
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(duText(app.bytes), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = DuCyan, modifier = Modifier.size(11.dp))
+                Text(duShort(app.rx), color = muted, fontSize = 11.sp)
+                Spacer(Modifier.width(4.dp))
+                Icon(Icons.Default.ArrowUpward, contentDescription = null, tint = DuGreen, modifier = Modifier.size(11.dp))
+                Text(duShort(app.tx), color = muted, fontSize = 11.sp)
+            }
+        }
+    }
+}
+
+/** Stacked bars for the slots: download (cyan) at the bottom, upload (green) on top; tap selects a bar. */
+@Composable
+private fun UsageChart(usage: List<DuSlotUsage>, medium: DuMedium, selected: Int, onTap: (Int) -> Unit) {
+    val max = (usage.maxOfOrNull { it.total(medium) } ?: 0L).coerceAtLeast(1L)
+    Row(Modifier.fillMaxWidth().height(150.dp)) {
+        usage.forEachIndexed { i, u ->
+            Box(
+                Modifier.weight(1f).fillMaxHeight().clickable { onTap(i) },
+                contentAlignment = Alignment.BottomCenter
             ) {
-                AppIcon(app.pkg, app.label)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(app.label, maxLines = 1, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                    StackedBar(app.rx, app.tx, max)
-                }
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(duText(app.bytes), fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = DuCyan, modifier = Modifier.size(11.dp))
-                        Text(duText(app.rx), color = muted, fontSize = 11.sp)
-                        Spacer(Modifier.width(4.dp))
-                        Icon(Icons.Default.ArrowUpward, contentDescription = null, tint = DuGreen, modifier = Modifier.size(11.dp))
-                        Text(duText(app.tx), color = muted, fontSize = 11.sp)
+                if (selected == i) Box(Modifier.fillMaxSize().background(faint(0.08f)))
+                val rx = u.rx(medium)
+                val tx = u.tx(medium)
+                if (rx + tx > 0L) {
+                    Column(Modifier.fillMaxWidth(0.6f).fillMaxHeight(fraction(rx + tx, max))) {
+                        if (tx > 0L) Box(Modifier.fillMaxWidth().weight(tx.toFloat()).background(DuGreen))
+                        if (rx > 0L) Box(Modifier.fillMaxWidth().weight(rx.toFloat()).background(DuCyan))
                     }
                 }
             }
@@ -348,21 +571,51 @@ fun DataUsageScreen() {
     }
 }
 
-private fun fraction(part: Long, whole: Long): Float = if (whole <= 0L) 0f else (part.toDouble() / whole).toFloat().coerceIn(0f, 1f)
-
+/** Labels under the chart: about seven evenly spaced ones. */
 @Composable
-private fun periodTitle(span: DuSpan): String = when (span) {
-    DuSpan.DAY -> tr("আজ — মোট ব্যবহার", "Today — total usage")
-    DuSpan.WEEK -> tr("গত ৭ দিন — মোট ব্যবহার", "Last 7 days — total usage")
-    DuSpan.MONTH -> {
-        val now = LocalDate.now()
-        if (AppPrefs.english) now.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)) + " — total usage"
-        else BN_MONTHS[now.monthValue - 1] + " " + bnDigits(now.year.toString()) + " — মোট ব্যবহার"
+private fun AxisLabels(labels: List<String>) {
+    val step = ((labels.size + 6) / 7).coerceAtLeast(1)
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(Modifier.fillMaxWidth()) {
+        labels.forEachIndexed { i, l ->
+            Text(if (i % step == 0) l else "", fontSize = 10.sp, color = muted, modifier = Modifier.weight(1f), maxLines = 1, textAlign = TextAlign.Center)
+        }
     }
 }
 
 @Composable
-private fun SpeedCell(label: String, value: String, color: Color, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier) {
+private fun DuChip(icon: ImageVector?, text: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val tint = if (selected) DuCyan else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        modifier.clip(RoundedCornerShape(50))
+            .background(if (selected) DuCyan.copy(alpha = 0.16f) else faint(0.05f))
+            .border(1.dp, if (selected) DuCyan.copy(alpha = 0.6f) else faint(0.1f), RoundedCornerShape(50))
+            .clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(4.dp))
+        }
+        Text(text, color = tint, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
+@Composable
+private fun NavArrow(icon: ImageVector, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(faint(0.05f)).clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = if (enabled) MaterialTheme.colorScheme.onSurface else faint(0.25f), modifier = Modifier.size(22.dp))
+    }
+}
+
+private fun fraction(part: Long, whole: Long): Float = if (whole <= 0L) 0f else (part.toDouble() / whole).toFloat().coerceIn(0f, 1f)
+
+@Composable
+private fun SpeedCell(label: String, value: String, color: Color, icon: ImageVector, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -373,7 +626,7 @@ private fun SpeedCell(label: String, value: String, color: Color, icon: androidx
 }
 
 @Composable
-private fun DuBar(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, fraction: Float, color: Color) {
+private fun DuBar(icon: ImageVector, label: String, value: String, fraction: Float, color: Color) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -389,7 +642,7 @@ private fun DuBar(icon: androidx.compose.ui.graphics.vector.ImageVector, label: 
 }
 
 @Composable
-private fun StatTile(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, color: Color, modifier: Modifier) {
+private fun StatTile(icon: ImageVector, label: String, value: String, color: Color, modifier: Modifier) {
     Column(
         modifier.clip(RoundedCornerShape(16.dp)).background(faint(0.05f)).border(1.dp, faint(0.1f), RoundedCornerShape(16.dp)).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -417,7 +670,7 @@ private fun StackedBar(down: Long, up: Long, max: Long) {
 }
 
 @Composable
-private fun IconValue(icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, label: String, value: String) {
+private fun IconValue(icon: ImageVector, color: Color, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(13.dp))
         Text(label + value, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
