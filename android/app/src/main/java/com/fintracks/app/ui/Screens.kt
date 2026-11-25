@@ -39,6 +39,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -675,7 +679,8 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
     var mood by remember { mutableStateOf(existing?.str("mood") ?: "") }
     var accountId by remember { mutableStateOf(existing?.accountId() ?: "") }
     var recurring by remember { mutableStateOf(existing?.bool("is_recurring") == true) }
-    var tagsText by remember { mutableStateOf(existing?.strList("tags")?.joinToString(", ") ?: "") }
+    var tags by remember { mutableStateOf(existing?.strList("tags").orEmpty()) }
+    var tagDraft by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     // A বাকি-পরিশোধ expense is changed from the বাকি খাতা, so it cannot drift from the debt.
     val source = existing?.str("source").orEmpty()
@@ -775,7 +780,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
                     "account_id" to (if (type == "Transfer") JsonNull else nonEmpty(accountId)),
                     "to_account_id" to JsonNull,
                     "is_recurring" to recurring,
-                    "tags" to JsonArray(tagsText.split(',', '#').map { it.trim() }.filter { it.isNotEmpty() }.distinct().map { JsonPrimitive(it) })
+                    "tags" to JsonArray((tags + splitTags(tagDraft)).distinct().map { JsonPrimitive(it) })
                 )
                 onSave(if (existing == null) JsonObject(body + ("id" to JsonPrimitive(txId))) else body, existing?.id())
             }
@@ -789,9 +794,8 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
                 .clip(RoundedCornerShape(28.dp))
                 .background(MaterialTheme.colorScheme.surface)
                 .border(1.dp, faint(0.1f), RoundedCornerShape(28.dp))
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             // Header
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -854,10 +858,11 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
                     textStyle = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface),
                     cursorBrush = SolidColor(Sky500),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    visualTransformation = BnDigitsVisual,
                     modifier = Modifier.weight(1f),
                     decorationBox = { inner ->
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-                            if (amount.isEmpty()) Text("0.00", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (amount.isEmpty()) Text("০.০০", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             inner()
                         }
                     }
@@ -884,66 +889,100 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
             }
             if (otherOpen && type != "Transfer") OtherCategoryField(category) { category = it }
 
-            // Payment chips in one row, cash by default. Each chip carries its method's icon.
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                modes.forEach { (key, label) ->
-                    val on = mode == key
+            // Payment method | Mood, side by side.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    FieldLabel(payIcon(mode), tr("পেমেন্ট মোড", "Payment"))
+                    PickerField(mode, modes, icon = payIcon(mode)) { mode = it }
+                    if (accounts.isNotEmpty() && type != "Transfer") {
+                        PickerField(accountId, listOf("" to tr("কোনোটি নয়", "None")) + accounts.map { it.id() to it.str("name") }, icon = Icons.Default.AccountBalanceWallet) { accountId = it }
+                    }
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    FieldLabel(null, tr("মুড", "Mood"))
                     Row(
-                        Modifier
-                            .weight(1f)
-                            .height(34.dp)
+                        Modifier.fillMaxWidth()
+                            .height(56.dp)
                             .clip(RoundedCornerShape(FIELD_RADIUS))
-                            .background(if (on) Sky500 else faint(0.06f))
-                            .clickable { mode = key }
-                            .padding(horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                            .background(faint(0.05f))
+                            .border(1.dp, faint(0.1f), RoundedCornerShape(FIELD_RADIUS))
                     ) {
-                        Icon(payIcon(key), contentDescription = null, modifier = Modifier.size(13.dp), tint = if (on) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.width(3.dp))
+                        MOODS.forEach { m ->
+                            val on = mood == m
+                            Box(
+                                Modifier.weight(1f).fillMaxHeight()
+                                    .background(if (on) Sky500.copy(alpha = 0.22f) else Color.Transparent)
+                                    .clickable { mood = if (on) "" else m },
+                                contentAlignment = Alignment.Center
+                            ) { Text(m, fontSize = 18.sp) }
+                        }
+                    }
+                }
+            }
+
+            // Hashtag: label, input and add button; added tags shown as chips on one scrolling line.
+            FieldLabel(null, "# " + tr("হ্যাশ ট্যাগ", "Hashtag"))
+            Row(
+                Modifier.fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(FIELD_RADIUS))
+                    .background(faint(0.05f))
+                    .border(1.dp, faint(0.1f), RoundedCornerShape(FIELD_RADIUS)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                BasicTextField(
+                    value = tagDraft,
+                    onValueChange = { tagDraft = it },
+                    singleLine = true,
+                    textStyle = TextStyle(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface),
+                    cursorBrush = SolidColor(Sky500),
+                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                    decorationBox = { inner ->
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+                            if (tagDraft.isEmpty()) Text(tr("ট্যাগ লিখুন (যেমন: ঈদ_শপিং)", "Type a tag (e.g. eid_shopping)"), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            inner()
+                        }
+                    }
+                )
+                IconButton(onClick = { tags = (tags + splitTags(tagDraft)).distinct(); tagDraft = "" }) {
+                    Icon(Icons.Default.Add, contentDescription = tr("ট্যাগ যোগ", "Add tag"), tint = Sky500)
+                }
+            }
+            if (tags.isNotEmpty()) {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    tags.forEach { t ->
                         Text(
-                            label,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = if (on) Color.White else MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f, fill = false)
+                            "#$t", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.clip(RoundedCornerShape(50)).background(Sky500.copy(alpha = 0.18f))
+                                .clickable { tags = tags - t }.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
                 }
             }
-            if (accounts.isNotEmpty() && type != "Transfer") {
-                PickerField(accountId, listOf("" to tr("কোনোটি নয়", "None")) + accounts.map { it.id() to it.str("name") }, icon = Icons.Default.AccountBalanceWallet) { accountId = it }
-            }
 
-            // Mood: four faces in one box.
-            Row(
-                Modifier.fillMaxWidth()
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(14.dp))
+            // Note: a multi-line box.
+            BasicTextField(
+                value = note,
+                onValueChange = { note = it },
+                textStyle = TextStyle(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface),
+                cursorBrush = SolidColor(Sky500),
+                modifier = Modifier.fillMaxWidth().height(56.dp)
+                    .clip(RoundedCornerShape(FIELD_RADIUS))
                     .background(faint(0.05f))
-                    .border(1.dp, faint(0.1f), RoundedCornerShape(14.dp))
-            ) {
-                MOODS.forEach { m ->
-                    val on = mood == m
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .background(if (on) Sky500.copy(alpha = 0.22f) else Color.Transparent)
-                            .clickable { mood = if (on) "" else m },
-                        contentAlignment = Alignment.Center
-                    ) { Text(m, fontSize = 20.sp) }
+                    .padding(10.dp),
+                decorationBox = { inner ->
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopStart) {
+                        if (note.isEmpty()) Text(tr("লেনদেনের বিস্তারিত এখানে লিখুন...", "Write details here..."), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        inner()
+                    }
                 }
-            }
+            )
 
-            CompactInput(note, { note = it }, tr("নোট", "Note"), Icons.Default.Notes)
-            CompactInput(tagsText, { tagsText = it }, tr("ট্যাগ (কমা দিয়ে)", "Tags (comma separated)"), Icons.Default.Sell)
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(Modifier.fillMaxWidth().height(32.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(tr("প্রতি মাসে পুনরাবৃত্ত", "Repeats monthly"))
+                    Icon(Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(tr("প্রতি মাসে পুনরাবৃত্ত", "Repeats monthly"), fontSize = 13.sp)
                 }
                 Switch(checked = recurring, onCheckedChange = { recurring = it })
             }
@@ -962,6 +1001,12 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
         }
     }
 }
+
+/** Shows the amount digits in Bengali; the typed value stays as entered (one character each, so the cursor maps 1:1). */
+private val BnDigitsVisual = VisualTransformation { t -> TransformedText(AnnotatedString(bnDigits(t.text)), OffsetMapping.Identity) }
+
+/** Comma or # separated tags, trimmed, without empties. */
+private fun splitTags(text: String): List<String> = text.split(',', '#').map { it.trim() }.filter { it.isNotEmpty() }
 
 /** Shared corner radius for every input field, chip and the amount card. */
 internal val FIELD_RADIUS = 14.dp
