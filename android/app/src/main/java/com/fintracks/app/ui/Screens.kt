@@ -1028,38 +1028,6 @@ private fun payIcon(key: String): ImageVector = when (key) {
     else -> Icons.Default.Payments
 }
 
-/** Single-line field with a 46dp box; text colour follows the active theme. */
-@Composable
-private fun CompactInput(value: String, onChange: (String) -> Unit, placeholder: String, icon: ImageVector? = null) {
-    BasicTextField(
-        value = value,
-        onValueChange = onChange,
-        singleLine = true,
-        textStyle = TextStyle(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface),
-        cursorBrush = SolidColor(Sky500),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(46.dp)
-            .shadow(2.dp, RoundedCornerShape(FIELD_RADIUS))
-            .clip(RoundedCornerShape(FIELD_RADIUS))
-            .background(faint(0.05f))
-            .border(1.dp, faint(0.1f), RoundedCornerShape(FIELD_RADIUS))
-            .padding(horizontal = 14.dp),
-        decorationBox = { inner ->
-            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                icon?.let {
-                    Icon(it, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.width(10.dp))
-                }
-                Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.CenterStart) {
-                    if (value.isEmpty()) Text(placeholder, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    inner()
-                }
-            }
-        }
-    )
-}
-
 @Composable
 internal fun StatPill(label: String, value: String, color: Color, modifier: Modifier = Modifier, countTo: Double? = null, countFmt: ((Double) -> String)? = null) {
     Column(
