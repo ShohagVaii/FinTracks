@@ -34,10 +34,9 @@ class DataUsagePeriodTest {
     }
 
     @Test fun shiftMovesWholePeriods() {
-        val nov = duRangeFor(DuPeriod.MONTH, LocalDate.of(2026, 12, 15), any, any)
-        assertEquals(LocalDate.of(2026, 11, 1), duShift(DuPeriod.MONTH, nov, -1).from)
-        val dec = duShift(DuPeriod.MONTH, nov, 1)
-        assertEquals(LocalDate.of(2026, 12, 31), dec.to)
+        val dec = duRangeFor(DuPeriod.MONTH, LocalDate.of(2026, 12, 15), any, any)
+        assertEquals(DuRange(LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 31)), dec)
+        assertEquals(LocalDate.of(2026, 11, 1), duShift(DuPeriod.MONTH, dec, -1).from)
         val jan = duShift(DuPeriod.MONTH, dec, 1)
         assertEquals(DuRange(LocalDate.of(2027, 1, 1), LocalDate.of(2027, 1, 31)), jan)
         val feb = duShift(DuPeriod.MONTH, jan, 1)
