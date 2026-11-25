@@ -636,14 +636,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun bikeTxOps(body: JsonObject, id: String?): List<JsonObject>? {
         val s = state.value
         val existing = id?.let { i -> s.rows(BikeLink.TX).firstOrNull { it.id() == i } }
-        if (existing != null && existing.str("source") == "bike") {
+        val linked = existing?.let { BikeLink.entriesForTx(it, s.rows(BikeLink.FUEL), s.rows(BikeLink.MAINT)).firstOrNull() }
+        if (existing != null && (existing.str("source") == "bike" || linked != null)) {
             val fixed = JsonObject(body + mapOf("type" to JsonPrimitive("Expense"), "category" to JsonPrimitive(BIKE_CAT)))
             val tx = JsonObject(existing + fixed)
             val ops = mutableListOf(BikeLink.updateOp(BikeLink.TX, existing, fixed))
-            val ref = existing.str("source_ref")
-            val table = listOf(BikeLink.FUEL, BikeLink.MAINT).firstOrNull { t -> s.rows(t).any { it.id() == ref } }
-            val entry = table?.let { t -> s.rows(t).firstOrNull { it.id() == ref } }
-            if (table != null && entry != null) {
+            linked?.let { (table, entry) ->
                 ops += BikeLink.updateOp(table, entry, BikeLink.entryFieldsFromTx(table, tx, entry, ::bikeKindLabel))
             }
             return ops
@@ -664,14 +662,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Edit of a bike entry: the entry changes and so does its linked expense (amount, date, note). */
-    fun saveBikeEntry(table: String, body: JsonObject, id: String) {
+    fun saveBikeEntry(table: String, body: JsonObject, id: String, paymentMode: String? = null) {
         val s = state.value
         val entry = s.rows(table).firstOrNull { it.id() == id } ?: return
         val merged = JsonObject(entry + body)
         val ops = mutableListOf(BikeLink.updateOp(table, entry, body))
         val tx = s.rows(BikeLink.TX).firstOrNull { it.id() == merged.str("tx_id") }
-        if (tx != null && tx.str("source") == "bike") {
-            ops += BikeLink.updateOp(BikeLink.TX, tx, BikeLink.txFieldsOf(table, merged, ::bikeKindLabel))
+        if (tx != null) {
+            ops += BikeLink.updateOp(BikeLink.TX, tx, BikeLink.txFieldsOf(table, merged, ::bikeKindLabel, paymentMode))
         }
         localChange(ops)
     }
@@ -758,9 +756,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         when (table) {
             // A bike entry and its expense go together, in both directions.
-            "bike_fuel_entries", "bike_maintenance_entries" -> s.rows("transactions")
-                .filter { it.str("source") == "bike" && it.str("source_ref") == id }
-                .forEach { removeOp("transactions", it.id(), stamp)?.let { out += it } }
+            "bike_fuel_entries", "bike_maintenance_entries" -> {
+                val entry = s.rows(table).firstOrNull { it.id() == id }
+                if (entry != null) BikeLink.txIdsForEntry(entry, s.rows("transactions")).forEach { tid ->
+                    removeOp("transactions", tid, stamp)?.let { out += it }
+                }
+            }
             "credit_payments" -> s.rows("transactions")
                 .filter { it.str("source") == "debt_payment" && it.str("source_ref") == id }
                 .forEach { removeOp("transactions", it.id(), stamp)?.let { out += it } }
@@ -770,10 +771,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             "transactions" -> {
                 val t = s.rows("transactions").firstOrNull { it.id() == id }
                 val ref = t?.str("source_ref").orEmpty()
-                if (ref.isNotEmpty() && t?.str("source") == "bike") {
-                    removeOp("bike_fuel_entries", ref, stamp)?.let { out += it }
-                    removeOp("bike_maintenance_entries", ref, stamp)?.let { out += it }
-                }
+                if (t != null) BikeLink.entriesForTx(t, s.rows("bike_fuel_entries"), s.rows("bike_maintenance_entries"))
+                    .forEach { (entryTable, e) -> removeOp(entryTable, e.id(), stamp)?.let { out += it } }
                 if (ref.isNotEmpty() && t?.str("source") == "debt_payment") removeOp("credit_payments", ref, stamp)?.let { out += it }
                 if (ref.isNotEmpty() && t?.str("source") == "personal_debt_payment") removeOp("debt_payments", ref, stamp)?.let { out += it }
             }

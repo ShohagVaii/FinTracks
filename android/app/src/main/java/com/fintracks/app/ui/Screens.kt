@@ -1093,7 +1093,7 @@ private fun RoundIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, des
 
 /** Dropdown-style picker used in the transaction sheet. */
 @Composable
-private fun PickerField(value: String, options: List<Pair<String, String>>, icon: ImageVector? = null, onPick: (String) -> Unit) {
+internal fun PickerField(value: String, options: List<Pair<String, String>>, icon: ImageVector? = null, onPick: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val shown = options.firstOrNull { it.first == value }?.second ?: tr("বাছাই করুন", "Choose")
     Box {
