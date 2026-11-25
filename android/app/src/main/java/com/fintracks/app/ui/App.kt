@@ -137,6 +137,8 @@ fun FinTracksApp(vm: AppViewModel = viewModel()) {
     }
 
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+    // Live notification: on by default, runs without sign-in or Usage Access.
+    LaunchedEffect(Unit) { syncLiveUsage(ctx) }
     LaunchedEffect(state.signedIn) {
         if (state.signedIn) {
             permissions.launch(arrayOf(Manifest.permission.RECEIVE_SMS, Manifest.permission.POST_NOTIFICATIONS))

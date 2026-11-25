@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DataUsage
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
@@ -68,7 +70,12 @@ data class PackProfile(
     val days: Int,
     val settled: Boolean = false,
     val alert80: Boolean = false,
-    val alertRisk: Boolean = false
+    val alertRisk: Boolean = false,
+    val cycleDay: Int = 0,        // renewal day of month (1..31); 0 = no renewal
+    val dailyGb: Double = 0.0,    // optional daily mobile quota; 0 = off
+    val quotaDay: String = "",    // date the daily alert flags belong to
+    val quota80: Boolean = false,
+    val quota100: Boolean = false
 )
 
 object PackStore {
@@ -81,7 +88,9 @@ object PackStore {
             val o = JSONObject(s)
             PackProfile(
                 o.getDouble("gb"), o.getDouble("price"), o.getLong("start"), o.getInt("days"),
-                o.optBoolean("settled"), o.optBoolean("alert80"), o.optBoolean("alertRisk")
+                o.optBoolean("settled"), o.optBoolean("alert80"), o.optBoolean("alertRisk"),
+                cycleDay = o.optInt("cycleDay"), dailyGb = o.optDouble("dailyGb", 0.0), quotaDay = o.optString("quotaDay"),
+                quota80 = o.optBoolean("quota80"), quota100 = o.optBoolean("quota100")
             )
         }.getOrNull()
     }
@@ -90,6 +99,8 @@ object PackStore {
         val o = JSONObject()
             .put("gb", p.gb).put("price", p.price).put("start", p.start).put("days", p.days)
             .put("settled", p.settled).put("alert80", p.alert80).put("alertRisk", p.alertRisk)
+            .put("cycleDay", p.cycleDay).put("dailyGb", p.dailyGb).put("quotaDay", p.quotaDay)
+            .put("quota80", p.quota80).put("quota100", p.quota100)
         prefs(ctx).edit().putString("profile", o.toString()).apply()
     }
 
@@ -123,7 +134,21 @@ fun settlePack(ctx: Context, used: Long): PackProfile? {
     PackStore.appendHistory(ctx, cur, used)
     val s = cur.copy(settled = true)
     PackStore.save(ctx, s)
-    return s
+    if (cur.cycleDay <= 0) return s
+    // Renewal: the next pack starts on the renewal day on or after today, same size and price.
+    val zone = ZoneId.systemDefault()
+    val next = cur.copy(
+        start = nextCycleStart(LocalDate.now(zone), cur.cycleDay).atStartOfDay(zone).toInstant().toEpochMilli(),
+        settled = false, alert80 = false, alertRisk = false
+    )
+    PackStore.save(ctx, next)
+    return next
+}
+
+/** Local midnight today, epoch millis. */
+private fun packStartOfToday(): Long {
+    val zone = ZoneId.systemDefault()
+    return LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
 }
 
 const val PACK_STATUS_OK = 0
@@ -236,6 +261,7 @@ fun PackCard() {
     var profile by remember { mutableStateOf(PackStore.load(ctx)) }
     var calc by remember { mutableStateOf<PackCalc?>(null) }
     var editing by remember { mutableStateOf(false) }
+    var todayMobile by remember { mutableStateOf(0L) }
 
     LaunchedEffect(Unit) { PackAlertWorker.schedule(ctx) }
 
@@ -244,8 +270,9 @@ fun PackCard() {
         while (isActive) {
             val used = withContext(Dispatchers.IO) { packUsed(ctx, p0) }
             val p = withContext(Dispatchers.IO) { settlePack(ctx, used) } ?: break
+            if (p != p0) { profile = p; break }
             calc = packCalc(p, used)
-            if (p.settled != p0.settled) { profile = p; break }
+            todayMobile = withContext(Dispatchers.IO) { duTotals(ctx, packStartOfToday(), System.currentTimeMillis()).mobile }
             delay(60_000)
         }
     }
@@ -296,6 +323,26 @@ fun PackCard() {
                     else -> PackPill(tr("মেয়াদ শেষ", "Expired"), MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            if (p.dailyGb > 0) {
+                val quotaBytes = p.dailyGb * GB
+                val qPct = if (quotaBytes <= 0) 0f else (todayMobile / quotaBytes).toFloat().coerceIn(0f, 1f)
+                val qColor = when (quotaLevel(todayMobile, quotaBytes)) {
+                    2 -> Rose500
+                    1 -> PackAmber
+                    else -> DuGreen
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.DataUsage, contentDescription = null, tint = qColor, modifier = Modifier.size(16.dp))
+                    Text(
+                        tr("আজ ", "Today ") + gbText(todayMobile.toDouble()) + " / " + gbText(quotaBytes) + " GB",
+                        fontSize = 13.sp, modifier = Modifier.weight(1f)
+                    )
+                    Text(bnDigits("${(qPct * 100).toInt()}%"), color = qColor, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+                Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(faint(0.08f))) {
+                    Box(Modifier.fillMaxWidth(qPct).fillMaxHeight().clip(RoundedCornerShape(3.dp)).background(qColor))
+                }
+            }
             if (c.status == PACK_STATUS_EXPIRED) {
                 val size = c.sizeBytes
                 val wastedBytes = (size - c.used).coerceAtLeast(0.0)
@@ -335,12 +382,22 @@ private fun PackSheet(current: PackProfile?, onDismiss: () -> Unit, onSave: (Pac
     var price by remember { mutableStateOf(current?.let { fmtInput(it.price) } ?: "") }
     var start by remember { mutableStateOf(current?.let { Instant.ofEpochMilli(it.start).atZone(ZoneId.systemDefault()).toLocalDate().toString() } ?: LocalDate.now().toString()) }
     var days by remember { mutableStateOf(current?.days?.toString() ?: "30") }
+    var cycle by remember {
+        mutableStateOf(
+            current?.takeIf { it.cycleDay > 0 }?.cycleDay?.toString()
+                ?: (runCatching { LocalDate.parse(start.trim().take(10)) }.getOrNull()?.dayOfMonth?.toString() ?: "")
+        )
+    }
+    var daily by remember { mutableStateOf(current?.takeIf { it.dailyGb > 0 }?.let { fmtInput(it.dailyGb) } ?: "") }
 
     val gbV = gb.toDoubleOrNull()
     val priceV = price.toDoubleOrNull()
     val startD = runCatching { LocalDate.parse(start.trim().take(10)) }.getOrNull()
     val daysV = days.toIntOrNull()
-    val valid = gbV != null && gbV > 0 && priceV != null && priceV >= 0 && startD != null && daysV != null && daysV in 1..400
+    val cycleV = if (cycle.isBlank()) 0 else cycle.toIntOrNull() ?: -1
+    val dailyV = if (daily.isBlank()) 0.0 else daily.toDoubleOrNull() ?: -1.0
+    val valid = gbV != null && gbV > 0 && priceV != null && priceV >= 0 && startD != null && daysV != null && daysV in 1..400 &&
+        (cycleV == 0 || cycleV in 1..31) && (dailyV == 0.0 || dailyV > 0)
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -364,11 +421,23 @@ private fun PackSheet(current: PackProfile?, onDismiss: () -> Unit, onSave: (Pac
                 leadingIcon = { Icon(Icons.Default.DateRange, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
+            OutlinedTextField(
+                value = cycle, onValueChange = { cycle = it }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                label = { Text(tr("সাইকেল শুরুর দিন (১–৩১)", "Renewal day (1–31)")) },
+                leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+            OutlinedTextField(
+                value = daily, onValueChange = { daily = it }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                label = { Text(tr("দৈনিক কোটা (GB)", "Daily quota (GB)")) },
+                leadingIcon = { Icon(Icons.Default.DataUsage, contentDescription = null) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+            )
             Button(
                 enabled = valid,
                 onClick = {
                     val startMs = startD!!.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                    onSave(PackProfile(gbV!!, priceV!!, startMs, daysV!!))
+                    onSave(PackProfile(gbV!!, priceV!!, startMs, daysV!!, cycleDay = cycleV, dailyGb = dailyV))
                 },
                 modifier = Modifier.fillMaxWidth()
             ) { Text(tr("সেভ", "Save")) }
@@ -464,7 +533,8 @@ class PackAlertWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
         val saved = PackStore.load(ctx) ?: return@withContext Result.success()
         val used = packUsed(ctx, saved)
         val p = settlePack(ctx, used) ?: return@withContext Result.success()
-        if (!p.settled) {
+        // A renewal changes the window, so this run's used figure belongs to the old one: skip pack alerts then.
+        if (!p.settled && p.start == saved.start) {
             val c = packCalc(p, used)
             var cur = p
             if (!cur.alert80 && c.pct >= 80) {
@@ -476,6 +546,26 @@ class PackAlertWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
                 cur = cur.copy(alertRisk = true)
             }
             if (cur != p) PackStore.save(ctx, cur)
+        }
+        // Daily quota: today's mobile use against the quota; alerts at 80% and 100%, once per day.
+        val fresh = PackStore.load(ctx)
+        if (fresh != null && fresh.dailyGb > 0) {
+            val zone = ZoneId.systemDefault()
+            val today = LocalDate.now(zone)
+            val used = duTotals(ctx, today.atStartOfDay(zone).toInstant().toEpochMilli(), System.currentTimeMillis()).mobile
+            val base = if (fresh.quotaDay == today.toString()) fresh
+                else fresh.copy(quotaDay = today.toString(), quota80 = false, quota100 = false)
+            val level = quotaLevel(used, base.dailyGb * GB)
+            var n = base
+            if (level >= 1 && !n.quota80) {
+                packNotify(ctx, 4403, "দৈনিক কোটার ৮০% ব্যবহৃত", "আজকের মোবাইল ডাটা প্রায় সীমায়।")
+                n = n.copy(quota80 = true)
+            }
+            if (level >= 2 && !n.quota100) {
+                packNotify(ctx, 4404, "আজকের দৈনিক কোটা শেষ", "আজকের মোবাইল ডাটা কোটা পূর্ণ হয়েছে।")
+                n = n.copy(quota100 = true)
+            }
+            if (n != fresh) PackStore.save(ctx, n)
         }
         Result.success()
     }

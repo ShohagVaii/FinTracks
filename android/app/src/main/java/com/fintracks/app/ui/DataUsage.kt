@@ -337,6 +337,7 @@ fun DataUsageScreen() {
         }
 
         LiveAppsCard(showSystem) { openApp = it }
+        LiveNotifRow()
 
         // Period segment
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(cardBg).padding(4.dp)) {
@@ -447,6 +448,7 @@ fun DataUsageScreen() {
 
         PackCard()
         CallCard()
+        PingCard()
 
         // Usage chart: stacked bars, download (cyan) at the bottom, upload (green) on top.
         Column(

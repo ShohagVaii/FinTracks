@@ -1,6 +1,7 @@
 package com.fintracks.app.ui
 
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
@@ -111,3 +112,20 @@ internal fun duSlots(period: DuPeriod, range: DuRange, zone: ZoneId): List<DuSlo
 internal fun duDateLabel(d: LocalDate, english: Boolean = false): String =
     if (english) "${d.dayOfMonth} ${DU_EN_MONTHS[d.monthValue - 1]} ${d.year}"
     else duBnDigits("${d.dayOfMonth}") + " " + DU_BN_MONTHS[d.monthValue - 1] + " " + duBnDigits("${d.year}")
+
+/** First renewal date on or after [from]: the [cycleDay] of a month, clamped to that month's length. */
+internal fun nextCycleStart(from: LocalDate, cycleDay: Int): LocalDate {
+    val day = cycleDay.coerceIn(1, 31)
+    val thisMonth = YearMonth.from(from).let { it.atDay(minOf(day, it.lengthOfMonth())) }
+    if (!thisMonth.isBefore(from)) return thisMonth
+    val next = YearMonth.from(from).plusMonths(1)
+    return next.atDay(minOf(day, next.lengthOfMonth()))
+}
+
+/** Daily quota level: 0 below 80%, 1 from 80%, 2 at or above 100%. 0 when no quota is set. */
+internal fun quotaLevel(usedToday: Long, quotaBytes: Double): Int = when {
+    quotaBytes <= 0.0 -> 0
+    usedToday >= quotaBytes -> 2
+    usedToday >= quotaBytes * 0.8 -> 1
+    else -> 0
+}
