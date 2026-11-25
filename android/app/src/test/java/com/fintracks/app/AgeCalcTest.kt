@@ -15,20 +15,20 @@ import java.time.LocalDate
 
 class AgeCalcTest {
     private val birth = LocalDate.of(2005, 4, 1)
-    private val asOf = LocalDate.of(2026, 11, 23)
+    private val asOf = LocalDate.of(2026, 11, 25)
 
     @Test
     fun ageAndTotalsMatchOwnerCase() {
         val s = ageStats(birth, asOf)!!
         assertEquals(21, s.years)
         assertEquals(7, s.months)
-        assertEquals(22, s.days)
-        assertEquals(7906L, s.totalDays)
+        assertEquals(24, s.days)
+        assertEquals(7908L, s.totalDays)
         assertEquals(1129L, s.weeks)
         assertEquals(259L, s.totalMonths)
-        assertEquals(189744L, s.hours)
-        assertEquals(11384640L, s.minutes)
-        assertEquals(683078400L, s.seconds)
+        assertEquals(189792L, s.hours)
+        assertEquals(11387520L, s.minutes)
+        assertEquals(683251200L, s.seconds)
         assertEquals(DayOfWeek.FRIDAY, s.weekday)
     }
 
@@ -36,7 +36,7 @@ class AgeCalcTest {
     fun nextBirthdayAndProgressMatchOwnerCase() {
         val s = ageStats(birth, asOf)!!
         assertEquals(LocalDate.of(2027, 4, 1), s.next)
-        assertEquals(129L, s.daysToNext)
+        assertEquals(127L, s.daysToNext)
         assertEquals(65, Math.round(s.progress * 100).toInt())
         assertFalse(s.isBirthdayToday)
     }
@@ -45,16 +45,16 @@ class AgeCalcTest {
     fun calendarDatesMatchOwnerCase() {
         assertEquals("18 চৈত্র 1411", bengaliText(birth))
         assertEquals("22 সফর 1426", hijriText(birth))
-        assertEquals("8 অগ্রহায়ণ 1433", bengaliText(asOf))
-        assertEquals("13 জমাদিউস সানি 1448", hijriText(asOf))
+        assertEquals("10 অগ্রহায়ণ 1433", bengaliText(asOf))
+        assertEquals("15 জমাদিউস সানি 1448", hijriText(asOf))
     }
 
     @Test
     fun indianGroupingAndZodiac() {
         assertEquals("7,906", groupIndian(7906))
-        assertEquals("1,89,744", groupIndian(189744))
-        assertEquals("1,13,84,640", groupIndian(11384640))
-        assertEquals("68,30,78,400", groupIndian(683078400))
+        assertEquals("1,89,792", groupIndian(189792))
+        assertEquals("1,13,87,520", groupIndian(11387520))
+        assertEquals("68,32,51,200", groupIndian(683251200))
         assertEquals("মেষ", zodiacBn(birth))
     }
 
