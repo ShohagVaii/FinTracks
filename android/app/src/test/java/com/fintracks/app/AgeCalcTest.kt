@@ -60,7 +60,7 @@ class AgeCalcTest {
 
     @Test
     fun birthdayTodayAndFutureBirth() {
-        val today = ageStats(LocalDate.of(2000, 11, 23), asOf)!!
+        val today = ageStats(LocalDate.of(2000, 11, 25), asOf)!!
         assertTrue(today.isBirthdayToday)
         assertEquals(0L, today.daysToNext)
         assertNull(ageStats(LocalDate.of(2027, 1, 1), asOf))
