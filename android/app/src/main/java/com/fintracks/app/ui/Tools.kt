@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.TwoWheeler
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.foundation.clickable
@@ -156,7 +157,7 @@ private fun defaultTools(): List<ToolTile> = listOf(
     ToolTile(Overlay.ACCOUNTS, "অ্যাকাউন্ট", Icons.Default.Add, Slate400),
     ToolTile(Overlay.COUNTER, "টাকা গণক", Icons.Default.Payments, Tok_FF84CC16),
     ToolTile(Overlay.AGE, "বয়স ক্যালকুলেটর", Icons.Default.Cake, Tok_FFE879F9),
-    ToolTile(Overlay.BIKE, "বাইক", Icons.Default.Build, Color(0xFF8B5CF6)),
+    ToolTile(Overlay.BIKE, "বাইক", Icons.Default.TwoWheeler, Color(0xFF8B5CF6)),
     ToolTile(Overlay.TRASH, "আবর্জনা", Icons.Default.Delete, Color(0xFF64748B)),
     ToolTile(Overlay.NOTES, "নোটপ্যাড", Icons.Default.Description, Tok_FFFACC15)
 )

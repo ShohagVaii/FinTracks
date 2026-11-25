@@ -208,6 +208,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val base = fetched + ("profiles" to listOfNotNull(profile))
             outbox.remember(base)
             publish(base, pendingSms = PendingSmsStore.load(getApplication()))
+            if (outbox.pendingCount.value == 0) backfillBike()
             _state.update { it.copy(syncError = null) }
             syncRegistry(profile, liveTables(fetched)["transactions"].orEmpty())
         } catch (e: CancellationException) {
@@ -615,6 +616,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Insert (id null, or a row with its own id) or update of one row. Debt entries also get created_at and settled. */
     private fun saveOps(table: String, body: JsonObject, id: String?): List<JsonObject> {
+        if (table == BikeLink.TX) bikeTxOps(body, id)?.let { return it }
         if (id == null) {
             val nid = body.str("id").ifEmpty { newId() }
             val extra: Map<String, JsonElement> = if (table == "debts")
@@ -624,6 +626,62 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         val existing = state.value.rows(table).firstOrNull { it.id() == id } ?: JsonObject(emptyMap())
         return listOf(LocalOutbox.op("update", table, id, body, JsonObject(existing + body)))
+    }
+
+    /**
+     * Bike category on a transaction. A linked bike expense keeps its category and mirrors amount, date and note
+     * into its entry. A manual bike expense gets its fuel entry in the same group, so a refused write drops both.
+     * Returns null for every other transaction.
+     */
+    private fun bikeTxOps(body: JsonObject, id: String?): List<JsonObject>? {
+        val s = state.value
+        val existing = id?.let { i -> s.rows(BikeLink.TX).firstOrNull { it.id() == i } }
+        if (existing != null && existing.str("source") == "bike") {
+            val fixed = JsonObject(body + mapOf("type" to JsonPrimitive("Expense"), "category" to JsonPrimitive(BIKE_CAT)))
+            val tx = JsonObject(existing + fixed)
+            val ops = mutableListOf(BikeLink.updateOp(BikeLink.TX, existing, fixed))
+            val ref = existing.str("source_ref")
+            val table = listOf(BikeLink.FUEL, BikeLink.MAINT).firstOrNull { t -> s.rows(t).any { it.id() == ref } }
+            val entry = table?.let { t -> s.rows(t).firstOrNull { it.id() == ref } }
+            if (table != null && entry != null) {
+                ops += BikeLink.updateOp(table, entry, BikeLink.entryFieldsFromTx(table, tx, entry, ::bikeKindLabel))
+            }
+            return ops
+        }
+        val merged = JsonObject((existing ?: JsonObject(emptyMap())) + body)
+        if (!BikeLink.isManualBikeTx(merged)) return null
+        val txId = id ?: body.str("id").ifEmpty { newId() }
+        val entryId = BikeLink.fuelIdForTx(txId)
+        val group = newId()
+        val link = mapOf("source" to JsonPrimitive("bike"), "source_ref" to JsonPrimitive(entryId))
+        val txOp = if (existing == null) {
+            BikeLink.insertOp(BikeLink.TX, JsonObject(body + mapOf("id" to JsonPrimitive(txId)) + link), group)
+        } else {
+            BikeLink.updateOp(BikeLink.TX, existing, JsonObject(body + link), group)
+        }
+        val entry = BikeLink.fuelRowFor(entryId, merged.str("tx_date").take(10), merged.num("amount"), "", merged.str("note"), txId)
+        return listOf(txOp, BikeLink.insertOp(BikeLink.FUEL, entry, group))
+    }
+
+    /** Edit of a bike entry: the entry changes and so does its linked expense (amount, date, note). */
+    fun saveBikeEntry(table: String, body: JsonObject, id: String) {
+        val s = state.value
+        val entry = s.rows(table).firstOrNull { it.id() == id } ?: return
+        val merged = JsonObject(entry + body)
+        val ops = mutableListOf(BikeLink.updateOp(table, entry, body))
+        val tx = s.rows(BikeLink.TX).firstOrNull { it.id() == merged.str("tx_id") }
+        if (tx != null && tx.str("source") == "bike") {
+            ops += BikeLink.updateOp(BikeLink.TX, tx, BikeLink.txFieldsOf(table, merged, ::bikeKindLabel))
+        }
+        localChange(ops)
+    }
+
+    /** Links bike entries and bike expenses that are not linked yet. Runs after a full load, with nothing waiting to send. */
+    private fun backfillBike() {
+        val s = state.value
+        if (!s.tables.containsKey(BikeLink.FUEL) || !s.tables.containsKey(BikeLink.MAINT)) return
+        val ops = BikeLink.backfill(s.rows(BikeLink.TX), s.rows(BikeLink.FUEL), s.rows(BikeLink.MAINT), s.currency, ::bikeKindLabel)
+        if (ops.isNotEmpty()) localChange(ops)
     }
 
     /** The change that removes one row: a soft delete (moved to the Trash) for trash tables, a hard delete otherwise. */

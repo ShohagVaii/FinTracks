@@ -679,7 +679,8 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
     var error by remember { mutableStateOf<String?>(null) }
     // A বাকি-পরিশোধ expense is changed from the বাকি খাতা, so it cannot drift from the debt.
     val source = existing?.str("source").orEmpty()
-    val locked = source == "debt_payment" || source == "personal_debt_payment" || source == "bike"
+    // A bike expense stays editable here: its fuel or maintenance entry follows the change (AppViewModel).
+    val locked = source == "debt_payment" || source == "personal_debt_payment"
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var reading by remember { mutableStateOf(false) }
