@@ -1,5 +1,6 @@
 package com.fintracks.app.ui
 
+import androidx.activity.compose.BackHandler
 import android.app.usage.NetworkStats
 import android.app.usage.NetworkStatsManager
 import android.content.Context
@@ -47,7 +48,7 @@ import java.util.concurrent.ConcurrentHashMap
 /** Data usage tool: live speed, totals per period, and per-app usage. Needs Usage Access for the totals. */
 
 internal val DuCyan = Color(0xFF38C7E0)
-private val DuPurple = Color(0xFF8B7CF6)
+internal val DuPurple = Color(0xFF8B7CF6)
 internal val DuGreen = Color(0xFF2ECC71)
 
 /** Icon bitmaps by package, so rows do not reload icons on every refresh. */
@@ -61,7 +62,7 @@ class DuTotals(val mobile: Long, val wifi: Long, val rx: Long, val tx: Long) {
     val total: Long get() = mobile + wifi
 }
 
-class DuApp(val label: String, val pkg: String?, val system: Boolean, val rx: Long, val tx: Long) {
+class DuApp(val uid: Int, val label: String, val pkg: String?, val system: Boolean, val rx: Long, val tx: Long) {
     val bytes: Long get() = rx + tx
 }
 
@@ -133,14 +134,14 @@ private fun duApps(ctx: Context, types: List<Int>, start: Long, end: Long): List
         if (pkg != null && appLabel != null) duUidCache[uid] = pkg to appLabel
         val system = uid < 10000 || (info != null && (info.flags and ApplicationInfo.FLAG_SYSTEM) != 0)
         DuApp(
-            label = uidLabel(uid, appLabel, AppPrefs.english),
+            uid = uid, label = uidLabel(uid, appLabel, AppPrefs.english),
             pkg = pkg, system = system, rx = v[0], tx = v[1]
         )
     }.sortedByDescending { it.bytes }
 }
 
 /** Bytes as "28.6 GB": the number and the unit. Decimals: 2 below 10, 1 below 100, none above. */
-private fun duParts(bytes: Long, perSecond: Boolean = false): Pair<String, String> {
+internal fun duParts(bytes: Long, perSecond: Boolean = false): Pair<String, String> {
     val unit: String
     val v: Double
     when {
@@ -204,7 +205,7 @@ private fun duSlotUsages(ctx: Context, slots: List<DuSlot>): List<DuSlotUsage> {
     }
 }
 
-private fun duShort(bytes: Long): String = if (bytes == 0L) (if (AppPrefs.english) "0 B" else "০ B") else duText(bytes)
+internal fun duShort(bytes: Long): String = if (bytes == 0L) (if (AppPrefs.english) "0 B" else "০ B") else duText(bytes)
 
 @Composable
 fun DataUsageScreen() {
@@ -225,6 +226,7 @@ fun DataUsageScreen() {
     var granted by remember { mutableStateOf(duHasUsageAccess(ctx)) }
     var load by remember { mutableStateOf<DuLoad?>(null) }
     var slotApps by remember { mutableStateOf<List<DuApp>>(emptyList()) }
+    var openApp by remember { mutableStateOf<DuApp?>(null) }
 
     val range = duRangeFor(period, anchor, customFrom, customTo)
     val slots = remember(period, range.from, range.to) { duSlots(period, range, zone) }
@@ -303,6 +305,12 @@ fun DataUsageScreen() {
     val ld = load
     val usage = ld?.usage ?: emptyList()
 
+    openApp?.let { app ->
+        BackHandler { openApp = null }
+        DataUsageAppDetail(app) { openApp = null }
+        return
+    }
+
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -327,6 +335,8 @@ fun DataUsageScreen() {
             SpeedCell(tr("ডাউনলোড", "Download"), duText(down, perSecond = true), DuCyan, Icons.Default.ArrowDownward, Modifier.weight(1f))
             SpeedCell(tr("আপলোড", "Upload"), duText(up, perSecond = true), DuGreen, Icons.Default.ArrowUpward, Modifier.weight(1f))
         }
+
+        LiveAppsCard(showSystem) { openApp = it }
 
         // Period segment
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(cardBg).padding(4.dp)) {
@@ -459,7 +469,7 @@ fun DataUsageScreen() {
                 if (pickedApps.isEmpty()) {
                     Text(tr("এই সময়ে ডাটা ব্যবহারের তথ্য নেই", "No data usage in this period"), color = muted, fontSize = 13.sp)
                 }
-                pickedApps.forEach { app -> AppRow(app, peak) }
+                pickedApps.forEach { app -> AppRow(app, peak) { openApp = it } }
             }
         }
 
@@ -497,7 +507,7 @@ fun DataUsageScreen() {
         if (shown.isEmpty()) {
             Text(tr("এই সময়ে ডাটা ব্যবহারের তথ্য নেই", "No data usage in this period"), color = muted, fontSize = 13.sp)
         }
-        shown.forEach { app -> AppRow(app, max) }
+        shown.forEach { app -> AppRow(app, max) { openApp = it } }
     }
 
     if (showFrom) {
@@ -517,15 +527,15 @@ fun DataUsageScreen() {
 
 /** Header label for a slot: the hour for the day view, the date otherwise. */
 @Composable
-private fun slotTitle(period: DuPeriod, slot: DuSlot): String =
+internal fun slotTitle(period: DuPeriod, slot: DuSlot): String =
     if (period == DuPeriod.DAY) slot.label + ":" + (if (AppPrefs.english) "00" else "০০")
     else duRangeLabel(DuPeriod.DAY, DuRange(slot.day, slot.day), AppPrefs.english)
 
 @Composable
-private fun AppRow(app: DuApp, max: Long) {
+internal fun AppRow(app: DuApp, max: Long, onOpen: (DuApp) -> Unit) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(faint(0.05f)).border(1.dp, faint(0.1f), RoundedCornerShape(16.dp)).padding(12.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(faint(0.05f)).border(1.dp, faint(0.1f), RoundedCornerShape(16.dp)).padding(12.dp).clickable { onOpen(app) },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -549,7 +559,7 @@ private fun AppRow(app: DuApp, max: Long) {
 
 /** Stacked bars for the slots: download (cyan) at the bottom, upload (green) on top; tap selects a bar. */
 @Composable
-private fun UsageChart(usage: List<DuSlotUsage>, medium: DuMedium, selected: Int, onTap: (Int) -> Unit) {
+internal fun UsageChart(usage: List<DuSlotUsage>, medium: DuMedium, selected: Int, onTap: (Int) -> Unit) {
     val max = (usage.maxOfOrNull { it.total(medium) } ?: 0L).coerceAtLeast(1L)
     Row(Modifier.fillMaxWidth().height(150.dp)) {
         usage.forEachIndexed { i, u ->
@@ -573,7 +583,7 @@ private fun UsageChart(usage: List<DuSlotUsage>, medium: DuMedium, selected: Int
 
 /** Labels under the chart: about seven evenly spaced ones. */
 @Composable
-private fun AxisLabels(labels: List<String>) {
+internal fun AxisLabels(labels: List<String>) {
     val step = ((labels.size + 6) / 7).coerceAtLeast(1)
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     Row(Modifier.fillMaxWidth()) {
@@ -584,7 +594,7 @@ private fun AxisLabels(labels: List<String>) {
 }
 
 @Composable
-private fun DuChip(icon: ImageVector?, text: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+internal fun DuChip(icon: ImageVector?, text: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val tint = if (selected) DuCyan else MaterialTheme.colorScheme.onSurfaceVariant
     Row(
         modifier.clip(RoundedCornerShape(50))
@@ -603,7 +613,7 @@ private fun DuChip(icon: ImageVector?, text: String, selected: Boolean, modifier
 }
 
 @Composable
-private fun NavArrow(icon: ImageVector, enabled: Boolean, onClick: () -> Unit) {
+internal fun NavArrow(icon: ImageVector, enabled: Boolean, onClick: () -> Unit) {
     Box(
         Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(faint(0.05f)).clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
@@ -612,7 +622,7 @@ private fun NavArrow(icon: ImageVector, enabled: Boolean, onClick: () -> Unit) {
     }
 }
 
-private fun fraction(part: Long, whole: Long): Float = if (whole <= 0L) 0f else (part.toDouble() / whole).toFloat().coerceIn(0f, 1f)
+internal fun fraction(part: Long, whole: Long): Float = if (whole <= 0L) 0f else (part.toDouble() / whole).toFloat().coerceIn(0f, 1f)
 
 @Composable
 private fun SpeedCell(label: String, value: String, color: Color, icon: ImageVector, modifier: Modifier) {
@@ -626,7 +636,7 @@ private fun SpeedCell(label: String, value: String, color: Color, icon: ImageVec
 }
 
 @Composable
-private fun DuBar(icon: ImageVector, label: String, value: String, fraction: Float, color: Color) {
+internal fun DuBar(icon: ImageVector, label: String, value: String, fraction: Float, color: Color) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -642,7 +652,7 @@ private fun DuBar(icon: ImageVector, label: String, value: String, fraction: Flo
 }
 
 @Composable
-private fun StatTile(icon: ImageVector, label: String, value: String, color: Color, modifier: Modifier) {
+internal fun StatTile(icon: ImageVector, label: String, value: String, color: Color, modifier: Modifier) {
     Column(
         modifier.clip(RoundedCornerShape(16.dp)).background(faint(0.05f)).border(1.dp, faint(0.1f), RoundedCornerShape(16.dp)).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -657,7 +667,7 @@ private fun StatTile(icon: ImageVector, label: String, value: String, color: Col
 
 /** Download-then-upload stacked bar: cyan for download, green for upload, scaled to [max]. */
 @Composable
-private fun StackedBar(down: Long, up: Long, max: Long) {
+internal fun StackedBar(down: Long, up: Long, max: Long) {
     val total = down + up
     Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(faint(0.08f))) {
         if (total > 0L) {
@@ -670,7 +680,7 @@ private fun StackedBar(down: Long, up: Long, max: Long) {
 }
 
 @Composable
-private fun IconValue(icon: ImageVector, color: Color, label: String, value: String) {
+internal fun IconValue(icon: ImageVector, color: Color, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(13.dp))
         Text(label + value, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
@@ -679,7 +689,7 @@ private fun IconValue(icon: ImageVector, color: Color, label: String, value: Str
 
 /** The app's real icon; a letter avatar when the icon cannot be loaded. */
 @Composable
-private fun AppIcon(pkg: String?, label: String) {
+internal fun AppIcon(pkg: String?, label: String) {
     val ctx = LocalContext.current
     val bmp by produceState<ImageBitmap?>(initialValue = pkg?.let { duIconCache[it] }, pkg) {
         value = if (pkg == null) null else duIconCache[pkg] ?: withContext(Dispatchers.IO) {
