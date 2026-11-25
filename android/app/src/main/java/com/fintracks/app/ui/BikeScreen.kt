@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -359,6 +360,7 @@ private fun MaintRow(m: MaintEntry, privacy: Boolean, onLong: () -> Unit) {
 }
 
 /** Bottom sheet opened by a long press on an entry. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EntryActionSheet(onEdit: () -> Unit, onDelete: () -> Unit, onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
