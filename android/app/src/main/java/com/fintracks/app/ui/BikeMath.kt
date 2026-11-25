@@ -71,7 +71,7 @@ internal fun dueDate(today: LocalDate, kmLeft: Double, perDay: Double?): LocalDa
     return today.plusDays(ceil(kmLeft / perDay).toLong())
 }
 
-class BikeStats(
+internal class BikeStats(
     val monthCost: Double,
     val totalCost: Double,
     val latestOdo: Double,
@@ -88,7 +88,7 @@ class BikeStats(
 private fun isoDate(s: String): LocalDate? = runCatching { LocalDate.parse(s.take(10)) }.getOrNull()
 
 /** Costs, distance and mileage for the bike tool, from the fuel and maintenance entries. Entries without an odometer count for cost only. */
-fun bikeStats(fuel: List<FuelEntry>, maint: List<MaintEntry>, today: String): BikeStats {
+internal fun bikeStats(fuel: List<FuelEntry>, maint: List<MaintEntry>, today: String): BikeStats {
     val month = today.take(7)
     val totalCost = fuel.sumOf { it.total } + maint.sumOf { it.cost }
     val fuelMonth = fuel.filter { it.date.startsWith(month) }
