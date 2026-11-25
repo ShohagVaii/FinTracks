@@ -40,6 +40,7 @@ val TABLES: List<Pair<String, String>> = listOf(
     "transactions" to "select=*&order=tx_date.desc,created_at.desc",
     "bike_fuel_entries" to "select=*&order=tx_date.desc",
     "bike_maintenance_entries" to "select=*&order=tx_date.desc",
+    "calendar_marks" to "select=*&order=mark_date.asc",
     "accounts" to "select=*&order=created_at.asc",
     "budgets" to "select=*",
     "goals" to "select=*",

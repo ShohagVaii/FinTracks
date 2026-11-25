@@ -25,7 +25,7 @@ object Sync {
     private const val PREFS = "fintrack_sync"
 
     /** Tables that may be missing on the server until their migration is applied. */
-    private val OPTIONAL_TABLES = setOf("debt_payments", "ai_chat_messages", "bike_fuel_entries", "bike_maintenance_entries")
+    private val OPTIONAL_TABLES = setOf("debt_payments", "ai_chat_messages", "bike_fuel_entries", "bike_maintenance_entries", "calendar_marks")
 
     /** Remembers when the last successful table fetch finished (shown in Settings). */
     fun markOk(ctx: Context) {
@@ -101,6 +101,7 @@ object Sync {
         val live = liveTables(tables)
         Reminders.check(ctx, live)
         SmartAlerts.evaluate(ctx, live)
+        BirthdayWish.mirror(ctx, calMarks(live[CAL_TABLE].orEmpty()))
         FinTrackWidgetProvider.refresh(ctx, live, privacy)
         return live
     }

@@ -54,6 +54,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Cake
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.AccountBalance
@@ -146,6 +147,7 @@ private fun defaultTools(): List<ToolTile> = listOf(
     ToolTile(Overlay.DATA, "ডাটা", Icons.Default.SignalCellularAlt, Sky400),
     ToolTile(Overlay.MATH, "অংক কথায়", Icons.Default.Calculate, Color(0xFF14B8A6)),
     ToolTile(Overlay.EXPORT, "এক্সপোর্ট", Icons.Default.Share, Color(0xFF6366F1)),
+    ToolTile(Overlay.CALENDAR, "ক্যালেন্ডার", Icons.Default.CalendarMonth, Color(0xFFF43F5E)),
     ToolTile(Overlay.CURRENCY, "কনভার্টার", Icons.Default.Refresh, Tok_FF60A5FA),
     ToolTile(Overlay.SUBSCRIPTIONS, "সাবস্ক্রিপশন", Icons.Default.Repeat, Tok_FFA78BFA),
     ToolTile(Overlay.CREDIT, "বাকি খাতা", Icons.Default.Receipt, Amber400),

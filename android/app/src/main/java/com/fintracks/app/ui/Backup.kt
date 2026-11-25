@@ -90,5 +90,5 @@ val RESTORE_ORDER: List<String> = listOf(
     "categories", "accounts", "credit_shops", "mess_members", "transactions", "budgets", "goals", "debt_people", "debts", "debt_payments", "loans",
     "subscriptions", "investments", "credit_entries", "credit_payments", "bill_splits", "shopping_items",
     "mess_bazaars", "mess_meals", "mess_deposits", "cash_counts",
-    "bike_fuel_entries", "bike_maintenance_entries", "ai_chat_messages"
+    "bike_fuel_entries", "bike_maintenance_entries", "ai_chat_messages", "calendar_marks"
 )

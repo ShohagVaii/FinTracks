@@ -7,6 +7,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import com.fintracks.app.ui.AppLock
 import com.fintracks.app.ui.DailyReminder
+import com.fintracks.app.ui.BirthdayWish
 import com.fintracks.app.ui.DailySyncWorker
 import com.fintracks.app.data.PushRouter
 import com.fintracks.app.ui.FinTracksApp
@@ -25,6 +26,7 @@ class MainActivity : FragmentActivity() {
         // Background work is queued after the first frame, so it never delays the home screen.
         window.decorView.post {
             DailySyncWorker.schedule(this)
+            BirthdayWish.schedule(this)
             DailyReminder.ensureScheduled(this)
         }
     }
