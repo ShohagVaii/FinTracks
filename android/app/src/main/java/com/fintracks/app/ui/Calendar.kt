@@ -182,7 +182,7 @@ class BirthdayWishWorker(ctx: Context, params: WorkerParameters) : CoroutineWork
 
 /* ---------- Screen ---------- */
 
-private fun saveMark(vm: AppViewModel, kind: String, title: String, date: LocalDate, color: String, yearly: Boolean, id: String?) {
+internal fun saveMark(vm: AppViewModel, kind: String, title: String, date: LocalDate, color: String, yearly: Boolean, id: String?) {
     vm.save(
         CAL_TABLE,
         row("kind" to kind, "title" to title, "mark_date" to date.toString(), "color" to color, "yearly" to yearly),

@@ -528,7 +528,7 @@ private fun OverlayContent(
         Overlay.REPORTS -> ReportsScreen(state) { go("ov:EXPORT") }
         Overlay.SETTINGS -> SettingsScreen(state, vm, subPage, { go("ov:SETTINGS/$it") }, onClose)
         Overlay.COUNTER -> MoneyCounterScreen(vm, counterHistory) { on -> if (on) go("ov:COUNTER/hist") else onClose() }
-        Overlay.AGE -> AgeCalcScreen()
+        Overlay.AGE -> AgeCalcScreen(state, vm)
         Overlay.NOTES -> NotesScreen(vm, subPage, go, onClose)
         Overlay.BIKE -> BikeScreen(state, vm)
         Overlay.TRASH -> TrashScreen(state, vm)
