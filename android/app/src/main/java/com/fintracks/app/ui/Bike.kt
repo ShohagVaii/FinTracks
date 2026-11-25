@@ -77,16 +77,18 @@ data class MaintEntry(
     val txId: String = ""
 )
 
+/** Kinds offered in the maintenance form. */
 fun bikeKinds() = listOf(
-    "mobil" to tr("মোবিল", "Oil"),
     "service" to tr("সার্ভিস", "Service"),
+    "repair" to tr("মেরামত", "Repair"),
     "parts" to tr("পার্টস", "Parts"),
-    "tyre" to tr("টায়ার", "Tyre"),
-    "chain" to tr("চেইন", "Chain"),
     "other" to tr("অন্যান্য", "Other")
 )
 
-fun bikeKindLabel(kind: String): String = bikeKinds().firstOrNull { it.first == kind }?.second ?: kind
+/** Labels for every kind ever saved, so older rows (oil, tyre, chain) still read correctly. */
+fun bikeKindLabel(kind: String): String =
+    (bikeKinds() + listOf("mobil" to tr("মোবিল", "Oil"), "tyre" to tr("টায়ার", "Tyre"), "chain" to tr("চেইন", "Chain")))
+        .firstOrNull { it.first == kind }?.second ?: kind
 
 private fun JsonObject.optNum(k: String): Double? = (this[k] as? JsonPrimitive)?.doubleOrNull
 

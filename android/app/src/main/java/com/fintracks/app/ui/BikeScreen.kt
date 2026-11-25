@@ -224,10 +224,12 @@ private fun ServiceCard(kmLeft: Double, date: LocalDate?) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon(Icons.Default.Build, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.width(20.dp).height(20.dp))
             Column(Modifier.weight(1f)) {
-                Text(
-                    tr("পরের সার্ভিস: আর ", "Next service: ") + bnDigits("%.0f".format(kmLeft)) + tr(" কিমি বাকি", " km left"),
-                    fontWeight = FontWeight.SemiBold, fontSize = 14.sp
-                )
+                val text = if (kmLeft >= 0) {
+                    tr("পরের সার্ভিস: আর ", "Next service: ") + bnDigits("%.0f".format(kmLeft)) + tr(" কিমি বাকি", " km left")
+                } else {
+                    tr("সার্ভিস পেরিয়ে গেছে: ", "Service overdue: ") + bnDigits("%.0f".format(-kmLeft)) + tr(" কিমি", " km")
+                }
+                Text(text, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 date?.let {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(displayDate(it.toString()), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -520,7 +522,9 @@ private fun MaintForm(state: UiState, vm: AppViewModel, existing: MaintEntry?, o
         content = {
             error?.let { Text(it, color = readableOn(Rose500), fontSize = 12.sp) }
             FieldLabel(tr("ধরন", "Type"))
-            PickerField(kind, bikeKinds()) { kind = it }
+            // A row saved with an older kind keeps its kind in the list until it is changed.
+            val kindOptions = bikeKinds().let { o -> if (o.any { it.first == kind }) o else o + (kind to bikeKindLabel(kind)) }
+            PickerField(kind, kindOptions) { kind = it }
             TextIn(tr("আইটেম / কাজ", "Item / work"), item, { item = it })
             TextIn(tr("খরচ (৳)", "Cost (৳)"), cost, { cost = it }, number = true)
             FieldLabel(tr("তারিখ", "Date"))

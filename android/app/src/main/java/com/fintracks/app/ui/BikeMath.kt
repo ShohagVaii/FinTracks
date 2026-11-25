@@ -101,9 +101,9 @@ internal fun bikeStats(fuel: List<FuelEntry>, maint: List<MaintEntry>, today: St
     val latest = odos.maxOrNull() ?: 0.0
     val mileages = fillMileages(fuel)
     val (avg, approx) = averageMileage(mileages)
+    // The newest service that set a next-service km decides the reminder; an older one is superseded.
     val nextKm = maint.mapNotNull { m -> m.nextKm?.let { m to it } }
-        .filter { it.second >= latest }
-        .minByOrNull { it.second }
+        .maxWithOrNull(compareBy<Pair<MaintEntry, Double>>({ it.first.odo ?: 0.0 }, { it.first.date }))
     val nextDate = maint.filter { it.nextDate.isNotEmpty() && it.nextDate >= today }.minByOrNull { it.nextDate }
     val points = (fuel.mapNotNull { f -> f.odo?.let { isoDate(f.date) to it } } +
         maint.mapNotNull { m -> m.odo?.let { isoDate(m.date) to it } }).mapNotNull { (d, o) -> d?.let { it to o } }

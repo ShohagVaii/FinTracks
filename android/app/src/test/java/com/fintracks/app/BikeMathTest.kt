@@ -117,6 +117,27 @@ class BikeMathTest {
         assertEquals(3.0, s.monthPerKm!!, 0.001)
     }
 
+    @Test fun serviceReminderUsesNewestServiceAndShowsOverdue() {
+        val fuel = listOf(FuelEntry(id = "f1", date = "2026-11-10", odo = 5000.0, total = 800.0))
+        val old = MaintEntry(id = "m1", date = "2026-06-01", kind = "service", item = "", cost = 900.0, odo = 2000.0, nextKm = 4000.0)
+        val newer = MaintEntry(id = "m2", date = "2026-10-01", kind = "service", item = "", cost = 900.0, odo = 4500.0, nextKm = 8000.0)
+        val s = bikeStats(fuel, listOf(old, newer), "2026-11-19")
+        assertEquals(8000.0, s.nextKm!!.second, 0.001)
+        assertEquals(3000.0, s.nextKm!!.second - s.latestOdo, 0.001)
+        // Passed the service km: still shown, as overdue (negative km left).
+        val late = MaintEntry(id = "m3", date = "2026-10-01", kind = "service", item = "", cost = 900.0, odo = 4000.0, nextKm = 4500.0)
+        val s2 = bikeStats(fuel, listOf(late), "2026-11-19")
+        assertEquals(-500.0, s2.nextKm!!.second - s2.latestOdo, 0.001)
+        assertNull(dueDate(LocalDate.of(2026, 11, 19), -500.0, 100.0))
+    }
+
+    @Test fun noServiceKmMeansNoReminder() {
+        val fuel = listOf(FuelEntry(id = "f1", date = "2026-11-10", odo = 5000.0, total = 800.0))
+        val m = MaintEntry(id = "m1", date = "2026-10-01", kind = "repair", item = "", cost = 300.0, odo = 4000.0)
+        assertNull(bikeStats(fuel, listOf(m), "2026-11-19").nextKm)
+        assertNull(bikeStats(fuel, emptyList(), "2026-11-19").nextKm)
+    }
+
     @Test fun nearestPointPicksTheTappedColumn() {
         assertEquals(0, nearestPoint(0f, 100f, 5))
         assertEquals(4, nearestPoint(100f, 100f, 5))

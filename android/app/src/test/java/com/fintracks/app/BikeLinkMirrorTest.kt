@@ -77,6 +77,24 @@ class BikeLinkMirrorTest {
         assertEquals(700.0, back.num("total"), 0.001)
     }
 
+    @Test fun maintenanceCreateEditDeleteMirror() {
+        // Add: an unlinked maintenance entry gets its expense (two inserts-or-updates, one group).
+        val ops = BikeLink.backfill(emptyList(), emptyList(), listOf(maint("m1", null)), "BDT", label)
+        assertEquals(2, ops.size)
+        assertEquals(ops[0].str("table"), "transactions")
+        assertEquals(1150.0, (ops[0]["body"] as JsonObject).num("amount"), 0.001)
+        val txId = (ops[0]["body"] as JsonObject).str("id")
+        // Edit: amount follows the cost; the note follows the item when it has one.
+        val edited = BikeLink.txFieldsOf("bike_maintenance_entries",
+            row("cost" to 1500.0, "kind" to "parts", "item" to "Chain", "tx_date" to "2026-11-12"), label, "Cash")
+        assertEquals(1500.0, edited.num("amount"), 0.001)
+        assertEquals("Chain", edited.str("note"))
+        // Delete: the linked expense is found from the entry, and back from the expense.
+        val m = maint("m1", txId)
+        assertEquals(listOf(txId), BikeLink.txIdsForEntry(m, listOf(tx(txId, "bike", "m1"))))
+        assertEquals("m1", BikeLink.entriesForTx(tx(txId, "bike", "m1"), emptyList(), listOf(m)).single().second.id())
+    }
+
     @Test fun paymentMethodGoesOnTheExpense() {
         assertEquals("bKash", BikeLink.txRow("BDT", "t", 1.0, "2026-11-01", "", "f", "bKash").str("payment_mode"))
         assertEquals("Cash", BikeLink.txRow("BDT", "t", 1.0, "2026-11-01", "", "f").str("payment_mode"))
