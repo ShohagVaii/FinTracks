@@ -12,6 +12,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.CellTower
+import androidx.compose.material.icons.filled.DataUsage
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -35,6 +38,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 /** Data usage tool: live speed, totals per period, and per-app usage. Needs Usage Access for the totals. */
 
@@ -42,13 +46,20 @@ internal val DuCyan = Color(0xFF38C7E0)
 private val DuPurple = Color(0xFF8B7CF6)
 internal val DuGreen = Color(0xFF2ECC71)
 
+/** Icon bitmaps by package, so rows do not reload icons on every refresh. */
+private val duIconCache = ConcurrentHashMap<String, ImageBitmap>()
+/** UID -> (package, app label), filled on the first successful lookup. */
+private val duUidCache = ConcurrentHashMap<Int, Pair<String, String>>()
+
 enum class DuSpan(val bn: String, val en: String) { DAY("আজ", "Today"), WEEK("সপ্তাহ", "Week"), MONTH("মাস", "Month") }
 
 class DuTotals(val mobile: Long, val wifi: Long, val rx: Long, val tx: Long) {
     val total: Long get() = mobile + wifi
 }
 
-class DuApp(val label: String, val pkg: String?, val system: Boolean, val bytes: Long)
+class DuApp(val label: String, val pkg: String?, val system: Boolean, val rx: Long, val tx: Long) {
+    val bytes: Long get() = rx + tx
+}
 
 /** Start of the period in epoch millis (today, the last 7 days, or this month). */
 internal fun duStart(span: DuSpan): Long {
@@ -87,11 +98,11 @@ internal fun duTotals(ctx: Context, start: Long, end: Long): DuTotals {
     return DuTotals(mobile = mRx + mTx, wifi = wRx + wTx, rx = mRx + wRx, tx = mTx + wTx)
 }
 
-/** Usage per app (uid), mobile and Wi-Fi together, largest first. */
+/** Usage per app (uid), mobile and Wi-Fi together, largest first. Names come from PackageManager. */
 private fun duApps(ctx: Context, start: Long, end: Long): List<DuApp> {
     val nsm = ctx.getSystemService(NetworkStatsManager::class.java)
     val pm = ctx.packageManager
-    val byUid = HashMap<Int, Long>()
+    val byUid = HashMap<Int, LongArray>() // [rx, tx]
     for (type in listOf(ConnectivityManager.TYPE_MOBILE, ConnectivityManager.TYPE_WIFI)) {
         try {
             val stats: NetworkStats = nsm.queryDetails(type, null, start, end)
@@ -99,7 +110,9 @@ private fun duApps(ctx: Context, start: Long, end: Long): List<DuApp> {
             try {
                 while (stats.hasNextBucket()) {
                     stats.getNextBucket(b)
-                    byUid[b.uid] = (byUid[b.uid] ?: 0L) + b.rxBytes + b.txBytes
+                    val acc = byUid.getOrPut(b.uid) { LongArray(2) }
+                    acc[0] += b.rxBytes
+                    acc[1] += b.txBytes
                 }
             } finally {
                 stats.close()
@@ -108,13 +121,17 @@ private fun duApps(ctx: Context, start: Long, end: Long): List<DuApp> {
             // This network type has no data for the period; the other one still counts.
         }
     }
-    return byUid.filter { it.value > 0L }.map { (uid, bytes) ->
-        val pkg = pm.getPackagesForUid(uid)?.firstOrNull()
+    return byUid.filter { it.value[0] + it.value[1] > 0L }.map { (uid, v) ->
+        val cached = duUidCache[uid]
+        val pkg = cached?.first ?: pm.getPackagesForUid(uid)?.firstOrNull()
         val info = pkg?.let { runCatching { pm.getApplicationInfo(it, 0) }.getOrNull() }
+        val appLabel = info?.let { pm.getApplicationLabel(it).toString() } ?: cached?.second
+        if (pkg != null && appLabel != null) duUidCache[uid] = pkg to appLabel
         val system = uid < 10000 || (info != null && (info.flags and ApplicationInfo.FLAG_SYSTEM) != 0)
-        val label = info?.let { pm.getApplicationLabel(it).toString() }
-            ?: if (uid < 10000) tr("সিস্টেম", "System") else "UID $uid"
-        DuApp(label = label, pkg = pkg, system = system, bytes = bytes)
+        DuApp(
+            label = uidLabel(uid, appLabel, AppPrefs.english),
+            pkg = pkg, system = system, rx = v[0], tx = v[1]
+        )
     }.sortedByDescending { it.bytes }
 }
 
@@ -217,7 +234,7 @@ fun DataUsageScreen() {
             Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(cardBg).border(1.dp, cardBorder, RoundedCornerShape(20.dp)).padding(16.dp)
         ) {
             SpeedCell(tr("ডাউনলোড", "Download"), duText(down, perSecond = true), DuCyan, Icons.Default.ArrowDownward, Modifier.weight(1f))
-            SpeedCell(tr("আপলোড", "Upload"), duText(up, perSecond = true), DuPurple, Icons.Default.ArrowUpward, Modifier.weight(1f))
+            SpeedCell(tr("আপলোড", "Upload"), duText(up, perSecond = true), DuGreen, Icons.Default.ArrowUpward, Modifier.weight(1f))
         }
 
         // Period segment
@@ -271,20 +288,21 @@ fun DataUsageScreen() {
                 Text(num, fontSize = 44.sp, fontWeight = FontWeight.Bold)
                 Text(unit, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DuCyan)
             }
-            DuBar(tr("মোবাইল ডাটা", "Mobile data"), duText(t?.mobile ?: 0L), fraction(t?.mobile ?: 0L, total), DuCyan)
-            DuBar("Wi-Fi", duText(t?.wifi ?: 0L), fraction(t?.wifi ?: 0L, total), DuPurple)
-            Text(
-                tr("আপলোড ", "Upload ") + duText(t?.tx ?: 0L) + "   ·   " + tr("ডাউনলোড ", "Download ") + duText(t?.rx ?: 0L),
-                color = muted, fontSize = 12.sp
-            )
+            DuBar(Icons.Default.CellTower, tr("মোবাইল ডাটা", "Mobile data"), duText(t?.mobile ?: 0L), fraction(t?.mobile ?: 0L, total), DuCyan)
+            DuBar(Icons.Default.Wifi, "Wi-Fi", duText(t?.wifi ?: 0L), fraction(t?.wifi ?: 0L, total), DuPurple)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconValue(Icons.Default.ArrowUpward, DuGreen, tr("আপলোড ", "Upload "), duText(t?.tx ?: 0L))
+                Spacer(Modifier.width(16.dp))
+                IconValue(Icons.Default.ArrowDownward, DuCyan, tr("ডাউনলোড ", "Download "), duText(t?.rx ?: 0L))
+            }
         }
 
         // Today tiles
         val td = today
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatTile(tr("আজকের ব্যবহার", "Today's usage"), duText(td?.total ?: 0L), DuCyan, Modifier.weight(1f))
+            StatTile(Icons.Default.DataUsage, tr("আজকের ব্যবহার", "Today's usage"), duText(td?.total ?: 0L), DuCyan, Modifier.weight(1f))
             StatTile(
-                tr("আজকের আপলোড / ডাউনলোড", "Today upload / download"),
+                Icons.Default.ArrowUpward, tr("আজকের আপলোড / ডাউনলোড", "Today upload / download"),
                 duText(td?.tx ?: 0L) + " / " + duText(td?.rx ?: 0L),
                 DuGreen, Modifier.weight(1f)
             )
@@ -313,11 +331,18 @@ fun DataUsageScreen() {
                 AppIcon(app.pkg, app.label)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(app.label, maxLines = 1, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                    Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(faint(0.08f))) {
-                        Box(Modifier.fillMaxWidth(fraction(app.bytes, max)).fillMaxHeight().clip(RoundedCornerShape(3.dp)).background(DuGreen))
+                    StackedBar(app.rx, app.tx, max)
+                }
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(duText(app.bytes), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = DuCyan, modifier = Modifier.size(11.dp))
+                        Text(duText(app.rx), color = muted, fontSize = 11.sp)
+                        Spacer(Modifier.width(4.dp))
+                        Icon(Icons.Default.ArrowUpward, contentDescription = null, tint = DuGreen, modifier = Modifier.size(11.dp))
+                        Text(duText(app.tx), color = muted, fontSize = 11.sp)
                     }
                 }
-                Text(duText(app.bytes), fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
         }
     }
@@ -348,10 +373,13 @@ private fun SpeedCell(label: String, value: String, color: Color, icon: androidx
 }
 
 @Composable
-private fun DuBar(label: String, value: String, fraction: Float, color: Color) {
+private fun DuBar(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, fraction: Float, color: Color) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, fontSize = 13.sp)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
+                Text(label, fontSize = 13.sp)
+            }
             Text(value, color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
         Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(faint(0.08f))) {
@@ -361,13 +389,38 @@ private fun DuBar(label: String, value: String, fraction: Float, color: Color) {
 }
 
 @Composable
-private fun StatTile(label: String, value: String, color: Color, modifier: Modifier) {
+private fun StatTile(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, color: Color, modifier: Modifier) {
     Column(
         modifier.clip(RoundedCornerShape(16.dp)).background(faint(0.05f)).border(1.dp, faint(0.1f), RoundedCornerShape(16.dp)).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+            Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, maxLines = 1)
+        }
         Text(value, color = color, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+/** Download-then-upload stacked bar: cyan for download, green for upload, scaled to [max]. */
+@Composable
+private fun StackedBar(down: Long, up: Long, max: Long) {
+    val total = down + up
+    Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(faint(0.08f))) {
+        if (total > 0L) {
+            Row(Modifier.fillMaxWidth(fraction(total, max)).fillMaxHeight()) {
+                if (down > 0L) Box(Modifier.weight(down.toFloat()).fillMaxHeight().background(DuCyan))
+                if (up > 0L) Box(Modifier.weight(up.toFloat()).fillMaxHeight().background(DuGreen))
+            }
+        }
+    }
+}
+
+@Composable
+private fun IconValue(icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(13.dp))
+        Text(label + value, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
     }
 }
 
@@ -375,9 +428,10 @@ private fun StatTile(label: String, value: String, color: Color, modifier: Modif
 @Composable
 private fun AppIcon(pkg: String?, label: String) {
     val ctx = LocalContext.current
-    val bmp by produceState<ImageBitmap?>(initialValue = null, pkg) {
-        value = if (pkg == null) null else withContext(Dispatchers.IO) {
-            runCatching { ctx.packageManager.getApplicationIcon(pkg).toBitmap(96, 96).asImageBitmap() }.getOrNull()
+    val bmp by produceState<ImageBitmap?>(initialValue = pkg?.let { duIconCache[it] }, pkg) {
+        value = if (pkg == null) null else duIconCache[pkg] ?: withContext(Dispatchers.IO) {
+            runCatching { ctx.packageManager.getApplicationIcon(pkg).toBitmap(96, 96).asImageBitmap() }
+                .getOrNull()?.also { duIconCache[pkg] = it }
         }
     }
     val shape = RoundedCornerShape(12.dp)
