@@ -1,5 +1,6 @@
 package com.fintracks.app.ui
 
+import com.fintracks.app.ui.design.QuickAmountChips
 import com.fintracks.app.ui.design.FilterPill
 import com.fintracks.app.ui.design.SearchBox
 import com.fintracks.app.ui.design.StatusChip
@@ -441,6 +442,17 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
     val open = people.firstOrNull { it.id() == openId }
     val ctx = LocalContext.current
     val pendingCount by vm.outbox.pendingCount.collectAsState()
+    var quickPayFor by remember { mutableStateOf<JsonObject?>(null) }
+    var remindFor by remember { mutableStateOf<JsonObject?>(null) }
+    val nameOf = people.associate { it.id() to it.str("name") }
+    val dues = state.rows("debts").mapNotNull { d ->
+        val due = d.strOrNull("due_date")?.take(10) ?: return@mapNotNull null
+        if (debtRemaining(d, state.rows("debt_payments")) <= 0.005) return@mapNotNull null
+        DebtDue(d.id(), due, nameOf[d.str("person_id")].orEmpty(), d.str("direction") == "owed")
+    }
+    LaunchedEffect(dues.toString()) { DebtReminders.sync(ctx, dues) }
+    quickPayFor?.let { person -> QuickPayDialog(person, state, vm) { quickPayFor = null } }
+    remindFor?.let { person -> RemindDialog(person, state, ctx) { remindFor = null } }
 
     // Back inside a person's page returns to the list; back on the list closes the screen.
 
@@ -531,6 +543,9 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
                                     state = state,
                                     onOpen = { go("ov:DEBTS/${person.id()}") },
                                     onContact = { sms -> requestContact(ctx, phone, sms) { contact = it } },
+                                    onQuickPay = { quickPayFor = person },
+                                    onRemind = { remindFor = person },
+                                    onShare = { shareStatement(ctx, person, state) },
                                     onEdit = { editingPerson = person },
                                     onDelete = { deletingPerson = person }
                                 )
@@ -595,7 +610,10 @@ private fun PersonCard(
     onOpen: () -> Unit,
     onContact: (Boolean) -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onQuickPay: () -> Unit,
+    onRemind: () -> Unit,
+    onShare: () -> Unit
 ) {
     val p = state.privacy
     var menu by remember { mutableStateOf(false) }
@@ -627,6 +645,9 @@ private fun PersonCard(
                     Icon(Icons.Default.MoreVert, contentDescription = tr("মেনু", "Menu"))
                 }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text(tr("দ্রুত পরিশোধ", "Quick payment")) }, onClick = { menu = false; onQuickPay() })
+                    DropdownMenuItem(text = { Text(tr("স্মরণ-বার্তা", "Reminder")) }, onClick = { menu = false; onRemind() })
+                    DropdownMenuItem(text = { Text(tr("খতিয়ান শেয়ার", "Share statement")) }, onClick = { menu = false; onShare() })
                     DropdownMenuItem(text = { Text(tr("এখনই কল করুন", "Call now")) }, onClick = { menu = false; onContact(false) })
                     DropdownMenuItem(text = { Text(tr("এসএমএস পাঠান", "Send SMS")) }, onClick = { menu = false; onContact(true) })
                     DropdownMenuItem(text = { Text(tr("এডিট করুন", "Edit")) }, onClick = { menu = false; onEdit() })
@@ -921,4 +942,192 @@ private fun personStat(state: UiState, personId: String): PersonStat {
         total = total,
         paidPct = if (total > 0) (1 - remaining / total).toFloat().coerceIn(0f, 1f) else null
     )
+}
+
+// ---------- Quick payment, reminder messages, statement ----------
+
+/** Open entries of one direction for a person, oldest due date first (the order a payment is applied in). */
+private fun personOpenEntries(state: UiState, personId: String, direction: String): List<JsonObject> {
+    val payments = state.rows("debt_payments")
+    return personEntries(state, personId, direction)
+        .filter { debtRemaining(it, payments) > 0.005 }
+        .sortedWith(compareBy<JsonObject>({ it.strOrNull("due_date") ?: "9999" }, { it.str("created_at") }))
+}
+
+/** Pays a person's open entries oldest-first; each part goes through the normal payment path (keeps the transaction rule). */
+@Composable
+private fun QuickPayDialog(person: JsonObject, state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
+    val id = person.id()
+    val p = state.privacy
+    var owed by remember { mutableStateOf(personRemaining(state, id, "owe") <= 0.005) }
+    var amount by remember { mutableStateOf("") }
+    val entries = personOpenEntries(state, id, if (owed) "owed" else "owe")
+    val payments = state.rows("debt_payments")
+    val balance = entries.sumOf { debtRemaining(it, payments) }
+    val a = parseAmount(amount)
+    val tooMuch = a != null && a > balance + 0.005
+    val valid = a != null && a > 0 && !tooMuch && balance > 0.005
+    DebtFormDialog(
+        title = tr("দ্রুত পরিশোধ", "Quick payment"),
+        confirmText = tr("সেভ করুন", "Save"),
+        confirmEnabled = valid,
+        onDismiss = onDismiss,
+        onConfirm = {
+            if (a != null) {
+                var left: Double = a
+                for (e in entries) {
+                    if (left <= 0.005) break
+                    val part = minOf(debtRemaining(e, payments), left)
+                    vm.recordPersonalDebtPayment(e, part, todayIso())
+                    left -= part
+                }
+                onDismiss()
+            }
+        }
+    ) {
+        Text(tr("বাকি: ", "Balance: ") + taka(balance, p), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterPill(tr("আমি দেব", "I owe"), !owed) { owed = false; amount = "" }
+            FilterPill(tr("আমি পাব", "Owed to me"), owed) { owed = true; amount = "" }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterPill(tr("সম্পূর্ণ", "Full"), false) { amount = "%.2f".format(balance) }
+            FilterPill(tr("অর্ধেক", "Half"), false) { amount = "%.2f".format(balance / 2) }
+        }
+        QuickAmountChips(onPick = { amount = it.toString() }, amounts = listOf(500, 1000))
+        TextIn(tr("পরিমাণ (৳)", "Amount (৳)"), amount, { amount = it }, number = true)
+        if (tooMuch) {
+            Text(tr("বাকির বেশি টাকা দেওয়া যাবে না", "Payment cannot exceed the balance"), fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+private fun toneLabel(tone: String): String = when (tone) {
+    "soft" -> tr("নরম", "Soft")
+    "normal" -> tr("সাধারণ", "Normal")
+    else -> tr("কড়া", "Firm")
+}
+
+private fun waNumber(number: String): String {
+    val digits = number.filter { it.isDigit() }
+    return if (digits.startsWith("0")) "88$digits" else digits
+}
+
+private fun sendReminder(ctx: Context, number: String, sms: Boolean, text: String) {
+    if (number.isBlank()) {
+        Toast.makeText(ctx, tr("ফোন নম্বর নেই", "No phone number"), Toast.LENGTH_SHORT).show()
+        return
+    }
+    try {
+        val intent = if (sms) {
+            Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$number")).putExtra("sms_body", text)
+        } else {
+            Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/${waNumber(number)}?text=${Uri.encode(text)}"))
+        }
+        ctx.startActivity(intent)
+    } catch (e: Exception) {
+        Toast.makeText(ctx, tr("অ্যাপ খোলা যায়নি", "Could not open the app"), Toast.LENGTH_SHORT).show()
+    }
+}
+
+/** Pick a tone and a channel; the text is filled from the template and the open entries. */
+@Composable
+private fun RemindDialog(person: JsonObject, state: UiState, ctx: Context, onDismiss: () -> Unit) {
+    val id = person.id()
+    var owed by remember { mutableStateOf(personRemaining(state, id, "owe") <= 0.005) }
+    var sms by remember { mutableStateOf(true) }
+    var editing by remember { mutableStateOf(false) }
+    val entries = personOpenEntries(state, id, if (owed) "owed" else "owe")
+    val payments = state.rows("debt_payments")
+    val balance = entries.sumOf { debtRemaining(it, payments) }
+    val reason = entries.firstOrNull()?.str("note")?.takeIf { it.isNotBlank() } ?: tr("বকেয়া", "dues")
+    val date = entries.mapNotNull { it.strOrNull("due_date")?.take(10) }.minOrNull()?.let { displayDate(it) } ?: ""
+    val amountText = bnDigits("%.0f".format(balance))
+    val number = person.str("phone")
+    if (editing) {
+        TemplateEditDialog(ctx, owed) { editing = false }
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(tr("স্মরণ-বার্তা", "Reminder"), fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterPill(tr("পাওনা", "Owed to me"), owed) { owed = true }
+                        FilterPill(tr("দেনা", "I owe"), !owed) { owed = false }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterPill("SMS", sms) { sms = true }
+                        FilterPill("WhatsApp", !sms) { sms = false }
+                    }
+                    DebtTemplates.tones.forEach { tone ->
+                        val text = DebtTemplates.render(DebtTemplates.get(ctx, owed, tone), reason, amountText, date)
+                        Column(
+                            Modifier.fillMaxWidth().clickable {
+                                sendReminder(ctx, number, sms, text)
+                                onDismiss()
+                            }.padding(vertical = 6.dp)
+                        ) {
+                            Text(toneLabel(tone), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(text, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    TextButton(onClick = { editing = true }) { Text(tr("বার্তা বদলান", "Edit messages")) }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
+        )
+    }
+}
+
+@Composable
+private fun TemplateEditDialog(ctx: Context, owed: Boolean, onDismiss: () -> Unit) {
+    var texts by remember(owed) { mutableStateOf(DebtTemplates.tones.associateWith { DebtTemplates.get(ctx, owed, it) }) }
+    DebtFormDialog(
+        title = tr("বার্তা বদলান", "Edit messages"),
+        confirmText = tr("সেভ করুন", "Save"),
+        confirmEnabled = true,
+        onDismiss = onDismiss,
+        onConfirm = {
+            DebtTemplates.tones.forEach { DebtTemplates.set(ctx, owed, it, texts[it].orEmpty()) }
+            onDismiss()
+        }
+    ) {
+        DebtTemplates.tones.forEach { tone ->
+            TextIn(toneLabel(tone), texts[tone].orEmpty(), { v -> texts = texts + (tone to v) })
+        }
+        Text(
+            tr("ডিফল্টে ফেরান", "Reset to default"),
+            color = MaterialTheme.colorScheme.primary,
+            fontSize = 13.sp,
+            modifier = Modifier.clickable {
+                texts = DebtTemplates.tones.associateWith { DebtTemplates.defaultText(owed, it) }
+            }
+        )
+    }
+}
+
+/** Plain-text statement of one person's entries, shared through the system share sheet. */
+private fun shareStatement(ctx: Context, person: JsonObject, state: UiState) {
+    val payments = state.rows("debt_payments")
+    val sb = StringBuilder()
+    sb.appendLine(tr("খতিয়ান: ", "Statement: ") + person.str("name"))
+    for (dir in listOf("owed", "owe")) {
+        val entries = personEntries(state, person.id(), dir)
+        if (entries.isEmpty()) continue
+        sb.appendLine()
+        sb.appendLine(if (dir == "owed") tr("পাওনা", "Owed to me") else tr("দেনা", "I owe"))
+        entries.forEach { e ->
+            sb.appendLine(
+                "${e.str("note").ifBlank { "-" }} · " + tr("মোট", "Total") + " ${taka(e.num("amount"))} · " +
+                    tr("পরিশোধ", "Paid") + " ${taka(debtPaid(e, payments))} · " +
+                    tr("বাকি", "Due") + " ${taka(debtRemaining(e, payments))}"
+            )
+        }
+    }
+    sb.appendLine()
+    sb.appendLine(tr("নিট", "Net") + ": " + taka(personRemaining(state, person.id(), "owed") - personRemaining(state, person.id(), "owe")))
+    val intent = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, sb.toString())
+    ctx.startActivity(Intent.createChooser(intent, tr("খতিয়ান শেয়ার", "Share statement")))
 }
