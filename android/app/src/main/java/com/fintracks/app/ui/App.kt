@@ -491,7 +491,7 @@ private fun HeaderIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, de
 }
 
 @Composable
-private fun OverlayHeader(title: String, trailing: (@Composable () -> Unit)? = null, onBack: () -> Unit) {
+internal fun OverlayHeader(title: String, trailing: (@Composable () -> Unit)? = null, onBack: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().topInsetPadding().padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically

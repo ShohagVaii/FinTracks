@@ -184,18 +184,6 @@ private fun openSms(ctx: Context, number: String) {
 // ---------- Shared pieces ----------
 
 @Composable
-private fun DebtHeader(title: String, onBack: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().topInsetPadding().padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(modifier = Modifier.pressScale(), onClick = onBack) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("ফিরে যান", "Back"))
-        }
-        Text(title, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-    }
-}
-
 @Composable
 private fun DebtGradientButton(text: String, enabled: Boolean, onClick: () -> Unit) {
     val fill = if (enabled) listOf(DebtViolet, DebtIndigo) else listOf(Color.Gray.copy(alpha = 0.4f), Color.Gray.copy(alpha = 0.4f))
@@ -477,9 +465,9 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
     // Back inside a person's page returns to the list; back on the list closes the screen.
 
     Column(Modifier.fillMaxSize()) {
-        DebtHeader(open?.str("name") ?: tr("দেনা ও পাওনা", "Debts & dues")) {
+        OverlayHeader(open?.str("name") ?: tr("দেনা ও পাওনা", "Debts & dues"), onBack = {
             if (open != null) onBack() else onClose()
-        }
+        })
         if (pendingCount > 0) {
             Text(
                 tr("সিঙ্ক বাকি: $pendingCount টি পরিবর্তন (ইন্টারনেট এলে যাবে)", "Waiting to sync: $pendingCount change(s) (sent when online)"),
