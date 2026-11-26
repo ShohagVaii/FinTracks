@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawBehind
+import com.fintracks.app.ui.design.LimitBar
 import com.fintracks.app.ui.design.StampLabel
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -55,6 +56,9 @@ import com.fintracks.app.data.str
 import com.fintracks.app.data.strOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -253,9 +257,10 @@ fun BakiScreen(state: UiState, vm: AppViewModel, subPage: String, go: (String) -
         if (shops.isEmpty()) EmptyHint(tr("কোনো দোকান নেই। দোকান যোগ করে কেনা ও বাকি তুলুন।", "No shops yet. Add a shop to record purchases and credit."))
         visible.forEach { s ->
             val st = stats.getValue(s.id())
-            val cat = shopCat
+            val cat = shopCategory(s.str("category"))
+            val limit = s.num("credit_limit")
             AppCard(onClick = { go("ov:CREDIT/${s.id()}") }) {
-                Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(cat.color))
+                Awning(cat.color)
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(44.dp).clip(CircleShape).background(cat.color.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
@@ -276,6 +281,11 @@ fun BakiScreen(state: UiState, vm: AppViewModel, subPage: String, go: (String) -
                         if (st.balance > 0.005) TextButton(onClick = { paying = s }) { Text(tr("শোধ", "Pay")) }
                     }
                 }
+                if (limit > 0) {
+                    Spacer(Modifier.height(8.dp))
+                    LimitBar((st.balance / limit).toFloat())
+                    Text(tr("সীমা ", "Limit ") + taka(limit, p), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
         ShopReports(state)
@@ -295,17 +305,33 @@ private fun ShopDialog(existing: JsonObject?, vm: AppViewModel, onDismiss: () ->
     var name by remember { mutableStateOf(existing?.str("name").orEmpty()) }
     var phone by remember { mutableStateOf(existing?.str("phone").orEmpty()) }
     var note by remember { mutableStateOf(existing?.str("note").orEmpty()) }
-    FormDialog(if (existing == null) tr("নতুন দোকান", "New shop") else tr("দোকান সম্পাদনা", "Edit shop"), confirmEnabled = name.isNotBlank(), onDismiss = onDismiss, onConfirm = {
-        vm.save(
-            "credit_shops",
-            row("name" to name.trim(), "phone" to phone.trim(), "note" to note.trim()),
-            existing?.id()
-        )
-        onDismiss()
-    }) {
+    var category by remember { mutableStateOf(shopCategory(existing?.str("category").orEmpty()).key) }
+    var limit by remember { mutableStateOf(existing?.num("credit_limit")?.takeIf { it > 0 }?.let { fmtNum(it) }.orEmpty()) }
+    val limitValid = limit.isBlank() || (parseAmount(limit) ?: -1.0) > 0
+    FormDialog(
+        if (existing == null) tr("নতুন দোকান", "New shop") else tr("দোকান সম্পাদনা", "Edit shop"),
+        confirmEnabled = name.isNotBlank() && limitValid, onDismiss = onDismiss,
+        onConfirm = {
+            vm.save(
+                "credit_shops",
+                row(
+                    "name" to name.trim(), "phone" to phone.trim(), "note" to note.trim(), "category" to category,
+                    "credit_limit" to (parseAmount(limit)?.takeIf { it > 0 }?.let { JsonPrimitive(it) } ?: JsonNull)
+                ),
+                existing?.id()
+            )
+            onDismiss()
+        }
+    ) {
         TextIn(tr("দোকান / ব্যক্তির নাম", "Shop / person name"), name, { name = it })
         TextIn(tr("ফোন (ঐচ্ছিক)", "Phone (optional)"), phone, { phone = it })
         TextIn(tr("নোট (ঐচ্ছিক)", "Note (optional)"), note, { note = it })
+        TextIn(tr("ক্রেডিট-সীমা (৳, ঐচ্ছিক)", "Credit limit (৳, optional)"), limit, { limit = it }, number = true)
+        shopCategories.chunked(4).forEach { row4 ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                row4.forEach { c -> FilterPill("${c.emoji} ${tr(c.bn, c.en)}", category == c.key) { category = c.key } }
+            }
+        }
     }
 }
 
@@ -369,6 +395,10 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
             lines.forEach { l ->
                 Column {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                        if (l.purchase) l.row.strOrNull("attachment_url")?.let { path ->
+                            AttachmentThumb(AttachmentStore.ref("credit_entries", l.row.id()), path)
+                            Spacer(Modifier.width(8.dp))
+                        }
                         Column(Modifier.weight(1f)) {
                             Text(displayDate(l.date), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (l.purchase) {
@@ -447,6 +477,13 @@ private fun PurchaseDialog(shopId: String, existing: JsonObject?, vm: AppViewMod
     var date by remember { mutableStateOf(existing?.let { dateOf(it, "purchase_date") }?.takeIf { it.isNotBlank() } ?: todayIso()) }
     var due by remember { mutableStateOf(existing?.strOrNull("due_date")?.take(10).orEmpty()) }
     var note by remember { mutableStateOf(existing?.str("note").orEmpty()) }
+    val ctx = LocalContext.current
+    val rowId = remember { existing?.id() ?: java.util.UUID.randomUUID().toString() }
+    val photoRef = AttachmentStore.ref("credit_entries", rowId)
+    var photo by remember { mutableStateOf<ByteArray?>(null) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) photo = AttachmentStore.readImage(ctx, uri)
+    }
 
     val adj = parseAmount(adjust) ?: 0.0
     val adjValid = adjust.isBlank() || parseAmount(adjust) != null
@@ -458,6 +495,7 @@ private fun PurchaseDialog(shopId: String, existing: JsonObject?, vm: AppViewMod
     val valid = linesValid && adjValid && total >= 0 && isValidIsoDate(date) && (due.isBlank() || isValidIsoDate(due))
 
     FormDialog(if (existing == null) tr("নতুন কেনা", "New purchase") else tr("কেনা সম্পাদনা", "Edit purchase"), confirmEnabled = valid, onDismiss = onDismiss, onConfirm = {
+        photo?.let { AttachmentStore.stage(ctx, photoRef, it) }
         val itemsJson = buildJsonArray {
             named.forEach { l ->
                 add(buildJsonObject {
@@ -470,6 +508,7 @@ private fun PurchaseDialog(shopId: String, existing: JsonObject?, vm: AppViewMod
         vm.save(
             "credit_entries",
             row(
+                "id" to rowId,
                 "shop_id" to shopId,
                 "item_name" to named.joinToString(", ") { it.name.trim() },
                 "quantity" to 1,
@@ -503,6 +542,11 @@ private fun PurchaseDialog(shopId: String, existing: JsonObject?, vm: AppViewMod
         DateField(tr("কেনার তারিখ", "Purchase date"), date, { date = it })
         DateField(tr("শেষ তারিখ (ঐচ্ছিক)", "Due date (optional)"), due, { due = it }, optional = true)
         TextIn(tr("নোট (ঐচ্ছিক)", "Note (optional)"), note, { note = it })
+        TextButton(modifier = Modifier.pressScale(), onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
+            Text(if (photo != null || existing?.strOrNull("attachment_url") != null) tr("ছবি বদলান", "Change photo") else tr("ছবি যোগ করুন", "Add photo"))
+        }
+        if (photo != null) Text(tr("ছবি যোগ হয়েছে", "Photo added"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        else existing?.strOrNull("attachment_url")?.let { AttachmentThumb(photoRef, it) }
     }
 }
 
@@ -611,11 +655,36 @@ private fun Modifier.ledgerPaper(lineColor: Color): Modifier = this.drawBehind {
 
 private class ShopCategory(val key: String, val bn: String, val en: String, val emoji: String, val color: Color)
 
-private val shopCat = ShopCategory("other", "", "", "🏪", Color(0xFF64748B))
+private val shopCategories = listOf(
+    ShopCategory("grocery", "মুদি", "Grocery", "🛒", Color(0xFFF59E0B)),
+    ShopCategory("pharmacy", "ফার্মেসি", "Pharmacy", "💊", Color(0xFF10B981)),
+    ShopCategory("dairy", "দুধ-ডিম", "Dairy", "🥛", Color(0xFF0EA5E9)),
+    ShopCategory("veg", "সবজি-ফল", "Veg & fruit", "🥬", Color(0xFF84CC16)),
+    ShopCategory("bill", "ভাড়া/বিল", "Rent/Bill", "🧾", Color(0xFF6366F1)),
+    ShopCategory("tea", "চা-নাস্তা", "Tea & snacks", "☕", Color(0xFFF97316)),
+    ShopCategory("other", "অন্যান্য", "Other", "🏪", Color(0xFF64748B))
+)
+
+private fun shopCategory(key: String): ShopCategory = shopCategories.firstOrNull { it.key == key } ?: shopCategories.last()
+
+/** Awning stripe along the top of a shop card. */
+@Composable
+private fun Awning(color: Color) {
+    Canvas(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50))) {
+        val step = 14.dp.toPx()
+        var x = 0f
+        var i = 0
+        while (x < size.width) {
+            drawRect(color = if (i % 2 == 0) color else color.copy(alpha = 0.35f), topLeft = Offset(x, 0f), size = Size(step, size.height))
+            x += step
+            i++
+        }
+    }
+}
 
 /** Repeats a purchase as a new one dated today: same items, totals and adjustment. */
 private fun repeatPurchase(vm: AppViewModel, e: JsonObject) {
-    val drop = setOf("id", "created_at", "user_id", "purchase_date", "due_date")
+    val drop = setOf("id", "created_at", "user_id", "purchase_date", "due_date", "attachment_url")
     val body = JsonObject(e.filterKeys { it !in drop } + mapOf("purchase_date" to JsonPrimitive(todayIso())))
     vm.save("credit_entries", body, null)
 }

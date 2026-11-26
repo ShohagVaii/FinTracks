@@ -491,7 +491,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val label = tr("দোকান: ", "Shop: ") + shopName + if (note.isNotBlank()) " · $note" else ""
         batch(
             listOf(
-                Triple("credit_payments", row("id" to paymentId, "shop_id" to shopId, "amount" to amount, "paid_on" to date, "note" to note), null),
+                Triple("credit_payments", row("id" to paymentId, "shop_id" to shopId, "amount" to amount, "paid_on" to date, "note" to note, "method" to method), null),
                 Triple(
                     "transactions",
                     row(
@@ -578,19 +578,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val app = getApplication<Application>()
         if (AttachmentStore.pendingIds(app).isEmpty() && AttachmentStore.pendingDeletes(app).isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
-            for (txId in AttachmentStore.pendingIds(app)) {
-                val file = AttachmentStore.file(app, txId)
-                val existing = state.value.rows("transactions").firstOrNull { it.id() == txId }
+            for (ref in AttachmentStore.pendingIds(app)) {
+                val table = AttachmentStore.refTable(ref)
+                val rowId = AttachmentStore.refId(ref)
+                val file = AttachmentStore.file(app, ref)
+                val existing = state.value.rows(table).firstOrNull { it.id() == rowId }
                 if (file == null || existing == null) {
-                    AttachmentStore.purge(app, txId)
+                    AttachmentStore.purge(app, ref)
                     continue
                 }
                 try {
-                    val path = repo.uploadAttachment(txId, file.readBytes())
-                    AttachmentStore.unstage(app, txId)
+                    val path = repo.uploadAttachment(ref, file.readBytes())
+                    AttachmentStore.unstage(app, ref)
                     val change = JsonObject(mapOf("attachment_url" to JsonPrimitive(path)))
                     withContext(Dispatchers.Main) {
-                        localChange(listOf(LocalOutbox.op("update", "transactions", txId, change, JsonObject(existing + change))))
+                        localChange(listOf(LocalOutbox.op("update", table, rowId, change, JsonObject(existing + change))))
                     }
                 } catch (e: Exception) {
                     // Offline or refused: the photo stays queued and is tried again on the next sync.
@@ -712,7 +714,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             rows.filter { it.str("deleted_at") in stamps }.map { t to it }
         }.sortedBy { TRASH_PURGE_ORDER.indexOf(it.first) }
         val ops = hit.map { (t, r) ->
-            if (t == "transactions") queueAttachmentDelete(r.id(), r)
+            if (t == "transactions" || t == "credit_entries") queueAttachmentDelete(AttachmentStore.ref(t, r.id()), r)
             LocalOutbox.op("delete", t, r.id())
         }
         if (ops.isNotEmpty()) localChange(ops)

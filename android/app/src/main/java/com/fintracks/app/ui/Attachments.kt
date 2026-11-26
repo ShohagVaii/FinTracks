@@ -8,6 +8,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,6 +39,14 @@ import androidx.compose.ui.Alignment
  */
 object AttachmentStore {
     private const val PREFS = "fintracks"
+
+    /**
+     * A photo's key: a transaction keeps its plain id (existing files stay valid);
+     * any other table is "table.id", e.g. credit_entries.<uuid>. Table names have no dots.
+     */
+    fun ref(table: String, id: String): String = if (table == "transactions") id else "$table.$id"
+    fun refTable(ref: String): String = if (ref.contains('.')) ref.substringBefore('.') else "transactions"
+    fun refId(ref: String): String = ref.substringAfter('.', ref)
     private const val KEY_PENDING = "attach_pending"
     private const val KEY_DELETE = "attach_delete"
 
@@ -127,5 +136,28 @@ fun AttachmentImage(txId: String, path: String, modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+/** Small square photo for a list row (e.g. a purchase). Loads like AttachmentImage, shows nothing on failure. */
+@Composable
+fun AttachmentThumb(ref: String, path: String, modifier: Modifier = Modifier) {
+    val ctx = LocalContext.current
+    val repo = remember { Repository(ctx) }
+    var bmp by remember(ref, path) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(ref, path) {
+        bmp = try {
+            withContext(Dispatchers.IO) { AttachmentStore.load(ctx, repo, ref, path) }
+        } catch (e: Exception) {
+            null
+        }
+    }
+    bmp?.let {
+        Image(
+            bitmap = it.asImageBitmap(),
+            contentDescription = tr("কেনার ছবি", "Purchase photo"),
+            contentScale = ContentScale.Crop,
+            modifier = modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
+        )
     }
 }
