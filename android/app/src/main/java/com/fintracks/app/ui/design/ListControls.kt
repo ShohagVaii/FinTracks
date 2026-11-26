@@ -34,7 +34,7 @@ fun SearchBox(value: String, onChange: (String) -> Unit, placeholder: String, mo
 
 /** Filter / sort pill. A selected pill is tinted with the primary colour. */
 @Composable
-fun FilterPill(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun FilterPill(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val bg = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
     else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     val fg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
