@@ -228,9 +228,17 @@ private fun AddPill(text: String, modifier: Modifier, onClick: () -> Unit) {
 }
 
 @Composable
-fun ConfirmDialog(text: String, confirmText: String, cancelText: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+fun ConfirmDialog(
+    text: String,
+    confirmText: String,
+    cancelText: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    title: String? = null
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        title = if (title != null) { { Text(title, fontWeight = FontWeight.Bold) } } else null,
         text = { Text(text) },
         confirmButton = { TextButton(modifier = Modifier.pressScale(), onClick = onConfirm) { Text(confirmText) } },
         dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(cancelText) } }
@@ -458,6 +466,7 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
     val debtUndo by vm.debtUndo.collectAsState()
     UndoBar(
         visible = debtUndo != null,
+        key = debtUndo?.id,
         message = debtUndo?.message.orEmpty(),
         onUndo = { debtUndo?.let { vm.remove(it.table, it.id) }; vm.debtUndo.value = null },
         onExpire = { vm.debtUndo.value = null }

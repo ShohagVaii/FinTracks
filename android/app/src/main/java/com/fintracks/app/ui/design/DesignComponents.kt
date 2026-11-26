@@ -353,8 +353,15 @@ fun EmptyState(icon: ImageVector, text: String, modifier: Modifier = Modifier) {
 
 /** Shown after a delete: undo for 5 seconds, then [onExpire] runs once. */
 @Composable
-fun UndoBar(visible: Boolean, message: String, onUndo: () -> Unit, onExpire: () -> Unit, modifier: Modifier = Modifier) {
-    LaunchedEffect(visible) {
+fun UndoBar(
+    visible: Boolean,
+    message: String,
+    onUndo: () -> Unit,
+    onExpire: () -> Unit,
+    modifier: Modifier = Modifier,
+    key: Any? = null
+) {
+    LaunchedEffect(visible, key) {
         if (visible) {
             delay(5000L)
             onExpire()

@@ -454,14 +454,13 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
     if (editingShop) ShopDialog(shop, vm) { editingShop = false }
     if (sharing) ShopStatementDialog(tr("খতিয়ান: ", "Statement: ") + shop.str("name"), shopStatementLines(shop, state, settled)) { sharing = false }
     if (confirmDelete) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text(tr("দোকানটি মুছবেন?", "Delete this shop?"), fontWeight = FontWeight.Bold) },
-            text = { Text(tr("এই দোকানের সব কেনা ও পরিশোধের হিসাব মুছে যাবে। এটি ফেরানো যাবে না।", "All purchases and payments of this shop will be deleted. This cannot be undone.")) },
-            confirmButton = {
-                TextButton(modifier = Modifier.pressScale(), onClick = { confirmDelete = false; vm.remove("credit_shops", shop.id()); onBack() }) { Text(tr("মুছুন", "Delete")) }
-            },
-            dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = { confirmDelete = false }) { Text(tr("বাতিল", "Cancel")) } }
+        ConfirmDialog(
+            title = tr("দোকানটি মুছবেন?", "Delete this shop?"),
+            text = tr("এই দোকানের সব কেনা ও পরিশোধের হিসাব মুছে যাবে। এটি ফেরানো যাবে না।", "All purchases and payments of this shop will be deleted. This cannot be undone."),
+            confirmText = tr("মুছুন", "Delete"),
+            cancelText = tr("বাতিল", "Cancel"),
+            onConfirm = { confirmDelete = false; vm.remove("credit_shops", shop.id()); onBack() },
+            onDismiss = { confirmDelete = false }
         )
     }
 }

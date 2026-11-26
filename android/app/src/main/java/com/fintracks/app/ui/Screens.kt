@@ -106,6 +106,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -678,6 +680,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
     var mood by remember { mutableStateOf(existing?.str("mood") ?: "") }
     var accountId by remember { mutableStateOf(existing?.accountId() ?: "") }
     var recurring by remember { mutableStateOf(existing?.bool("is_recurring") == true) }
+    val haptic = LocalHapticFeedback.current
     var tags by remember { mutableStateOf(existing?.strList("tags").orEmpty()) }
     var tagDraft by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -983,7 +986,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
                     Icon(Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(tr("প্রতি মাসে পুনরাবৃত্ত", "Repeats monthly"), fontSize = 13.sp)
                 }
-                Switch(checked = recurring, onCheckedChange = { recurring = it })
+                Switch(checked = recurring, onCheckedChange = { recurring = it; haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) })
             }
             error?.let { Text(it, color = readableOn(expenseRed), fontSize = 12.sp) }
 
