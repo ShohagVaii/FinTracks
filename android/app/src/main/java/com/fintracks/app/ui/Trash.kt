@@ -37,13 +37,13 @@ val TRASH_TABLES: Set<String> = setOf(
     "accounts", "categories", "transactions", "budgets", "goals",
     "debt_people", "debts", "debt_payments", "loans", "subscriptions", "investments",
     "credit_shops", "credit_entries", "credit_payments", "bill_splits", "shopping_items",
-    "mess_members", "mess_bazaars", "mess_meals", "mess_deposits", "notes", "cash_counts",
+    "mess_members", "mess_bazaars", "mess_meals", "mess_deposits", "mess_fixed_costs", "notes", "cash_counts",
     "bike_fuel_entries", "bike_maintenance_entries"
 )
 
 /** Children before parents (same order as fintrack_purge_trash). */
 val TRASH_PURGE_ORDER: List<String> = listOf(
-    "bike_maintenance_entries", "bike_fuel_entries", "cash_counts", "notes", "mess_deposits", "mess_meals",
+    "bike_maintenance_entries", "bike_fuel_entries", "cash_counts", "notes", "mess_deposits", "mess_fixed_costs", "mess_meals",
     "mess_bazaars", "mess_members", "shopping_items", "bill_splits", "credit_payments", "credit_entries",
     "credit_shops", "investments", "subscriptions", "loans", "debt_payments", "debts", "debt_people",
     "goals", "budgets", "transactions", "categories", "accounts"
@@ -73,7 +73,7 @@ private val PRIMARY_ORDER = listOf(
     "debt_people", "credit_shops", "mess_members", "debts", "loans", "notes", "categories", "accounts",
     "goals", "budgets", "subscriptions", "investments", "bike_fuel_entries", "bike_maintenance_entries",
     "transactions", "credit_entries", "credit_payments", "debt_payments", "bill_splits", "shopping_items",
-    "mess_bazaars", "mess_meals", "mess_deposits", "cash_counts"
+    "mess_bazaars", "mess_meals", "mess_deposits", "mess_fixed_costs", "cash_counts"
 )
 
 fun trashEntries(trashed: Map<String, List<JsonObject>>): List<TrashEntry> {
@@ -105,7 +105,7 @@ private fun kindLabel(table: String): String = when (table) {
     "bike_fuel_entries", "bike_maintenance_entries" -> tr("বাইক লগ", "Bike log")
     "subscriptions" -> tr("সাবস্ক্রিপশন", "Subscription")
     "investments" -> tr("বিনিয়োগ", "Investment")
-    "mess_members", "mess_bazaars", "mess_meals", "mess_deposits" -> tr("মেস", "Mess")
+    "mess_members", "mess_bazaars", "mess_meals", "mess_deposits", "mess_fixed_costs" -> tr("মেস", "Mess")
     "shopping_items" -> tr("শপিং", "Shopping")
     "bill_splits" -> tr("বিল ভাগ", "Bill split")
     "cash_counts" -> tr("গণনা", "Cash count")

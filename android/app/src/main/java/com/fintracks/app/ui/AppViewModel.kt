@@ -62,6 +62,8 @@ val TABLES: List<Pair<String, String>> = listOf(
     "mess_bazaars" to "select=*&order=bazaar_date.desc",
     "mess_meals" to "select=*&order=meal_date.desc",
     "mess_deposits" to "select=*&order=deposit_date.desc",
+    "mess_fixed_costs" to "select=*&order=cost_date.desc",
+    "mess_months" to "select=*&order=month.desc",
     "categories" to "select=*&order=name.asc",
     "cash_counts" to "select=*&order=counted_at.desc",
     "ai_chat_messages" to "select=*&order=created_at.asc"
@@ -80,14 +82,14 @@ private val UNDO_BN = mapOf(
     "debts" to "ধার", "debt_people" to "ধার ব্যক্তি", "debt_payments" to "ধার পরিশোধ", "loans" to "লোন", "subscriptions" to "সাবস্ক্রিপশন", "investments" to "বিনিয়োগ",
     "credit_entries" to "কেনা", "credit_payments" to "পরিশোধ", "shopping_items" to "শপিং আইটেম",
     "bill_splits" to "বিল ভাগ", "bill_groups" to "বিল গ্রুপ", "shopping_lists" to "শপিং তালিকা", "bill_settlements" to "বিল পরিশোধ", "mess_bazaars" to "বাজার", "mess_meals" to "মিল", "mess_deposits" to "জমা",
-    "categories" to "ক্যাটাগরি", "cash_counts" to "গণনা"
+    "mess_fixed_costs" to "মেস খরচ", "mess_months" to "মেস মাস", "categories" to "ক্যাটাগরি", "cash_counts" to "গণনা"
 )
 private val UNDO_EN = mapOf(
     "transactions" to "transaction", "accounts" to "account", "budgets" to "budget", "goals" to "goal",
     "debts" to "debt", "debt_people" to "debt person", "debt_payments" to "debt payment", "loans" to "loan", "subscriptions" to "subscription", "investments" to "investment",
     "credit_entries" to "purchase", "credit_payments" to "payment", "shopping_items" to "shopping item",
     "bill_splits" to "bill split", "bill_groups" to "bill group", "bill_settlements" to "bill payment", "mess_bazaars" to "bazaar", "mess_meals" to "meal", "mess_deposits" to "deposit",
-    "categories" to "category", "cash_counts" to "count"
+    "mess_fixed_costs" to "mess fixed cost", "mess_months" to "mess month", "categories" to "category", "cash_counts" to "count"
 )
 fun undoLabel(table: String): String = tr(UNDO_BN[table] ?: "আইটেম", UNDO_EN[table] ?: "item")
 

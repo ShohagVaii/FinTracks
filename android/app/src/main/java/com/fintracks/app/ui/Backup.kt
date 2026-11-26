@@ -89,6 +89,6 @@ object Backup {
 val RESTORE_ORDER: List<String> = listOf(
     "categories", "accounts", "credit_shops", "mess_members", "transactions", "budgets", "goals", "debt_people", "debts", "debt_payments", "loans",
     "subscriptions", "investments", "credit_entries", "credit_payments", "bill_groups", "bill_splits", "bill_settlements", "shopping_lists", "shopping_items",
-    "mess_bazaars", "mess_meals", "mess_deposits", "cash_counts",
+    "mess_bazaars", "mess_meals", "mess_deposits", "mess_fixed_costs", "mess_months", "cash_counts",
     "bike_fuel_entries", "bike_maintenance_entries", "ai_chat_messages", "calendar_marks"
 )
