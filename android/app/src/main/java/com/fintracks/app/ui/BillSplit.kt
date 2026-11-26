@@ -254,9 +254,6 @@ private fun SettleDialog(b: JsonObject, net: Map<String, Double>, vm: AppViewMod
 
 // ======================= New bill =======================
 
-/** Blank = 0; otherwise the number, or null when it is not a number. */
-private fun amountOrNull(s: String): Double? = if (s.isBlank()) 0.0 else parseAmount(s)
-
 /** Share the bill summary as an image, reusing the statement image writer. */
 private fun shareBillImage(ctx: Context, b: JsonObject, net: Map<String, Double>, p: Boolean) {
     val lines = billSummaryText(b, net, p).lines()
