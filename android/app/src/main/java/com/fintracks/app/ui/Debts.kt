@@ -19,6 +19,7 @@ import com.fintracks.app.ui.design.QuickAmountChips
 import com.fintracks.app.ui.design.FilterPill
 import com.fintracks.app.ui.design.SearchBox
 import com.fintracks.app.ui.design.StatusChip
+import com.fintracks.app.ui.design.UndoBar
 import com.fintracks.app.ui.design.DivergingBar
 import com.fintracks.app.ui.design.AvatarCircle
 import androidx.compose.animation.AnimatedContent
