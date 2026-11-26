@@ -796,7 +796,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * Owe (দেনা) payment = Expense; owed (পাওনা) payment = Income. Both are linked by source = personal_debt_payment.
      * The payment row is written first, so an over-payment rejected by the database creates no transaction.
      */
-    fun recordPersonalDebtPayment(entry: JsonObject, amount: Double, date: String) {
+    /** Adds a person and returns the new id, so a quick entry can use the person straight away. */
+    fun addPerson(name: String, phone: String): String {
+        val nid = newId()
+        val full = withFields(row("name" to name, "phone" to phone, "address" to ""), "id" to nid, "created_at" to nowIso())
+        localChange(listOf(LocalOutbox.op("insert", "debt_people", nid, full, full)))
+        return nid
+    }
+
+    /** method = the transaction's payment mode (Cash, Bkash, …); note = the payment's own note. */
+    fun recordPersonalDebtPayment(entry: JsonObject, amount: Double, date: String, method: String = "Cash", note: String = "") {
         val paymentId = newId()
         val txId = newId()
         val owed = entry.str("direction") == "owed"
@@ -807,12 +816,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // The payment goes first: if the server refuses it (over-payment), its transaction is dropped with it.
         val payment = row(
             "id" to paymentId, "debt_id" to entry.id(), "amount" to amount, "paid_on" to date,
-            "note" to "", "created_at" to nowIso()
+            "note" to note, "created_at" to nowIso()
         )
         val tx = row(
             "id" to txId, "type" to (if (owed) "Income" else "Expense"), "amount" to amount,
             "currency" to state.value.currency, "category" to (if (owed) "ধার আদায়" else "ধার পরিশোধ"),
-            "note" to label, "tx_date" to date, "payment_mode" to "Cash", "mood" to "", "is_recurring" to false,
+            "note" to label, "tx_date" to date, "payment_mode" to method, "mood" to "", "is_recurring" to false,
             "source" to "personal_debt_payment", "source_ref" to paymentId
         )
         localChange(

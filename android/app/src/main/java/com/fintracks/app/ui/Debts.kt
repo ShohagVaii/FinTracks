@@ -1,5 +1,20 @@
 package com.fintracks.app.ui
 
+import kotlin.math.abs
+import com.fintracks.app.ui.design.NumberPad
+import com.fintracks.app.ui.design.SpeedDialFab
+import com.fintracks.app.ui.design.StampLabel
+import com.fintracks.app.ui.design.FormSheet
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.Slider
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Button
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import com.fintracks.app.ui.design.QuickAmountChips
 import com.fintracks.app.ui.design.FilterPill
 import com.fintracks.app.ui.design.SearchBox
@@ -131,12 +146,12 @@ fun debtsRemaining(state: UiState, direction: String): Double {
     return state.rows("debts").filter { it.str("direction") == direction }.sumOf { debtRemaining(it, payments) }
 }
 
-private fun personEntries(state: UiState, personId: String, direction: String): List<JsonObject> =
+internal fun personEntries(state: UiState, personId: String, direction: String): List<JsonObject> =
     state.rows("debts")
         .filter { it.str("person_id") == personId && it.str("direction") == direction }
         .sortedByDescending { it.str("created_at") }
 
-private fun personRemaining(state: UiState, personId: String, direction: String): Double {
+internal fun personRemaining(state: UiState, personId: String, direction: String): Double {
     val payments = state.rows("debt_payments")
     return personEntries(state, personId, direction).sumOf { debtRemaining(it, payments) }
 }
@@ -444,6 +459,8 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
     val pendingCount by vm.outbox.pendingCount.collectAsState()
     var quickPayFor by remember { mutableStateOf<JsonObject?>(null) }
     var remindFor by remember { mutableStateOf<JsonObject?>(null) }
+    var shareFor by remember { mutableStateOf<JsonObject?>(null) }
+    var quickEntry by remember { mutableStateOf(false) }
     val nameOf = people.associate { it.id() to it.str("name") }
     val dues = state.rows("debts").mapNotNull { d ->
         val due = d.strOrNull("due_date")?.take(10) ?: return@mapNotNull null
@@ -453,6 +470,8 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
     LaunchedEffect(dues.toString()) { DebtReminders.sync(ctx, dues) }
     quickPayFor?.let { person -> QuickPayDialog(person, state, vm) { quickPayFor = null } }
     remindFor?.let { person -> RemindDialog(person, state, ctx) { remindFor = null } }
+    shareFor?.let { person -> StatementShareDialog(person, state) { shareFor = null } }
+    if (quickEntry) QuickEntrySheet(people, state.privacy, vm) { quickEntry = false }
 
     // Back inside a person's page returns to the list; back on the list closes the screen.
 
@@ -469,6 +488,10 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
             )
         }
         Box(Modifier.fillMaxWidth().weight(1f)) {
+            if (open == null) SpeedDialFab(
+                actions = listOf(Triple(tr("নতুন এন্ট্রি", "New entry"), Icons.Default.Add, { quickEntry = true })),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+            )
             if (open == null) {
                 Box(Modifier.fillMaxSize()) {
                     Column(
@@ -545,7 +568,7 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
                                     onContact = { sms -> requestContact(ctx, phone, sms) { contact = it } },
                                     onQuickPay = { quickPayFor = person },
                                     onRemind = { remindFor = person },
-                                    onShare = { shareStatement(ctx, person, state) },
+                                    onShare = { shareFor = person },
                                     onEdit = { editingPerson = person },
                                     onDelete = { deletingPerson = person }
                                 )
@@ -563,7 +586,8 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
                     person = open,
                     state = state,
                     vm = vm,
-                    onContact = { sms, number -> requestContact(ctx, number, sms) { contact = it } }
+                    onContact = { sms, number -> requestContact(ctx, number, sms) { contact = it } },
+                    onEditPerson = { editingPerson = open }
                 )
             }
         }
@@ -619,7 +643,7 @@ private fun PersonCard(
     var menu by remember { mutableStateOf(false) }
     val net = stat.owed - stat.owe
     val settled = stat.total > 0 && stat.owe + stat.owed <= 0.005
-    AppCard(onClick = onOpen) {
+    AppCard(onClick = onOpen, onLongClick = onQuickPay) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AvatarCircle(person.str("name"), size = 48.dp, percent = stat.paidPct)
             Spacer(Modifier.width(12.dp))
@@ -664,10 +688,13 @@ private fun PersonDetail(
     person: JsonObject,
     state: UiState,
     vm: AppViewModel,
-    onContact: (Boolean, String) -> Unit
+    onContact: (Boolean, String) -> Unit,
+    onEditPerson: () -> Unit
 ) {
     val p = state.privacy
     var tab by rememberSaveable { mutableStateOf("owe") }
+    var chatView by rememberSaveable { mutableStateOf(false) }
+    val ctx = LocalContext.current
     var addingEntry by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<JsonObject?>(null) }
     var deletingEntry by remember { mutableStateOf<JsonObject?>(null) }
@@ -689,6 +716,14 @@ private fun PersonDetail(
                 TabItem(tr("দেনা", "I owe"), owe, Modifier.weight(1f)) { tab = "owe" }
                 TabItem(tr("পাওনা", "Owed to me"), !owe, Modifier.weight(1f)) { tab = "owed" }
             }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                ActionOrb(Icons.Default.Phone, tr("কল", "Call")) { onContact(false, person.str("phone")) }
+                ActionOrb(Icons.Default.Email, "SMS") { onContact(true, person.str("phone")) }
+                ActionOrb(Icons.AutoMirrored.Filled.Send, "WhatsApp") { sendReminder(ctx, person.str("phone"), false, "") }
+                ActionOrb(Icons.Default.Edit, tr("এডিট", "Edit")) { onEditPerson() }
+                Spacer(Modifier.weight(1f))
+                FilterPill(tr("কথা", "Chat"), chatView) { chatView = !chatView }
+            }
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -703,7 +738,9 @@ private fun PersonDetail(
                 )
                 Text(taka(total, p), fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
-            AnimatedContent(
+            if (chatView) {
+                ChatThread(person, state, p)
+            } else AnimatedContent(
                 targetState = tab,
                 transitionSpec = {
                     val forward = targetState == "owed"
@@ -954,48 +991,67 @@ private fun personOpenEntries(state: UiState, personId: String, direction: Strin
         .sortedWith(compareBy<JsonObject>({ it.strOrNull("due_date") ?: "9999" }, { it.str("created_at") }))
 }
 
-/** Pays a person's open entries oldest-first; each part goes through the normal payment path (keeps the transaction rule). */
+/** Long-press (or ⋮ → Quick payment): pays open entries oldest-first, each part through the normal payment path. */
 @Composable
 private fun QuickPayDialog(person: JsonObject, state: UiState, vm: AppViewModel, onDismiss: () -> Unit) {
     val id = person.id()
     val p = state.privacy
+    val ctx = LocalContext.current
     var owed by remember { mutableStateOf(personRemaining(state, id, "owe") <= 0.005) }
     var amount by remember { mutableStateOf("") }
+    var method by remember { mutableStateOf("Cash") }
+    var note by remember { mutableStateOf("") }
     val entries = personOpenEntries(state, id, if (owed) "owed" else "owe")
     val payments = state.rows("debt_payments")
     val balance = entries.sumOf { debtRemaining(it, payments) }
     val a = parseAmount(amount)
     val tooMuch = a != null && a > balance + 0.005
     val valid = a != null && a > 0 && !tooMuch && balance > 0.005
-    DebtFormDialog(
+    val full = valid && abs((a ?: 0.0) - balance) < 0.005
+    fun pay() {
+        var left: Double = a ?: return
+        for (e in entries) {
+            if (left <= 0.005) break
+            val part = minOf(debtRemaining(e, payments), left)
+            vm.recordPersonalDebtPayment(e, part, todayIso(), method, note.trim())
+            left -= part
+        }
+        Toast.makeText(ctx, tr("পরিশোধ সেভ হয়েছে", "Payment saved"), Toast.LENGTH_SHORT).show()
+        onDismiss()
+    }
+    FormSheet(
         title = tr("দ্রুত পরিশোধ", "Quick payment"),
-        confirmText = tr("সেভ করুন", "Save"),
-        confirmEnabled = valid,
         onDismiss = onDismiss,
-        onConfirm = {
-            if (a != null) {
-                var left: Double = a
-                for (e in entries) {
-                    if (left <= 0.005) break
-                    val part = minOf(debtRemaining(e, payments), left)
-                    vm.recordPersonalDebtPayment(e, part, todayIso())
-                    left -= part
-                }
-                onDismiss()
+        footer = {
+            Button(onClick = { pay() }, enabled = valid, modifier = Modifier.fillMaxWidth()) {
+                Text(if (full) tr("শোধ করুন", "Settle") else tr("সেভ করুন", "Save"))
             }
         }
     ) {
-        Text(tr("বাকি: ", "Balance: ") + taka(balance, p), fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterPill(tr("আমি দেব", "I owe"), !owed) { owed = false; amount = "" }
             FilterPill(tr("আমি পাব", "Owed to me"), owed) { owed = true; amount = "" }
         }
+        Text(tr("বাকি: ", "Balance: ") + taka(balance, p), fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterPill(tr("সম্পূর্ণ", "Full"), false) { amount = "%.2f".format(balance) }
             FilterPill(tr("অর্ধেক", "Half"), false) { amount = "%.2f".format(balance / 2) }
         }
         QuickAmountChips(onPick = { amount = it.toString() }, amounts = listOf(500, 1000))
+        if (balance > 0.005) {
+            Slider(
+                value = (a ?: 0.0).coerceIn(0.0, balance).toFloat(),
+                onValueChange = { amount = "%.0f".format(it) },
+                valueRange = 0f..balance.toFloat()
+            )
+        }
         TextIn(tr("পরিমাণ (৳)", "Amount (৳)"), amount, { amount = it }, number = true)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("Cash" to tr("ক্যাশ", "Cash"), "Bkash" to tr("বিকাশ", "Bkash"), "Nagad" to tr("নগদ", "Nagad"), "Bank" to tr("ব্যাংক", "Bank"))
+                .forEach { (key, label) -> FilterPill(label, method == key) { method = key } }
+        }
+        TextIn(tr("নোট (ঐচ্ছিক)", "Note (optional)"), note, { note = it })
+        if (full) StampLabel(tr("শোধ", "Settled"), Emerald500)
         if (tooMuch) {
             Text(tr("বাকির বেশি টাকা দেওয়া যাবে না", "Payment cannot exceed the balance"), fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
         }
@@ -1108,26 +1164,198 @@ private fun TemplateEditDialog(ctx: Context, owed: Boolean, onDismiss: () -> Uni
     }
 }
 
-/** Plain-text statement of one person's entries, shared through the system share sheet. */
-private fun shareStatement(ctx: Context, person: JsonObject, state: UiState) {
-    val payments = state.rows("debt_payments")
-    val sb = StringBuilder()
-    sb.appendLine(tr("খতিয়ান: ", "Statement: ") + person.str("name"))
-    for (dir in listOf("owed", "owe")) {
-        val entries = personEntries(state, person.id(), dir)
-        if (entries.isEmpty()) continue
-        sb.appendLine()
-        sb.appendLine(if (dir == "owed") tr("পাওনা", "Owed to me") else tr("দেনা", "I owe"))
-        entries.forEach { e ->
-            sb.appendLine(
-                "${e.str("note").ifBlank { "-" }} · " + tr("মোট", "Total") + " ${taka(e.num("amount"))} · " +
-                    tr("পরিশোধ", "Paid") + " ${taka(debtPaid(e, payments))} · " +
-                    tr("বাকি", "Due") + " ${taka(debtRemaining(e, payments))}"
-            )
+// ---------- Quick entry (4 steps), chat view, action orbs ----------
+
+@Composable
+private fun ActionOrb(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier.size(46.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.primary)
+        }
+        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Four steps: who → owe/owed → amount, reason, optional due date → save. */
+@Composable
+private fun QuickEntrySheet(people: List<JsonObject>, privacy: Boolean, vm: AppViewModel, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    var step by rememberSaveable { mutableStateOf(0) }
+    var pickedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var newMode by rememberSaveable { mutableStateOf(false) }
+    var newName by rememberSaveable { mutableStateOf("") }
+    var newPhone by rememberSaveable { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
+    var owe by rememberSaveable { mutableStateOf(true) }
+    var amount by rememberSaveable { mutableStateOf("") }
+    var reason by rememberSaveable { mutableStateOf("") }
+    var due by rememberSaveable { mutableStateOf("") }
+    val recent = people.sortedByDescending { it.str("created_at") }.take(5)
+    val q = query.trim()
+    val matches = people.filter { q.isEmpty() || it.str("name").contains(q, true) || it.str("phone").contains(q) }.take(8)
+    val a = parseAmount(amount)
+    val pickedName = pickedId?.let { id -> people.firstOrNull { it.id() == id }?.str("name") }.orEmpty()
+    val canNext = when (step) {
+        0 -> pickedId != null || (newMode && newName.isNotBlank())
+        2 -> a != null && a > 0 && reason.isNotBlank()
+        else -> true
+    }
+    fun save() {
+        val amt = a ?: return
+        val pid = pickedId ?: vm.addPerson(newName.trim(), newPhone.trim())
+        val name = if (pickedId != null) pickedName else newName.trim()
+        vm.save(
+            "debts",
+            row(
+                "person" to name, "person_id" to pid, "amount" to amt,
+                "direction" to (if (owe) "owe" else "owed"), "note" to reason.trim(),
+                "due_date" to (nonEmpty(due)?.let { JsonPrimitive(it) } ?: JsonNull)
+            ),
+            null
+        )
+        Toast.makeText(ctx, tr("এন্ট্রি যুক্ত হয়েছে", "Entry added"), Toast.LENGTH_SHORT).show()
+        onDismiss()
+    }
+    FormSheet(
+        title = tr("নতুন এন্ট্রি", "New entry"),
+        onDismiss = onDismiss,
+        footer = {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (step > 0) OutlinedButton(onClick = { step-- }) { Text(tr("পেছনে", "Back")) }
+                Button(
+                    onClick = { if (step < 3) step++ else save() },
+                    enabled = canNext,
+                    modifier = Modifier.weight(1f)
+                ) { Text(if (step < 3) tr("পরবর্তী", "Next") else tr("সেভ করুন", "Save")) }
+            }
+        }
+    ) {
+        Text(tr("ধাপ ", "Step ") + bnDigits((step + 1).toString()) + " / " + bnDigits("4"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        when (step) {
+            0 -> {
+                SearchBox(query, { query = it }, tr("নাম বা ফোন খুঁজুন", "Search name or phone"))
+                if (recent.isNotEmpty()) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        recent.forEach { pr ->
+                            Column(
+                                Modifier.clickable { pickedId = pr.id(); newMode = false },
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                AvatarCircle(pr.str("name"), size = 44.dp)
+                                Text(pr.str("name"), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(56.dp))
+                            }
+                        }
+                    }
+                }
+                matches.forEach { pr ->
+                    val picked = pickedId == pr.id()
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                            .background(if (picked) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent)
+                            .clickable { pickedId = pr.id(); newMode = false }
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(pr.str("name"), modifier = Modifier.weight(1f))
+                        if (picked) Text("✓", color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                FilterPill(tr("নতুন ব্যক্তি", "New person"), newMode) { newMode = true; pickedId = null }
+                if (newMode) {
+                    TextIn(tr("নাম", "Name"), newName, { newName = it })
+                    TextIn(tr("ফোন (ঐচ্ছিক)", "Phone (optional)"), newPhone, { newPhone = it })
+                }
+            }
+            1 -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FilterPill(tr("দেনা", "I owe"), owe, Modifier.weight(1f)) { owe = true }
+                FilterPill(tr("পাওনা", "Owed to me"), !owe, Modifier.weight(1f)) { owe = false }
+            }
+            2 -> {
+                Text(if (amount.isEmpty()) bnDigits("0") else bnDigits(amount), fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                NumberPad(
+                    onKey = { k -> if (!(k == "." && amount.contains("."))) amount += k },
+                    onBackspace = { amount = amount.dropLast(1) }
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(tr("বাজার", "Groceries"), tr("বিল", "Bill"), tr("ধার", "Loan"), tr("অন্যান্য", "Other"))
+                        .forEach { r -> FilterPill(r, reason == r) { reason = r } }
+                }
+                TextIn(tr("কারণ", "Reason"), reason, { reason = it })
+                DateField(tr("মেয়াদ (ঐচ্ছিক)", "Due date (optional)"), due, { due = it }, optional = true)
+            }
+            else -> {
+                Text(pickedName.ifEmpty { newName.trim() }, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(if (owe) tr("দেনা", "I owe") else tr("পাওনা", "Owed to me"), fontSize = 13.sp)
+                Text(taka(a ?: 0.0, privacy), fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                Text(reason, fontSize = 13.sp)
+                if (due.isNotBlank()) Text(displayDate(due), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
-    sb.appendLine()
-    sb.appendLine(tr("নিট", "Net") + ": " + taka(personRemaining(state, person.id(), "owed") - personRemaining(state, person.id(), "owe")))
-    val intent = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, sb.toString())
-    ctx.startActivity(Intent.createChooser(intent, tr("খতিয়ান শেয়ার", "Share statement")))
 }
+
+/** Chat view of one person: owed-to-me bubbles on the right, I-owe bubbles on the left, payments as ✓ chips, a date divider. */
+@Composable
+private fun ChatThread(person: JsonObject, state: UiState, p: Boolean) {
+    val payments = state.rows("debt_payments")
+    val events = ArrayList<ChatEvent>()
+    for (dir in listOf("owe", "owed")) {
+        val owed = dir == "owed"
+        personEntries(state, person.id(), dir).forEach { e ->
+            events += ChatEvent(e.str("created_at").take(10), 0, owed, false, e.str("note").ifBlank { "-" }, e.num("amount"))
+            payments.filter { it.str("debt_id") == e.id() }.forEach { pay ->
+                events += ChatEvent(pay.str("paid_on").take(10), 1, owed, true, pay.str("note").ifBlank { tr("পরিশোধ", "Payment") }, pay.num("amount"))
+            }
+        }
+    }
+    val sorted = events.sortedWith(compareBy<ChatEvent>({ it.date }, { it.order }))
+    if (sorted.isEmpty()) {
+        Text(tr("কোনো কথোপকথন নেই", "No messages yet"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        var lastDate = ""
+        sorted.forEach { ev ->
+            if (ev.date.isNotEmpty() && ev.date != lastDate) {
+                lastDate = ev.date
+                Text(
+                    displayDate(ev.date), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center
+                )
+            }
+            if (ev.payment) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    Text(
+                        "✓ " + ev.text + " · " + taka(ev.amount, p), fontSize = 12.sp, color = Emerald500,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Emerald500.copy(alpha = 0.12f))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            } else {
+                val color = if (ev.owed) Emerald500 else Rose500
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = if (ev.owed) Arrangement.End else Arrangement.Start) {
+                    Column(
+                        Modifier.widthIn(max = 260.dp).clip(RoundedCornerShape(16.dp))
+                            .background(color.copy(alpha = 0.14f)).padding(12.dp)
+                    ) {
+                        Text(ev.text, fontSize = 13.sp)
+                        Text(taka(ev.amount, p), fontWeight = FontWeight.Bold, color = color, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private class ChatEvent(
+    val date: String,
+    val order: Int,
+    val owed: Boolean,
+    val payment: Boolean,
+    val text: String,
+    val amount: Double
+)
