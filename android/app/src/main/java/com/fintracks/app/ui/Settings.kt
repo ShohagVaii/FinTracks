@@ -791,9 +791,7 @@ internal fun ResetDialog(pendingOffline: Int, onDismiss: () -> Unit, onConfirm: 
             }
         },
         confirmButton = {
-            TextButton(enabled = word == "RESET", onClick = onConfirm) {
-                Text(tr("মুছুন", "Erase"), color = MaterialTheme.colorScheme.error)
-            }
+            HoldToConfirm(tr("মুছুন", "Erase"), MaterialTheme.colorScheme.error, enabled = word == "RESET", onConfirm = onConfirm)
         },
         dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
@@ -816,9 +814,8 @@ fun DeleteAccountDialog(email: String, onDismiss: () -> Unit, onConfirm: (String
             }
         },
         confirmButton = {
-            TextButton(enabled = word == "DELETE" && password.isNotEmpty(), onClick = { onConfirm(password) }) {
-                Text(tr("স্থায়ীভাবে মুছুন", "Delete permanently"), color = MaterialTheme.colorScheme.error)
-            }
+            HoldToConfirm(tr("স্থায়ীভাবে মুছুন", "Delete permanently"), MaterialTheme.colorScheme.error,
+                enabled = word == "DELETE" && password.isNotEmpty(), onConfirm = { onConfirm(password) })
         },
         dismissButton = { TextButton(modifier = Modifier.pressScale(), onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )

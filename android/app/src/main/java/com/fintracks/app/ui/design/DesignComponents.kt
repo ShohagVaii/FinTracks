@@ -68,6 +68,7 @@ import com.fintracks.app.ui.faint
 import com.fintracks.app.ui.floatingBob
 import com.fintracks.app.ui.readableOn
 import com.fintracks.app.ui.rememberReduceMotion
+import com.fintracks.app.ui.slamIn
 import com.fintracks.app.ui.tr
 import kotlinx.coroutines.delay
 
@@ -226,7 +227,7 @@ fun StatusChip(text: String, color: Color, modifier: Modifier = Modifier) {
 /** Tilted stamp word (paid, overdue, ...). */
 @Composable
 fun StampLabel(text: String, color: Color, modifier: Modifier = Modifier) {
-    StampText(text, color, modifier)
+    StampText(text, color, modifier.slamIn())
 }
 
 /** Quick amount chips in Bengali digits. */

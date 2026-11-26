@@ -434,7 +434,7 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
                                 fontSize = 11.sp,
                                 color = if (l.balance > EPS) readableOn(BakiRed) else readableOn(BakiGreen)
                             )
-                            l.stamp?.let { (text, color) -> Spacer(Modifier.height(4.dp)); StampLabel(text, color) }
+                            l.stamp?.let { (text, color) -> Spacer(Modifier.height(4.dp)); StampLabel(text, color, if (color == BakiRed) Modifier.warnPulse(true, color) else Modifier) }
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
