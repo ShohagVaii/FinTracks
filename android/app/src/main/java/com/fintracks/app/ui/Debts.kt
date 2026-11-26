@@ -43,7 +43,6 @@ import androidx.compose.ui.window.DialogProperties
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -161,7 +160,7 @@ private fun plainNumber(v: Double): String = if (v % 1.0 == 0.0) v.toLong().toSt
 private data class ContactAction(val sms: Boolean, val number: String)
 
 private fun requestContact(ctx: Context, number: String, sms: Boolean, onContact: (ContactAction) -> Unit) {
-    if (number.isBlank()) Toast.makeText(ctx, tr("ফোন নম্বর নেই", "No phone number"), Toast.LENGTH_SHORT).show()
+    if (number.isBlank()) flash(tr("ফোন নম্বর নেই", "No phone number"))
     else onContact(ContactAction(sms, number))
 }
 
@@ -169,7 +168,7 @@ private fun openDialer(ctx: Context, number: String) {
     try {
         ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number")))
     } catch (e: Exception) {
-        Toast.makeText(ctx, tr("ডায়ালার খোলা যায়নি", "Could not open the dialer"), Toast.LENGTH_SHORT).show()
+        flash(tr("ডায়ালার খোলা যায়নি", "Could not open the dialer"))
     }
 }
 
@@ -177,7 +176,7 @@ private fun openSms(ctx: Context, number: String) {
     try {
         ctx.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$number")))
     } catch (e: Exception) {
-        Toast.makeText(ctx, tr("মেসেজ অ্যাপ খোলা যায়নি", "Could not open Messages"), Toast.LENGTH_SHORT).show()
+        flash(tr("মেসেজ অ্যাপ খোলা যায়নি", "Could not open Messages"))
     }
 }
 
@@ -330,12 +329,8 @@ private fun PersonDialog(existing: JsonObject?, vm: AppViewModel, onDismiss: () 
         onDismiss = onDismiss,
         onConfirm = {
             vm.savePerson(existing?.id(), name.trim(), phone.trim(), address.trim())
-            Toast.makeText(
-                ctx,
-                if (existing == null) tr("ব্যবহারকারী সফলভাবে যোগ করা হয়েছে", "User added successfully")
-                else tr("ব্যবহারকারী আপডেট হয়েছে", "User updated"),
-                Toast.LENGTH_SHORT
-            ).show()
+            flash(if (existing == null) tr("ব্যবহারকারী সফলভাবে যোগ করা হয়েছে", "User added successfully")
+                else tr("ব্যবহারকারী আপডেট হয়েছে", "User updated"))
             onDismiss()
         }
     ) {
@@ -387,7 +382,7 @@ private fun EntryDialog(
                     owe -> tr("দেনা সফলভাবে যুক্ত হয়েছে।", "Debt added successfully.")
                     else -> tr("পাওনা সফলভাবে যুক্ত হয়েছে।", "Dues added successfully.")
                 }
-                Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+                flash(msg)
                 onDismiss()
             }
         }
@@ -1016,7 +1011,7 @@ private fun QuickPayDialog(person: JsonObject, state: UiState, vm: AppViewModel,
             vm.recordPersonalDebtPayment(e, part, todayIso(), method, note.trim())
             left -= part
         }
-        Toast.makeText(ctx, tr("পরিশোধ সেভ হয়েছে", "Payment saved"), Toast.LENGTH_SHORT).show()
+        flash(tr("পরিশোধ সেভ হয়েছে", "Payment saved"))
         onDismiss()
     }
     FormSheet(
@@ -1071,7 +1066,7 @@ private fun waNumber(number: String): String {
 
 private fun sendReminder(ctx: Context, number: String, sms: Boolean, text: String) {
     if (number.isBlank()) {
-        Toast.makeText(ctx, tr("ফোন নম্বর নেই", "No phone number"), Toast.LENGTH_SHORT).show()
+        flash(tr("ফোন নম্বর নেই", "No phone number"))
         return
     }
     try {
@@ -1082,7 +1077,7 @@ private fun sendReminder(ctx: Context, number: String, sms: Boolean, text: Strin
         }
         ctx.startActivity(intent)
     } catch (e: Exception) {
-        Toast.makeText(ctx, tr("অ্যাপ খোলা যায়নি", "Could not open the app"), Toast.LENGTH_SHORT).show()
+        flash(tr("অ্যাপ খোলা যায়নি", "Could not open the app"))
     }
 }
 
@@ -1217,7 +1212,7 @@ private fun QuickEntrySheet(people: List<JsonObject>, privacy: Boolean, vm: AppV
             ),
             null
         )
-        Toast.makeText(ctx, tr("এন্ট্রি যুক্ত হয়েছে", "Entry added"), Toast.LENGTH_SHORT).show()
+        flash(tr("এন্ট্রি যুক্ত হয়েছে", "Entry added"))
         onDismiss()
     }
     FormSheet(

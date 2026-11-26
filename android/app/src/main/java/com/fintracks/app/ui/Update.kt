@@ -3,7 +3,6 @@ package com.fintracks.app.ui
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -177,9 +176,9 @@ object UpdateCenter {
         MainScope().launch {
             val info = fetchLatest()
             when {
-                info == null -> Toast.makeText(ctx, tr("আপডেট যাচাই করা যায়নি", "Could not check for updates"), Toast.LENGTH_SHORT)
+                info == null -> flash(tr("আপডেট যাচাই করা যায়নি", "Could not check for updates"))
                 isNewer(info) -> offer(info)
-                else -> Toast.makeText(ctx, tr("আপনার অ্যাপটি ইতিমধ্যেই সর্বশেষ আপডেট রয়েছে। নতুন কোনো আপডেট এভেইলেবল নাই।", "Your app is already up to date. No new update is available."), Toast.LENGTH_SHORT)
+                else -> flash(tr("আপনার অ্যাপটি ইতিমধ্যেই সর্বশেষ আপডেট রয়েছে। নতুন কোনো আপডেট এভেইলেবল নাই।", "Your app is already up to date. No new update is available."))
             }
         }
     }

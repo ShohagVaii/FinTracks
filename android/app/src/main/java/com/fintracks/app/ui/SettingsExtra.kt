@@ -12,7 +12,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -198,12 +197,12 @@ fun CustomWordField(label: String, value: String, onChange: (String) -> Unit) {
 fun copyText(ctx: Context, label: String, text: String) {
     val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     cm.setPrimaryClip(ClipData.newPlainText(label, text))
-    Toast.makeText(ctx, tr("কপি হয়েছে", "Copied"), Toast.LENGTH_SHORT).show()
+    flash(tr("কপি হয়েছে", "Copied"))
 }
 
 fun openUrl(ctx: Context, url: String) {
     runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-        .onFailure { Toast.makeText(ctx, tr("লিংক খোলা যায়নি", "Could not open the link"), Toast.LENGTH_SHORT).show() }
+        .onFailure { flash(tr("লিংক খোলা যায়নি", "Could not open the link")) }
 }
 
 fun shareApp(ctx: Context) {
@@ -223,7 +222,7 @@ fun sendSupportMail(ctx: Context) {
         putExtra(Intent.EXTRA_SUBJECT, "FinTrack support")
     }
     runCatching { ctx.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-        .onFailure { Toast.makeText(ctx, tr("মেইল অ্যাপ পাওয়া যায়নি", "No mail app found"), Toast.LENGTH_SHORT).show() }
+        .onFailure { flash(tr("মেইল অ্যাপ পাওয়া যায়নি", "No mail app found")) }
 }
 
 const val WEBSITE_URL = "https://shohagvaii.github.io/FinTracks/"
@@ -356,7 +355,7 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
                     onClick = {
                         scope.launch {
                             val err = vm.sendResetEmail(email)
-                            Toast.makeText(ctx, err ?: tr("রিসেট ইমেইল পাঠানো হয়েছে", "Reset email sent"), Toast.LENGTH_LONG).show()
+                            flash(err ?: tr("রিসেট ইমেইল পাঠানো হয়েছে", "Reset email sent"))
                         }
                     },
                     enabled = email.isNotBlank()
@@ -370,7 +369,7 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
             SwitchRow(tr("অ্যাপ লক", "App lock"), appLock) { on ->
                 if (on) {
                     if (!pinSet) {
-                        Toast.makeText(ctx, tr("আগে PIN সেট করুন", "Set a PIN first"), Toast.LENGTH_SHORT).show()
+                        flash(tr("আগে PIN সেট করুন", "Set a PIN first"))
                     } else {
                         appLock = true
                         AppLock.enable(ctx)
@@ -444,7 +443,7 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
         ChangePasswordDialog(
             email = email,
             onDismiss = { changing = false },
-            onDone = { changing = false; Toast.makeText(ctx, tr("পাসওয়ার্ড বদলানো হয়েছে", "Password changed"), Toast.LENGTH_SHORT).show() },
+            onDone = { changing = false; flash(tr("পাসওয়ার্ড বদলানো হয়েছে", "Password changed")) },
             vm = vm
         )
     }
@@ -459,10 +458,10 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
                     scope.launch {
                         try {
                             vm.unlinkIdentity(identityId)
-                            Toast.makeText(ctx, tr("Google সরানো হয়েছে", "Google removed"), Toast.LENGTH_SHORT).show()
+                            flash(tr("Google সরানো হয়েছে", "Google removed"))
                             reload++
                         } catch (e: Exception) {
-                            Toast.makeText(ctx, tr("সরানো যায়নি: ${e.message}", "Could not remove: ${e.message}"), Toast.LENGTH_LONG).show()
+                            flash(tr("সরানো যায়নি: ${e.message}", "Could not remove: ${e.message}"))
                         }
                     }
                 }) { Text(tr("সরান", "Remove"), color = readableOn(Rose500)) }
@@ -474,7 +473,7 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
         PinSetupDialog(onDismiss = { showSetPin = false }) { pin ->
             AppLock.setPin(ctx, pin)
             pinSet = true
-            Toast.makeText(ctx, tr("PIN সেভ হয়েছে", "PIN saved"), Toast.LENGTH_SHORT).show()
+            flash(tr("PIN সেভ হয়েছে", "PIN saved"))
             showSetPin = false
         }
     }
@@ -498,7 +497,7 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
             onConfirm = {
                 showReset = false
                 vm.resetLocal()
-                Toast.makeText(ctx, tr("লোকাল ডেটা মুছে ফেলা হয়েছে", "Local data erased"), Toast.LENGTH_LONG).show()
+                flash(tr("লোকাল ডেটা মুছে ফেলা হয়েছে", "Local data erased"))
             }
         )
     }

@@ -1,7 +1,6 @@
 package com.fintracks.app.ui
 
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -204,7 +203,7 @@ fun ExportCenterScreen(state: UiState, notesFlow: StateFlow<List<JsonObject>>) {
                             .putLong("last_at", now).putString("last_fmt", chosen.name).apply()
                         last = now to chosen
                     } catch (e: Exception) {
-                        Toast.makeText(ctx, tr("এক্সপোর্ট ব্যর্থ: ${e.message}", "Export failed: ${e.message}"), Toast.LENGTH_LONG).show()
+                        flash(tr("এক্সপোর্ট ব্যর্থ: ${e.message}", "Export failed: ${e.message}"))
                     } finally {
                         busy = false
                     }

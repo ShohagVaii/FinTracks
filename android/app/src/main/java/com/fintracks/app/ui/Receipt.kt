@@ -8,7 +8,6 @@ import android.content.Intent
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.net.Uri
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -123,7 +122,7 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onEdit: () -> Unit, onDelete: (
     fun copy(label: String, value: String) {
         val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         cm.setPrimaryClip(ClipData.newPlainText(label, value))
-        Toast.makeText(ctx, tr("কপি হয়েছে", "Copied"), Toast.LENGTH_SHORT).show()
+        flash(tr("কপি হয়েছে", "Copied"))
     }
 
     fun openVerify() {
@@ -131,7 +130,7 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onEdit: () -> Unit, onDelete: (
         try {
             ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         } catch (e: ActivityNotFoundException) {
-            Toast.makeText(ctx, tr("ব্রাউজার খুলতে পারেনি", "Could not open a browser"), Toast.LENGTH_LONG).show()
+            flash(tr("ব্রাউজার খুলতে পারেনি", "Could not open a browser"))
         }
     }
 
@@ -150,7 +149,7 @@ fun ReceiptDialog(t: JsonObject, state: UiState, onEdit: () -> Unit, onDelete: (
                     Export.share(ctx, file, "image/png", tr("FinTrack লেনদেন ভাউচার", "FinTrack transaction voucher"))
                 }
             } catch (e: Exception) {
-                Toast.makeText(ctx, tr("শেয়ার ব্যর্থ: ${e.message}", "Share failed: ${e.message}"), Toast.LENGTH_LONG).show()
+                flash(tr("শেয়ার ব্যর্থ: ${e.message}", "Share failed: ${e.message}"))
             } finally {
                 busy = false
             }

@@ -12,6 +12,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import android.Manifest
 import com.fintracks.app.data.SmsAuto
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.ui.draw.rotate
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -23,7 +30,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
@@ -142,7 +148,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
                 }
                 restorePlan = Backup.parse(text)
             } catch (e: Exception) {
-                Toast.makeText(ctx, e.message ?: tr("ফাইল পড়া যায়নি", "Couldn't read the file"), Toast.LENGTH_LONG).show()
+                flash(e.message ?: tr("ফাইল পড়া যায়নি", "Couldn't read the file"))
             }
         }
     }
@@ -152,15 +158,15 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
 
     // Sub-pages are entries on the app's back stack (page comes from the route); back returns here.
     if (page == "login") {
-        LoginSecurityPage(vm, lockOn, hasPin, bioOn, bioHardware, onBack = onBack, onOpenSecurity = onBack)
+        SlideInPage { LoginSecurityPage(vm, lockOn, hasPin, bioOn, bioHardware, onBack = onBack, onOpenSecurity = onBack) }
         return
     }
     if (page == "faq") {
-        FaqPage { onBack() }
+        SlideInPage { FaqPage { onBack() } }
         return
     }
     if (page == "help") {
-        Page {
+        SlideInPage { Page {
             AppCard {
                 SectionTitle(tr("সাহায্য ও অ্যাপ", "Help & app"))
                 SettingLink(tr("প্রশ্ন-উত্তর", "Questions & answers")) { onPage("faq") }
@@ -170,15 +176,15 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
                 SettingLink(tr("অ্যাপ শেয়ার করুন", "Share the app")) { shareApp(ctx) }
                 SettingLink(tr("রেট দিন", "Rate the app")) { openUrl(ctx, WEBSITE_URL) }
             }
-        }
+        } }
         return
     }
     if (page == "notifs") {
-        NotifPage()
+        SlideInPage { NotifPage() }
         return
     }
     if (page == "categories") {
-        CategoriesPage(state, vm, onBack = onBack)
+        SlideInPage { CategoriesPage(state, vm, onBack = onBack) }
         return
     }
     val uid = remember { vm.currentUid() }
@@ -320,7 +326,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
                                 val file = withContext(Dispatchers.IO) { Export.listFile(ctx, fmt, state, txs, tr("সব লেনদেন", "All transactions")) }
                                 Export.share(ctx, file, fmt.mime, tr("FinTrack লেনদেন", "FinTrack transactions"))
                             } catch (e: Exception) {
-                                Toast.makeText(ctx, tr("এক্সপোর্ট ব্যর্থ: ${e.message}", "Export failed: ${e.message}"), Toast.LENGTH_LONG).show()
+                                flash(tr("এক্সপোর্ট ব্যর্থ: ${e.message}", "Export failed: ${e.message}"))
                             } finally {
                                 exporting = false
                             }
@@ -335,7 +341,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
                         val file = withContext(Dispatchers.IO) { Backup.file(ctx, state) }
                         Export.share(ctx, file, "application/json", tr("FinTrack ব্যাকআপ", "FinTrack backup"))
                     } catch (e: Exception) {
-                        Toast.makeText(ctx, tr("ব্যাকআপ ব্যর্থ: ${e.message}", "Backup failed: ${e.message}"), Toast.LENGTH_LONG).show()
+                        flash(tr("ব্যাকআপ ব্যর্থ: ${e.message}", "Backup failed: ${e.message}"))
                     }
                 }
             }) { Text(tr("ব্যাকআপ ফাইল শেয়ার", "Share backup file")) }
@@ -369,7 +375,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
         PinSetupDialog(onDismiss = { showSetPin = false }) { pin ->
             AppLock.setPin(ctx, pin)
             hasPin = true
-            Toast.makeText(ctx, tr("PIN সেভ হয়েছে", "PIN saved"), Toast.LENGTH_SHORT).show()
+            flash(tr("PIN সেভ হয়েছে", "PIN saved"))
             showSetPin = false
         }
     }
@@ -637,21 +643,17 @@ private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () ->
             try {
                 val bytes = withContext(Dispatchers.IO) { compressAvatar(ctx, uri) }
                 if (bytes == null) {
-                    Toast.makeText(ctx, tr("ছবিটি পড়া যায়নি", "Could not read the photo"), Toast.LENGTH_SHORT).show()
+                    flash(tr("ছবিটি পড়া যায়নি", "Could not read the photo"))
                 } else {
                     // The new URL goes into this dialog at once, so Save cannot write the old value back.
                     photoUrl = vm.uploadAvatar(bytes)
-                    Toast.makeText(ctx, tr("প্রোফাইল ছবি সেভ হয়েছে", "Profile photo saved"), Toast.LENGTH_SHORT).show()
+                    flash(tr("প্রোফাইল ছবি সেভ হয়েছে", "Profile photo saved"))
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
                 // The real reason, shown right here; a silent failure would look like nothing happened.
-                Toast.makeText(
-                    ctx,
-                    tr("ছবি আপলোড ব্যর্থ: ${e.message ?: "অজানা ত্রুটি"}", "Photo upload failed: ${e.message ?: "unknown error"}"),
-                    Toast.LENGTH_LONG
-                ).show()
+                flash(tr("ছবি আপলোড ব্যর্থ: ${e.message ?: "অজানা ত্রুটি"}", "Photo upload failed: ${e.message ?: "unknown error"}"))
             } finally {
                 uploading = false
             }
@@ -853,4 +855,16 @@ private fun SmsAutoRow(ctx: Context) {
     SwitchRow(tr("SMS থেকে অটো লেনদেন", "Auto transactions from SMS"), on) { checked ->
         if (checked) consent = true else { SmsAuto.setEnabled(ctx, false); on = false }
     }
+}
+
+/** Sub-page slides in from the right (300 ms, fade). Reduce Motion: appears at once. */
+@Composable
+private fun SlideInPage(content: @Composable () -> Unit) {
+    val reduce = rememberReduceMotion()
+    val visible = remember { MutableTransitionState(false).apply { targetState = true } }
+    AnimatedVisibility(
+        visibleState = visible,
+        enter = if (reduce) EnterTransition.None else slideInHorizontally(tween(300)) { it / 4 } + fadeIn(tween(300)),
+        exit = ExitTransition.None
+    ) { content() }
 }

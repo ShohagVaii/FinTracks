@@ -120,7 +120,6 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.speech.RecognizerIntent
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -465,7 +464,7 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                 val file = withContext(Dispatchers.IO) { Export.listFile(ctx, fmt, state, filtered, range.label) }
                 Export.share(ctx, file, fmt.mime, "FinTrack - ${range.label}")
             } catch (e: Exception) {
-                Toast.makeText(ctx, tr("এক্সপোর্ট ব্যর্থ: ${e.message}", "Export failed: ${e.message}"), Toast.LENGTH_LONG).show()
+                flash(tr("এক্সপোর্ট ব্যর্থ: ${e.message}", "Export failed: ${e.message}"))
             } finally { busy = false }
         }
     }
@@ -477,7 +476,7 @@ fun TransactionsScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -
                 val file = withContext(Dispatchers.IO) { Voucher.summaryPdf(ctx, state, filtered, range.label, ref) }
                 Export.share(ctx, file, "application/pdf", tr("FinTrack সারসংক্ষেপ ভাউচার", "FinTrack summary voucher"))
             } catch (e: Exception) {
-                Toast.makeText(ctx, tr("ভাউচার ব্যর্থ: ${e.message}", "Voucher failed: ${e.message}"), Toast.LENGTH_LONG).show()
+                flash(tr("ভাউচার ব্যর্থ: ${e.message}", "Voucher failed: ${e.message}"))
             } finally { busy = false }
         }
     }
@@ -711,7 +710,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
                 val text = withContext(Dispatchers.IO) { recognizeReceiptText(ctx, uri) }
                 applyReceipt(CaptureParser.parseReceipt(text))
             } catch (e: Exception) {
-                Toast.makeText(ctx, tr("রসিদ পড়া যায়নি", "Could not read receipt") + ": ${e.message ?: tr("অজানা সমস্যা", "unknown error")}", Toast.LENGTH_LONG).show()
+                flash(tr("রসিদ পড়া যায়নি", "Could not read receipt") + ": ${e.message ?: tr("অজানা সমস্যা", "unknown error")}")
             } finally {
                 reading = false
             }
@@ -722,7 +721,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
         if (!said.isNullOrBlank()) {
             val v = CaptureParser.parseVoice(said)
             if (v == null) {
-                Toast.makeText(ctx, tr("পরিমাণ বোঝা যায়নি। আবার বলুন বা লিখুন", "Couldn't read the amount. Say it again or type it."), Toast.LENGTH_LONG).show()
+                flash(tr("পরিমাণ বোঝা যায়নি। আবার বলুন বা লিখুন", "Couldn't read the amount. Say it again or type it."))
             } else {
                 amount = fmtNum(v.amount)
                 type = v.type
@@ -747,7 +746,7 @@ fun TransactionDialog(state: UiState, existing: JsonObject?, transfer: Boolean =
         try {
             voiceLauncher.launch(intent)
         } catch (e: ActivityNotFoundException) {
-            Toast.makeText(ctx, tr("এই ফোনে ভয়েস সার্চ চালু নেই", "Voice search is not available on this phone"), Toast.LENGTH_LONG).show()
+            flash(tr("এই ফোনে ভয়েস সার্চ চালু নেই", "Voice search is not available on this phone"))
         }
     }
     fun launchCamera() {

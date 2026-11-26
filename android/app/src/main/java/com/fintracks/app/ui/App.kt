@@ -164,6 +164,9 @@ fun FinTracksApp(vm: AppViewModel = viewModel()) {
                 else -> MainScaffold(state, vm, onSaved = { celebration = Celebrate(1) })
             }
             celebration?.let { CelebrationOverlay(it.kind) }
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+                GlassSnackbarHost(Modifier.padding(bottom = 96.dp))
+            }
         }
     }
 }

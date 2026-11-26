@@ -12,7 +12,6 @@ import android.graphics.Shader
 import android.graphics.Typeface
 import android.os.Build
 import android.provider.MediaStore
-import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -245,11 +244,7 @@ fun saveAgeCard(ctx: Context, bmp: Bitmap) {
         val ok = uri != null && ctx.contentResolver.openOutputStream(uri)?.use {
             bmp.compress(Bitmap.CompressFormat.PNG, 100, it)
         } == true
-        Toast.makeText(
-            ctx,
-            if (ok) tr("ছবি ডাউনলোডে সেভ হয়েছে", "Saved to Downloads") else tr("ছবি সেভ হয়নি", "Could not save the image"),
-            Toast.LENGTH_SHORT
-        ).show()
+        flash(if (ok) tr("ছবি ডাউনলোডে সেভ হয়েছে", "Saved to Downloads") else tr("ছবি সেভ হয়নি", "Could not save the image"))
         return
     }
     val dir = File(ctx.cacheDir, "exports").apply { mkdirs() }

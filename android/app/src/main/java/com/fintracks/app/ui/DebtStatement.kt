@@ -7,7 +7,6 @@ import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
-import android.widget.Toast
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -124,7 +123,7 @@ private fun shareStatementAs(ctx: Context, person: JsonObject, state: UiState, k
             }
         }
     } catch (e: Exception) {
-        Toast.makeText(ctx, tr("খতিয়ান তৈরি করা যায়নি", "Could not create the statement"), Toast.LENGTH_SHORT).show()
+        flash(tr("খতিয়ান তৈরি করা যায়নি", "Could not create the statement"))
     }
 }
 
@@ -165,7 +164,7 @@ fun ShopStatementDialog(title: String, lines: List<String>, onDismiss: () -> Uni
                 )
             }
         } catch (e: Exception) {
-            Toast.makeText(ctx, tr("খতিয়ান তৈরি করা যায়নি", "Could not create the statement"), Toast.LENGTH_SHORT).show()
+            flash(tr("খতিয়ান তৈরি করা যায়নি", "Could not create the statement"))
         }
         onDismiss()
     }
