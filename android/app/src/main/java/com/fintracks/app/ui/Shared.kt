@@ -64,7 +64,7 @@ fun SharedScreen(state: UiState, vm: AppViewModel) {
             when (section) { "bill" -> Sky500; "mess" -> Emerald500; else -> Amber500 }, tween(300), label = "accent"
         )
         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            SegmentedTabs(listOf("bill" to tr("বিল স্প্লিটার", "Bill splitter"), "mess" to tr("মেস ম্যানেজার", "Mess manager"), "shop" to tr("শপিং লিস্ট", "Shopping list")), section) { section = it }
+            SegmentedTabs(listOf("bill" to tr("বিল স্প্লিটার", "Bill splitter"), "mess" to tr("মেস ম্যানেজার", "Mess manager"), "shop" to tr("শপিং লিস্ট", "Shopping list")), selected = section, onSelect = { section = it })
             Box(Modifier.fillMaxWidth().padding(top = 6.dp).height(3.dp).background(accent, RoundedCornerShape(50)))
         }
         Column(
