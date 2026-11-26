@@ -48,6 +48,7 @@ import com.fintracks.app.data.id
 import com.fintracks.app.data.num
 import com.fintracks.app.data.row
 import com.fintracks.app.data.str
+import com.fintracks.app.ui.design.AvatarCircle
 import com.fintracks.app.ui.design.DivergingBar
 import com.fintracks.app.ui.design.SegmentedTabs
 import com.fintracks.app.ui.design.SpeedDialFab
