@@ -63,18 +63,6 @@ import kotlin.math.min
 
 // ======================= বয়স ক্যালকুলেটর =======================
 
-private fun bnDate(d: LocalDate): String = displayDate(d.toString())
-
-private fun bnWeekday(d: java.time.DayOfWeek): String = when (d) {
-    java.time.DayOfWeek.SATURDAY -> tr("শনিবার", "Saturday")
-    java.time.DayOfWeek.SUNDAY -> tr("রবিবার", "Sunday")
-    java.time.DayOfWeek.MONDAY -> tr("সোমবার", "Monday")
-    java.time.DayOfWeek.TUESDAY -> tr("মঙ্গলবার", "Tuesday")
-    java.time.DayOfWeek.WEDNESDAY -> tr("বুধবার", "Wednesday")
-    java.time.DayOfWeek.THURSDAY -> tr("বৃহস্পতিবার", "Thursday")
-    java.time.DayOfWeek.FRIDAY -> tr("শুক্রবার", "Friday")
-}
-
 /** The birthday in [year]; Feb 29 falls back to Feb 28 in non-leap years. */
 private fun birthdayIn(birth: LocalDate, year: Int): LocalDate {
     val len = java.time.YearMonth.of(year, birth.month).lengthOfMonth()

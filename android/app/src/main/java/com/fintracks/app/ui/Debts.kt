@@ -256,19 +256,6 @@ private fun DebtFormDialog(
     )
 }
 
-@Composable
-private fun DashedDivider() {
-    Canvas(Modifier.fillMaxWidth().height(1.dp)) {
-        drawLine(
-            color = Tok_66888888,
-            start = Offset(0f, 0f),
-            end = Offset(size.width, 0f),
-            strokeWidth = 2f,
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f))
-        )
-    }
-}
-
 /** Folder-and-paper motif shown when there are no people yet. Drawn in the app's violet accent. */
 @Composable
 private fun EmptyFolderMotif() {
@@ -475,6 +462,8 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
         onUndo = { debtUndo?.let { vm.remove(it.table, it.id) }; vm.debtUndo.value = null },
         onExpire = { vm.debtUndo.value = null }
     )
+    // A payment just went in: a coin pops up under the undo bar (one pop per payment, none under Reduce Motion).
+    if (debtUndo?.table == "debt_payments") key(debtUndo?.id) { CoinPop() }
 
     // Back inside a person's page returns to the list; back on the list closes the screen.
 
@@ -1362,3 +1351,16 @@ private class ChatEvent(
     val text: String,
     val amount: Double
 )
+
+/** Amber coin that pops in once when a debt payment is saved. */
+@Composable
+private fun CoinPop() {
+    Box(Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.size(34.dp).popIn().clip(RoundedCornerShape(50)).background(Amber500),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("৳", color = readableOn(Amber500), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        }
+    }
+}
