@@ -39,6 +39,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import com.fintracks.app.ui.topInsetPadding
+import com.fintracks.app.ui.design.BalanceScale
+import com.fintracks.app.ui.design.GlassCard
+import com.fintracks.app.ui.design.MetricTile
+import com.fintracks.app.ui.design.SwipeAction
+import com.fintracks.app.ui.design.SwipeRow
+import com.fintracks.app.ui.Emerald500
+import com.fintracks.app.ui.Rose500
+import com.fintracks.app.ui.Sky500
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -444,9 +454,15 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
                         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            SummaryBox(tr("মোট দেনা", "Total debt"), taka(debtsRemaining(state, "owe"), p), Modifier.weight(1f))
-                            SummaryBox(tr("মোট পাওনা", "Total dues"), taka(debtsRemaining(state, "owed"), p), Modifier.weight(1f))
+                        val totalOwe = debtsRemaining(state, "owe")
+                        val totalOwed = debtsRemaining(state, "owed")
+                        GlassCard(Modifier.fillMaxWidth()) {
+                            BalanceScale(owed = totalOwed, owe = totalOwe, privacy = p)
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            MetricTile(tr("মোট দেনা", "Total debt"), taka(totalOwe, p), Modifier.weight(1f), Rose500)
+                            MetricTile(tr("মোট পাওনা", "Total dues"), taka(totalOwed, p), Modifier.weight(1f), Emerald500)
+                            MetricTile(tr("ব্যক্তি", "People"), people.size.toString(), Modifier.weight(1f))
                         }
                         if (people.isEmpty()) {
                             Spacer(Modifier.height(40.dp))
@@ -457,14 +473,23 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
                             }
                         }
                         people.forEach { person ->
-                            PersonCard(
-                                person = person,
-                                state = state,
-                                onOpen = { go("ov:DEBTS/${person.id()}") },
-                                onContact = { sms -> requestContact(ctx, person.str("phone"), sms) { contact = it } },
-                                onEdit = { editingPerson = person },
-                                onDelete = { deletingPerson = person }
-                            )
+                            val phone = person.str("phone")
+                            val callAction = if (phone.isBlank()) null else SwipeAction(
+                                tr("কল", "Call"), Icons.Default.Phone, Emerald500
+                            ) { requestContact(ctx, phone, false) { contact = it } }
+                            val smsAction = if (phone.isBlank()) null else SwipeAction(
+                                tr("এসএমএস", "SMS"), Icons.Default.Email, Sky500
+                            ) { requestContact(ctx, phone, true) { contact = it } }
+                            SwipeRow(onSwipeRight = callAction, onSwipeLeft = smsAction) {
+                                PersonCard(
+                                    person = person,
+                                    state = state,
+                                    onOpen = { go("ov:DEBTS/${person.id()}") },
+                                    onContact = { sms -> requestContact(ctx, phone, sms) { contact = it } },
+                                    onEdit = { editingPerson = person },
+                                    onDelete = { deletingPerson = person }
+                                )
+                            }
                         }
                         Spacer(Modifier.height(80.dp))
                     }
@@ -514,20 +539,6 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
     }
 }
 
-@Composable
-private fun SummaryBox(label: String, amount: String, modifier: Modifier) {
-    Column(
-        modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(4.dp))
-        Text(amount, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-    }
-}
 
 /** One person: name, দেনা/পাওনা balances, phone, address, and the ⋮ menu. */
 @Composable
