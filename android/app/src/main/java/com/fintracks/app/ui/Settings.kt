@@ -430,20 +430,7 @@ private fun ProfileHero(state: UiState, email: String, emailLoaded: Boolean, uid
                             )
                         }
                         AvatarImage(url = state.profile?.str("avatar_url").orEmpty(), fallback = name, size = 62.dp)
-                        Box(
-                            Modifier
-                                .align(Alignment.BottomCenter)
-                                .clip(RoundedCornerShape(50))
-                                .background(MaterialTheme.colorScheme.primary)
-                                .padding(horizontal = 6.dp, vertical = 1.dp)
-                        ) {
-                            Text(
-                                "${bnDigits(pct.toString())}%",
-                                fontSize = 10.sp, fontWeight = FontWeight.Bold,
-                                color = readableOn(MaterialTheme.colorScheme.primary)
-                            )
                         }
-                    }
                     Column(Modifier.weight(1f)) {
                         Text(name, fontWeight = FontWeight.Bold, fontSize = 18.sp, maxLines = 1)
                         Text(
@@ -649,8 +636,6 @@ private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () ->
     val u = username.trim().lowercase()
     val error = when {
         name.isBlank() -> tr("নাম লিখুন", "Enter a name")
-        photoUrl.isNotBlank() && !photoUrl.trim().startsWith("https://") ->
-            tr("ছবির URL অবশ্যই https:// দিয়ে শুরু হতে হবে (অথবা খালি রাখুন)", "The photo URL must start with https:// (or leave it empty)")
         u.isNotEmpty() && !USERNAME_RE.matches(u) -> tr("ইউজারনেম ৩–২০ অক্ষর: ইংরেজি ছোট হাতের অক্ষর, সংখ্যা বা _", "Username: 3–20 lowercase letters, digits or _")
         else -> null
     }
@@ -674,7 +659,6 @@ private fun EditProfileDialog(state: UiState, vm: AppViewModel, onDismiss: () ->
                         picker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }) { Text(if (uploading) tr("আপলোড হচ্ছে…", "Uploading…") else tr("গ্যালারি থেকে ছবি", "Photo from gallery")) }
                 }
-                OutlinedTextField(photoUrl, { photoUrl = it.take(500) }, label = { Text(tr("ছবির URL (ঐচ্ছিক)", "Photo URL (optional)")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             GroupLabel(tr("ব্যক্তিগত", "Personal"))
                 OutlinedTextField(name, { name = it.take(60) }, label = { Text(tr("নাম", "Name")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(username, { username = it.take(20) }, label = { Text(tr("ইউজারনেম", "Username")) }, singleLine = true,
