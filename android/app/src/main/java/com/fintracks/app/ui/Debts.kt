@@ -1,5 +1,10 @@
 package com.fintracks.app.ui
 
+import com.fintracks.app.ui.design.FilterPill
+import com.fintracks.app.ui.design.SearchBox
+import com.fintracks.app.ui.design.StatusChip
+import com.fintracks.app.ui.design.DivergingBar
+import com.fintracks.app.ui.design.AvatarCircle
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -429,6 +434,9 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
     var editingPerson by remember { mutableStateOf<JsonObject?>(null) }
     var deletingPerson by remember { mutableStateOf<JsonObject?>(null) }
     var contact by remember { mutableStateOf<ContactAction?>(null) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var chipFilter by rememberSaveable { mutableStateOf("all") }
+    var sortKey by rememberSaveable { mutableStateOf("owe") }
     val open = people.firstOrNull { it.id() == openId }
     val ctx = LocalContext.current
     val pendingCount by vm.outbox.pendingCount.collectAsState()
@@ -454,16 +462,49 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
                         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        val stats = people.associate { it.id() to personStat(state, it.id()) }
+                        val scale = stats.values.maxOfOrNull { maxOf(it.owe, it.owed) }?.coerceAtLeast(1.0) ?: 1.0
                         val totalOwe = debtsRemaining(state, "owe")
                         val totalOwed = debtsRemaining(state, "owed")
                         GlassCard(Modifier.fillMaxWidth()) {
                             BalanceScale(owed = totalOwed, owe = totalOwe, privacy = p)
                         }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            MetricTile(tr("মোট দেনা", "Total debt"), taka(totalOwe, p), Modifier.weight(1f), Rose500)
-                            MetricTile(tr("মোট পাওনা", "Total dues"), taka(totalOwed, p), Modifier.weight(1f), Emerald500)
-                            MetricTile(tr("ব্যক্তি", "People"), people.size.toString(), Modifier.weight(1f))
+                            MetricTile(tr("মোট দেনা", "Total debt"), taka(totalOwe, p), Modifier.weight(1f).clickable { chipFilter = "owe" }, Rose500)
+                            MetricTile(tr("মোট পাওনা", "Total dues"), taka(totalOwed, p), Modifier.weight(1f).clickable { chipFilter = "owed" }, Emerald500)
+                            MetricTile(tr("ব্যক্তি", "People"), people.size.toString(), Modifier.weight(1f).clickable { chipFilter = "all" })
                         }
+                        SearchBox(query, { query = it }, tr("নাম বা ফোন খুঁজুন", "Search name or phone"))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            FilterPill(tr("সব", "All"), chipFilter == "all") { chipFilter = "all" }
+                            FilterPill(tr("আমি দেব", "I owe"), chipFilter == "owe") { chipFilter = "owe" }
+                            FilterPill(tr("আমি পাব", "Owed to me"), chipFilter == "owed") { chipFilter = "owed" }
+                            FilterPill(tr("মেয়াদ-পার", "Overdue"), chipFilter == "overdue") { chipFilter = "overdue" }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            val sortText = when (sortKey) {
+                                "due" -> tr("মেয়াদ আগে", "Overdue first")
+                                "name" -> tr("নাম", "Name")
+                                else -> tr("বেশি বাকি", "Highest due")
+                            }
+                            FilterPill(sortText, false) { sortKey = when (sortKey) { "owe" -> "due"; "due" -> "name"; else -> "owe" } }
+                        }
+                        val q = query.trim()
+                        val visible = people.filter { pr ->
+                            val st = stats.getValue(pr.id())
+                            (q.isEmpty() || pr.str("name").contains(q, true) || pr.str("phone").contains(q)) &&
+                                when (chipFilter) {
+                                    "owe" -> st.owe > 0.005
+                                    "owed" -> st.owed > 0.005
+                                    "overdue" -> st.overdue
+                                    else -> true
+                                }
+                        }.sortedWith(when (sortKey) {
+                            "due" -> compareByDescending<JsonObject> { stats.getValue(it.id()).overdue }
+                                .thenByDescending { stats.getValue(it.id()).owe + stats.getValue(it.id()).owed }
+                            "name" -> compareBy<JsonObject> { it.str("name") }
+                            else -> compareByDescending<JsonObject> { stats.getValue(it.id()).owe + stats.getValue(it.id()).owed }
+                        })
                         if (people.isEmpty()) {
                             Spacer(Modifier.height(40.dp))
                             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -472,7 +513,8 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
                                 Text(tr("এখনো কোনো ব্যক্তি নেই", "No people yet"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        people.forEach { person ->
+                        visible.forEach { person ->
+                            val stat = stats.getValue(person.id())
                             val phone = person.str("phone")
                             val callAction = if (phone.isBlank()) null else SwipeAction(
                                 tr("কল", "Call"), Icons.Default.Phone, Emerald500
@@ -483,6 +525,8 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
                             SwipeRow(onSwipeRight = callAction, onSwipeLeft = smsAction) {
                                 PersonCard(
                                     person = person,
+                                    stat = stat,
+                                    scale = scale,
                                     state = state,
                                     onOpen = { go("ov:DEBTS/${person.id()}") },
                                     onContact = { sms -> requestContact(ctx, phone, sms) { contact = it } },
@@ -544,6 +588,8 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
 @Composable
 private fun PersonCard(
     person: JsonObject,
+    stat: PersonStat,
+    scale: Double,
     state: UiState,
     onOpen: () -> Unit,
     onContact: (Boolean) -> Unit,
@@ -552,19 +598,28 @@ private fun PersonCard(
 ) {
     val p = state.privacy
     var menu by remember { mutableStateOf(false) }
-    val owe = personRemaining(state, person.id(), "owe")
-    val owed = personRemaining(state, person.id(), "owed")
+    val net = stat.owed - stat.owe
+    val settled = stat.total > 0 && stat.owe + stat.owed <= 0.005
     AppCard(onClick = onOpen) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            AvatarCircle(person.str("name"), size = 48.dp, percent = stat.paidPct)
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(person.str("name"), fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(
-                    tr("দেনা - ", "I owe - ") + taka(owe, p) + tr(" । পাওনা - ", " · Owed to me - ") + taka(owed, p),
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (person.str("phone").isNotBlank()) Text(person.str("phone"), fontSize = 13.sp)
-                if (person.str("address").isNotBlank()) Text(person.str("address"), fontSize = 13.sp)
+                Text(person.str("name"), fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(6.dp))
+                DivergingBar(value = net, maxAbs = scale)
+                Spacer(Modifier.height(6.dp))
+                when {
+                    stat.overdue -> StatusChip(tr("মেয়াদ-পার", "Overdue"), Rose500)
+                    settled -> StatusChip(tr("সব শোধ", "All settled"), Emerald500)
+                }
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                when {
+                    net > 0.005 -> Text(taka(net, p) + tr(" পাব", " to get"), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Emerald500)
+                    net < -0.005 -> Text(taka(-net, p) + tr(" দেব", " to pay"), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Rose500)
+                    else -> Text(taka(0.0, p), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
             Box {
                 IconButton(modifier = Modifier.pressScale(), onClick = { menu = true }) {
@@ -845,4 +900,24 @@ private fun DetailStat(label: String, value: String, color: Color, modifier: Mod
         Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
+}
+
+private class PersonStat(val owe: Double, val owed: Double, val overdue: Boolean, val total: Double, val paidPct: Float?)
+
+private fun personStat(state: UiState, personId: String): PersonStat {
+    val payments = state.rows("debt_payments")
+    val all = state.rows("debts").filter { it.str("person_id") == personId }
+    val today = todayIso()
+    val remaining = all.sumOf { debtRemaining(it, payments) }
+    val total = all.sumOf { it.num("amount") }
+    val overdue = all.any { d ->
+        debtRemaining(d, payments) > 0.005 && (d.strOrNull("due_date")?.take(10)?.let { it < today } ?: false)
+    }
+    return PersonStat(
+        owe = personRemaining(state, personId, "owe"),
+        owed = personRemaining(state, personId, "owed"),
+        overdue = overdue,
+        total = total,
+        paidPct = if (total > 0) (1 - remaining / total).toFloat().coerceIn(0f, 1f) else null
+    )
 }
