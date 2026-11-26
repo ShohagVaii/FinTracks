@@ -1,5 +1,6 @@
 package com.fintracks.app.ui
 
+import com.fintracks.app.ui.design.StatusChip
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -319,7 +320,7 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(email.ifBlank { "—" }, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
                 if (info != null) {
-                    StatusChip(if (verified) tr("যাচাইকৃত", "Verified") else tr("যাচাই হয়নি", "Not verified"))
+                    StatusChip(if (verified) tr("যাচাইকৃত", "Verified") else tr("যাচাই হয়নি", "Not verified"), if (verified) Emerald500 else Amber500)
                 }
             }
             HorizontalDivider(color = faint(0.08f))
@@ -508,17 +509,6 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
             onConfirm = { password -> vm.deleteAccount(password); showDelete = false }
         )
     }
-}
-
-/** Small status label, e.g. the verified state of the email. */
-@Composable
-private fun StatusChip(text: String) {
-    Text(
-        text,
-        fontSize = 11.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.clip(RoundedCornerShape(50)).background(faint(0.08f)).padding(horizontal = 8.dp, vertical = 3.dp)
-    )
 }
 
 @Composable

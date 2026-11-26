@@ -1,5 +1,14 @@
 package com.fintracks.app.ui
 
+import java.time.YearMonth
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Size
+import androidx.compose.foundation.Canvas
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawBehind
 import com.fintracks.app.ui.design.StampLabel
@@ -181,6 +190,14 @@ fun BakiScreen(state: UiState, vm: AppViewModel, subPage: String, go: (String) -
             overdue = lines.count { it.overdue(today) }
         )
     }
+    val ctx = LocalContext.current
+    val creditDues = shops.flatMap { sh ->
+        settleShop(sh.id(), state).mapNotNull { (id, st) ->
+            val due = st.dueDate
+            if (due == null || st.remaining <= EPS) null else DebtDue(id, due, sh.str("name"), false)
+        }
+    }
+    LaunchedEffect(creditDues.toString()) { DebtReminders.sync(ctx, creditDues, "credit") }
     val q = query.trim()
     val visible = shops.filter { s ->
         val st = stats.getValue(s.id())
@@ -236,9 +253,14 @@ fun BakiScreen(state: UiState, vm: AppViewModel, subPage: String, go: (String) -
         if (shops.isEmpty()) EmptyHint(tr("কোনো দোকান নেই। দোকান যোগ করে কেনা ও বাকি তুলুন।", "No shops yet. Add a shop to record purchases and credit."))
         visible.forEach { s ->
             val st = stats.getValue(s.id())
+            val cat = shopCat
             AppCard(onClick = { go("ov:CREDIT/${s.id()}") }) {
+                Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(cat.color))
+                Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    AvatarCircle(s.str("name"), size = 44.dp)
+                    Box(Modifier.size(44.dp).clip(CircleShape).background(cat.color.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+                        Text(cat.emoji, fontSize = 20.sp)
+                    }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(s.str("name"), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -251,13 +273,13 @@ fun BakiScreen(state: UiState, vm: AppViewModel, subPage: String, go: (String) -
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text(taka(st.balance, p), fontWeight = FontWeight.Bold, color = readableOn(BakiRed))
-                        if (st.balance > 0.005) {
-                            TextButton(onClick = { paying = s }) { Text(tr("শোধ", "Pay")) }
-                        }
+                        if (st.balance > 0.005) TextButton(onClick = { paying = s }) { Text(tr("শোধ", "Pay")) }
                     }
                 }
             }
         }
+        ShopReports(state)
+        ShopDonut(shops, stats, p)
     }
 
     if (addingShop) {
@@ -274,7 +296,11 @@ private fun ShopDialog(existing: JsonObject?, vm: AppViewModel, onDismiss: () ->
     var phone by remember { mutableStateOf(existing?.str("phone").orEmpty()) }
     var note by remember { mutableStateOf(existing?.str("note").orEmpty()) }
     FormDialog(if (existing == null) tr("নতুন দোকান", "New shop") else tr("দোকান সম্পাদনা", "Edit shop"), confirmEnabled = name.isNotBlank(), onDismiss = onDismiss, onConfirm = {
-        vm.save("credit_shops", row("name" to name.trim(), "phone" to phone.trim(), "note" to note.trim()), existing?.id())
+        vm.save(
+            "credit_shops",
+            row("name" to name.trim(), "phone" to phone.trim(), "note" to note.trim()),
+            existing?.id()
+        )
         onDismiss()
     }) {
         TextIn(tr("দোকান / ব্যক্তির নাম", "Shop / person name"), name, { name = it })
@@ -292,6 +318,7 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
     var addingPayment by remember { mutableStateOf(false) }
     var editingShop by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var sharing by remember { mutableStateOf(false) }
     val p = state.privacy
     val today = todayIso()
     val purchases = state.rows("credit_entries").filter { it.str("shop_id") == shop.id() }
@@ -326,6 +353,7 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(modifier = Modifier.pressScale(), onClick = { editingShop = true }) { Text(tr("দোকান সম্পাদনা", "Edit shop")) }
+                TextButton(modifier = Modifier.pressScale(), onClick = { sharing = true }) { Text(tr("খতিয়ান শেয়ার", "Share statement")) }
                 DeleteButton { confirmDelete = true }
             }
         }
@@ -381,6 +409,7 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (l.purchase) TextButton(modifier = Modifier.pressScale(), onClick = { editingPurchase = l.row }) { Text(tr("সম্পাদনা", "Edit")) }
+                        if (l.purchase) TextButton(modifier = Modifier.pressScale(), onClick = { repeatPurchase(vm, l.row) }) { Text(tr("আবার একই", "Repeat")) }
                         DeleteButton { vm.remove(if (l.purchase) "credit_entries" else "credit_payments", l.row.id()) }
                     }
                 }
@@ -393,6 +422,7 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
     editingPurchase?.let { PurchaseDialog(shop.id(), it, vm) { editingPurchase = null } }
     if (addingPayment) PaymentDialog(shop.id(), shop.str("name"), balance, vm) { addingPayment = false }
     if (editingShop) ShopDialog(shop, vm) { editingShop = false }
+    if (sharing) ShopStatementDialog(tr("খতিয়ান: ", "Statement: ") + shop.str("name"), shopStatementLines(shop, state, settled)) { sharing = false }
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -483,13 +513,14 @@ private fun PaymentDialog(shopId: String, shopName: String, balance: Double, vm:
     var amount by remember { mutableStateOf("") }
     var date by remember { mutableStateOf(todayIso()) }
     var note by remember { mutableStateOf("") }
+    var method by remember { mutableStateOf("Cash") }
     val a = parseAmount(amount)
     val tooMuch = a != null && a > balance + EPS
     val valid = a != null && a > 0 && !tooMuch && isValidIsoDate(date) && balance > EPS
 
     FormDialog(tr("পরিশোধ / কিস্তি", "Payment / instalment"), confirmEnabled = valid, onDismiss = onDismiss, onConfirm = {
         if (a != null) {
-            vm.recordDebtPayment(shopName, a, date.trim(), note.trim(), shopId)
+            vm.recordDebtPayment(shopName, a, date.trim(), note.trim(), shopId, method)
             onDismiss()
         }
     }) {
@@ -498,6 +529,10 @@ private fun PaymentDialog(shopId: String, shopName: String, balance: Double, vm:
         if (tooMuch) Text(tr("বাকির বেশি টাকা দেওয়া যাবে না", "Payment cannot exceed the balance due"), fontSize = 12.sp, color = readableOn(BakiRed))
         DateField(tr("তারিখ", "Date"), date, { date = it })
         TextIn(tr("নোট (ঐচ্ছিক)", "Note (optional)"), note, { note = it })
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("Cash" to tr("ক্যাশ", "Cash"), "Bkash" to tr("বিকাশ", "Bkash"), "Nagad" to tr("নগদ", "Nagad"), "Bank" to tr("ব্যাংক", "Bank"))
+                .forEach { (key, label) -> FilterPill(label, method == key) { method = key } }
+        }
     }
 }
 
@@ -572,4 +607,88 @@ private fun Modifier.ledgerPaper(lineColor: Color): Modifier = this.drawBehind {
         y += step
     }
     drawLine(BakiRed.copy(alpha = 0.25f), Offset(margin, 0f), Offset(margin, size.height), strokeWidth = 2f)
+}
+
+private class ShopCategory(val key: String, val bn: String, val en: String, val emoji: String, val color: Color)
+
+private val shopCat = ShopCategory("other", "", "", "🏪", Color(0xFF64748B))
+
+/** Repeats a purchase as a new one dated today: same items, totals and adjustment. */
+private fun repeatPurchase(vm: AppViewModel, e: JsonObject) {
+    val drop = setOf("id", "created_at", "user_id", "purchase_date", "due_date")
+    val body = JsonObject(e.filterKeys { it !in drop } + mapOf("purchase_date" to JsonPrimitive(todayIso())))
+    vm.save("credit_entries", body, null)
+}
+
+/** Plain lines of a shop's khata page, for the statement share. */
+private fun shopStatementLines(shop: JsonObject, state: UiState, settled: Map<String, Settlement>): List<String> {
+    val purchases = state.rows("credit_entries").filter { it.str("shop_id") == shop.id() }
+    val payments = state.rows("credit_payments").filter { it.str("shop_id") == shop.id() }
+    val out = mutableListOf(tr("খতিয়ান: ", "Statement: ") + shop.str("name"))
+    ledgerLines(purchases, payments, settled, todayIso()).forEach { l ->
+        val what = if (l.purchase) l.row.str("item_name") else tr("পরিশোধ", "Payment")
+        val sign = if (l.purchase) "+" else "−"
+        out += "${displayDate(l.date)} · $what · $sign${taka(l.amount)} · " + tr("জের", "Balance") + " ${taka(l.balance)}" +
+            (l.note?.let { " · $it" } ?: "")
+    }
+    return out
+}
+
+/** Last six months: purchases (rose) against payments (emerald). */
+@Composable
+private fun ShopReports(state: UiState) {
+    val months = (5 downTo 0).map { YearMonth.now().minusMonths(it.toLong()).toString() }
+    val entries = state.rows("credit_entries")
+    val pays = state.rows("credit_payments")
+    val bought = months.map { m -> entries.filter { it.str("purchase_date").startsWith(m) }.sumOf { it.num("total") } }
+    val paid = months.map { m -> pays.filter { it.str("paid_on").startsWith(m) }.sumOf { it.num("amount") } }
+    val max = (bought + paid).maxOrNull()?.coerceAtLeast(1.0) ?: 1.0
+    GlassCard(Modifier.fillMaxWidth()) {
+        Text(tr("মাসভিত্তিক কেনা ও শোধ", "Bought vs paid by month"), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Row(Modifier.fillMaxWidth().height(120.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            months.indices.forEach { i ->
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(Modifier.height(100.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Box(Modifier.width(8.dp).height((100.0 * bought[i] / max).toFloat().dp).clip(RoundedCornerShape(4.dp)).background(BakiRed))
+                        Box(Modifier.width(8.dp).height((100.0 * paid[i] / max).toFloat().dp).clip(RoundedCornerShape(4.dp)).background(BakiGreen))
+                    }
+                    Text(bnDigits(months[i].substring(5)), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+/** Donut of the balance by shop; the legend lists the first six. */
+@Composable
+private fun ShopDonut(shops: List<JsonObject>, stats: Map<String, ShopStat>, p: Boolean) {
+    val due = shops.map { it to (stats[it.id()]?.balance ?: 0.0) }.filter { it.second > EPS }
+    val total = due.sumOf { it.second }
+    if (total <= EPS) return
+    val palette = listOf(BakiSky, BakiGreen, BakiAmber, BakiRed, Color(0xFF8B5CF6), Color(0xFF14B8A6))
+    GlassCard(Modifier.fillMaxWidth()) {
+        Text(tr("দোকানভিত্তিক বাকি", "Due by shop"), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Canvas(Modifier.size(120.dp)) {
+                var start = -90f
+                due.forEachIndexed { i, pair ->
+                    val sweep = (pair.second / total * 360.0).toFloat()
+                    drawArc(
+                        color = palette[i % palette.size], startAngle = start, sweepAngle = sweep, useCenter = false,
+                        topLeft = Offset(11f, 11f), size = Size(size.width - 22f, size.height - 22f), style = Stroke(width = 22f)
+                    )
+                    start += sweep
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                due.take(6).forEachIndexed { i, pair ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(palette[i % palette.size]))
+                        Text(pair.first.str("name"), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(96.dp))
+                        Text(taka(pair.second, p), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
 }

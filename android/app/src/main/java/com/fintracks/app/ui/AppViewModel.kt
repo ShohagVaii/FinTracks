@@ -486,7 +486,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * The expense (category বাকি পরিশোধ) is linked by source = debt_payment and source_ref = payment id.
      * Purchases on credit do not create expenses, so the money is counted once, when it is paid.
      */
-    fun recordDebtPayment(shopName: String, amount: Double, date: String, note: String, shopId: String) {
+    fun recordDebtPayment(shopName: String, amount: Double, date: String, note: String, shopId: String, method: String = "Cash") {
         val paymentId = java.util.UUID.randomUUID().toString()
         val label = tr("দোকান: ", "Shop: ") + shopName + if (note.isNotBlank()) " · $note" else ""
         batch(
@@ -496,7 +496,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     "transactions",
                     row(
                         "type" to "Expense", "amount" to amount, "currency" to state.value.currency,
-                        "category" to "বাকি পরিশোধ", "note" to label, "tx_date" to date, "payment_mode" to "Cash",
+                        "category" to "বাকি পরিশোধ", "note" to label, "tx_date" to date, "payment_mode" to method,
                         "mood" to "", "is_recurring" to false,
                         "source" to "debt_payment", "source_ref" to paymentId
                     ),
