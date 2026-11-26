@@ -235,7 +235,12 @@ fun CountUpText(
 /** Progress ring (0..1) whose arc sweeps to the new value. */
 @Composable
 fun AnimatedRing(fraction: Float, color: Color, size: Dp, stroke: Dp, modifier: Modifier = Modifier) {
-    val f by animateFloatAsState(fraction.coerceIn(0f, 1f), tween(400, easing = FastOutSlowInEasing), label = "ring")
+    val reduce = rememberReduceMotion()
+    val f by animateFloatAsState(
+        fraction.coerceIn(0f, 1f),
+        if (reduce) androidx.compose.animation.core.snap<Float>() else tween(400, easing = FastOutSlowInEasing),
+        label = "ring"
+    )
     val track = faint(0.08f) // read here: Canvas drawing blocks are not composable
     Canvas(modifier.size(size)) {
         val s = stroke.toPx()

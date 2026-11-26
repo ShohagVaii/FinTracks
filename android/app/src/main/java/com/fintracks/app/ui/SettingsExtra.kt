@@ -40,6 +40,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -392,6 +394,7 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
                 timeout = it
                 AppLock.setTimeout(ctx, it.toInt())
             }
+            val haptic = LocalHapticFeedback.current
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(tr("ফিঙ্গারপ্রিন্ট / ফেস", "Fingerprint / face"), fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 Switch(
@@ -399,6 +402,7 @@ fun LoginSecurityPage(vm: AppViewModel, lockOn: Boolean, hasPin: Boolean, bioOn:
                     enabled = appLock && bioHardware,
                     onCheckedChange = {
                         bio = it
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         AppLock.setBiometric(ctx, it)
                     }
                 )

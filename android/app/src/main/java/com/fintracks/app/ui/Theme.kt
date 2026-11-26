@@ -8,6 +8,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -129,7 +130,21 @@ fun FinTracksTheme(dark: Boolean, accent: AccentColor, content: @Composable () -
             error = Rose500
         )
     }
-    MaterialTheme(colorScheme = scheme, typography = Typography().withFamily(HindFamily), content = content)
+    // Theme change: the main colours fade over 300 ms (instant with Reduce Motion).
+    val reduce = rememberReduceMotion()
+    val spec = androidx.compose.animation.core.tween<Color>(if (reduce) 0 else 300)
+    val bg by androidx.compose.animation.animateColorAsState(scheme.background, spec, label = "thBg")
+    val surf by androidx.compose.animation.animateColorAsState(scheme.surface, spec, label = "thSurf")
+    val onSurf by androidx.compose.animation.animateColorAsState(scheme.onSurface, spec, label = "thOnSurf")
+    val onBg by androidx.compose.animation.animateColorAsState(scheme.onBackground, spec, label = "thOnBg")
+    val surfVar by androidx.compose.animation.animateColorAsState(scheme.surfaceVariant, spec, label = "thSv")
+    val onSv by androidx.compose.animation.animateColorAsState(scheme.onSurfaceVariant, spec, label = "thOsv")
+    val prim by androidx.compose.animation.animateColorAsState(scheme.primary, spec, label = "thPrim")
+    val animated = scheme.copy(
+        background = bg, surface = surf, onSurface = onSurf, onBackground = onBg,
+        surfaceVariant = surfVar, onSurfaceVariant = onSv, primary = prim
+    )
+    MaterialTheme(colorScheme = animated, typography = Typography().withFamily(HindFamily), content = content)
 }
 
 // Colour literals that used to be scattered through the screens. Moved here so each one has one definition.

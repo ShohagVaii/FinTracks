@@ -184,7 +184,8 @@ fun AvatarStack(names: List<String>, modifier: Modifier = Modifier, max: Int = 4
 @Composable
 fun DivergingBar(value: Double, maxAbs: Double, modifier: Modifier = Modifier, height: Dp = 8.dp) {
     val frac = if (maxAbs > 0) (value / maxAbs).toFloat().coerceIn(-1f, 1f) else 0f
-    val f by animateFloatAsState(frac, tween(400), label = "diverge")
+    val reduce = rememberReduceMotion()
+    val f by animateFloatAsState(frac, if (reduce) androidx.compose.animation.core.snap<Float>() else tween(400), label = "diverge")
     val track = faint(0.08f)
     val centre = faint(0.5f)
     Canvas(modifier.fillMaxWidth().height(height)) {

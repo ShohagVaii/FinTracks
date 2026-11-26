@@ -121,6 +121,9 @@ data class UiState(
     val name: String get() = profile?.str("name").orEmpty()
 }
 
+/** A just-made debt change that the Debts screen can undo for a few seconds (same mirrored-delete path as remove). */
+data class DebtUndo(val table: String, val id: String, val message: String)
+
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Shared with the UI (inbox reads and writes through it). */
     val repo = Repository(app)
@@ -134,6 +137,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var serverProfile: JsonObject? = null
     private var netCallback: ConnectivityManager.NetworkCallback? = null
     private val _state = MutableStateFlow(UiState())
+    val debtUndo = MutableStateFlow<DebtUndo?>(null)
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     init {
@@ -837,6 +841,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 LocalOutbox.op("insert", "transactions", txId, tx, tx, group)
             )
         )
+        debtUndo.value = DebtUndo("debt_payments", paymentId, tr("পরিশোধ যুক্ত হয়েছে", "Payment added"))
     }
 
     /** Moves a row with everything that depends on it to the Trash. Only a plain single row can be undone. */

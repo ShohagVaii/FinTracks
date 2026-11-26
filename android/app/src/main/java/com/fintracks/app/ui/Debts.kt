@@ -467,6 +467,13 @@ fun DebtsScreen(state: UiState, vm: AppViewModel, openId: String?, go: (String) 
     remindFor?.let { person -> RemindDialog(person, state, ctx) { remindFor = null } }
     shareFor?.let { person -> StatementShareDialog(person, state) { shareFor = null } }
     if (quickEntry) QuickEntrySheet(people, state.privacy, vm) { quickEntry = false }
+    val debtUndo by vm.debtUndo.collectAsState()
+    UndoBar(
+        visible = debtUndo != null,
+        message = debtUndo?.message.orEmpty(),
+        onUndo = { debtUndo?.let { vm.remove(it.table, it.id) }; vm.debtUndo.value = null },
+        onExpire = { vm.debtUndo.value = null }
+    )
 
     // Back inside a person's page returns to the list; back on the list closes the screen.
 
@@ -1011,7 +1018,6 @@ private fun QuickPayDialog(person: JsonObject, state: UiState, vm: AppViewModel,
             vm.recordPersonalDebtPayment(e, part, todayIso(), method, note.trim())
             left -= part
         }
-        flash(tr("পরিশোধ সেভ হয়েছে", "Payment saved"))
         onDismiss()
     }
     FormSheet(
@@ -1202,17 +1208,18 @@ private fun QuickEntrySheet(people: List<JsonObject>, privacy: Boolean, vm: AppV
     fun save() {
         val amt = a ?: return
         val pid = pickedId ?: vm.addPerson(newName.trim(), newPhone.trim())
+        val nid = java.util.UUID.randomUUID().toString()
         val name = if (pickedId != null) pickedName else newName.trim()
         vm.save(
             "debts",
             row(
-                "person" to name, "person_id" to pid, "amount" to amt,
+                "id" to nid, "person" to name, "person_id" to pid, "amount" to amt,
                 "direction" to (if (owe) "owe" else "owed"), "note" to reason.trim(),
                 "due_date" to (nonEmpty(due)?.let { JsonPrimitive(it) } ?: JsonNull)
             ),
             null
         )
-        flash(tr("এন্ট্রি যুক্ত হয়েছে", "Entry added"))
+        vm.debtUndo.value = DebtUndo("debts", nid, tr("এন্ট্রি যুক্ত হয়েছে", "Entry added"))
         onDismiss()
     }
     FormSheet(
