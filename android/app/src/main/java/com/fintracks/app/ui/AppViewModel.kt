@@ -54,6 +54,8 @@ val TABLES: List<Pair<String, String>> = listOf(
     "credit_entries" to "select=*&order=purchase_date.desc",
     "credit_payments" to "select=*&order=paid_on.desc",
     "bill_splits" to "select=*&order=split_date.desc",
+    "bill_groups" to "select=*&order=name.asc",
+    "bill_settlements" to "select=*&order=paid_on.desc",
     "shopping_items" to "select=*",
     "mess_members" to "select=*",
     "mess_bazaars" to "select=*&order=bazaar_date.desc",
@@ -76,14 +78,14 @@ private val UNDO_BN = mapOf(
     "transactions" to "লেনদেন", "accounts" to "অ্যাকাউন্ট", "budgets" to "বাজেট", "goals" to "লক্ষ্য",
     "debts" to "ধার", "debt_people" to "ধার ব্যক্তি", "debt_payments" to "ধার পরিশোধ", "loans" to "লোন", "subscriptions" to "সাবস্ক্রিপশন", "investments" to "বিনিয়োগ",
     "credit_entries" to "কেনা", "credit_payments" to "পরিশোধ", "shopping_items" to "শপিং আইটেম",
-    "bill_splits" to "বিল ভাগ", "mess_bazaars" to "বাজার", "mess_meals" to "মিল", "mess_deposits" to "জমা",
+    "bill_splits" to "বিল ভাগ", "bill_groups" to "বিল গ্রুপ", "bill_settlements" to "বিল পরিশোধ", "mess_bazaars" to "বাজার", "mess_meals" to "মিল", "mess_deposits" to "জমা",
     "categories" to "ক্যাটাগরি", "cash_counts" to "গণনা"
 )
 private val UNDO_EN = mapOf(
     "transactions" to "transaction", "accounts" to "account", "budgets" to "budget", "goals" to "goal",
     "debts" to "debt", "debt_people" to "debt person", "debt_payments" to "debt payment", "loans" to "loan", "subscriptions" to "subscription", "investments" to "investment",
     "credit_entries" to "purchase", "credit_payments" to "payment", "shopping_items" to "shopping item",
-    "bill_splits" to "bill split", "mess_bazaars" to "bazaar", "mess_meals" to "meal", "mess_deposits" to "deposit",
+    "bill_splits" to "bill split", "bill_groups" to "bill group", "bill_settlements" to "bill payment", "mess_bazaars" to "bazaar", "mess_meals" to "meal", "mess_deposits" to "deposit",
     "categories" to "category", "cash_counts" to "count"
 )
 fun undoLabel(table: String): String = tr(UNDO_BN[table] ?: "আইটেম", UNDO_EN[table] ?: "item")

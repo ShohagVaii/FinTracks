@@ -1,6 +1,13 @@
 package com.fintracks.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.height
+import com.fintracks.app.ui.design.SegmentedTabs
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,8 +60,12 @@ import androidx.compose.foundation.layout.Box
 fun SharedScreen(state: UiState, vm: AppViewModel) {
     var section by remember { mutableStateOf("bill") }
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            ChoiceChips(listOf("bill" to tr("বিল স্প্লিটার", "Bill splitter"), "mess" to tr("মেস ম্যানেজার", "Mess manager"), "shop" to tr("শপিং লিস্ট", "Shopping list")), section) { section = it }
+        val accent by animateColorAsState(
+            when (section) { "bill" -> Sky500; "mess" -> Emerald500; else -> Amber500 }, tween(300), label = "accent"
+        )
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            SegmentedTabs(listOf("bill" to tr("বিল স্প্লিটার", "Bill splitter"), "mess" to tr("মেস ম্যানেজার", "Mess manager"), "shop" to tr("শপিং লিস্ট", "Shopping list")), section) { section = it }
+            Box(Modifier.fillMaxWidth().padding(top = 6.dp).height(3.dp).background(accent, RoundedCornerShape(50)))
         }
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -74,15 +85,15 @@ fun SharedScreen(state: UiState, vm: AppViewModel) {
 // ======================= Shared math =======================
 
 /** One payment needed to settle: [from] pays [to] [amount]. Keys are names (bills) or member ids (mess). */
-private data class Payout(val from: String, val to: String, val amount: Double)
+internal data class Payout(val from: String, val to: String, val amount: Double)
 
-private fun round2(v: Double): Double = Math.round(v * 100) / 100.0
+internal fun round2(v: Double): Double = Math.round(v * 100) / 100.0
 
 /**
  * Smallest practical set of payments that brings every balance to zero.
  * Balances must sum to zero (they do for bills and mess); positive = is owed, negative = owes.
  */
-private fun settleBalances(balances: Map<String, Double>): List<Payout> {
+internal fun settleBalances(balances: Map<String, Double>): List<Payout> {
     val debtors = balances.filter { it.value < -0.005 }.map { it.key to -it.value }.sortedByDescending { it.second }.toMutableList()
     val creditors = balances.filter { it.value > 0.005 }.map { it.key to it.value }.sortedByDescending { it.second }.toMutableList()
     val out = mutableListOf<Payout>()
@@ -97,182 +108,6 @@ private fun settleBalances(balances: Map<String, Double>): List<Payout> {
         if (creditors[j].second < 0.005) j++
     }
     return out
-}
-
-/** What one person owes for a bill: equal split, or their custom amount. Zero if not a participant. */
-private fun billShare(b: JsonObject, name: String): Double {
-    val people = b.strList("participants")
-    if (!people.contains(name)) return 0.0
-    if (b.str("split_mode") == "custom") {
-        val shares = b["shares"] as? JsonObject
-        return shares?.num(name) ?: 0.0
-    }
-    return b.num("total_amount") / people.size
-}
-
-/** Net position per person for one bill: the payer paid the total, every participant owes their share. */
-private fun billNet(b: JsonObject): Map<String, Double> {
-    val total = b.num("total_amount")
-    val payer = b.str("payer").trim()
-    val names = (b.strList("participants") + payer).filter { it.isNotBlank() }.distinct()
-    return names.associateWith { n -> (if (n == payer) total else 0.0) - billShare(b, n) }
-}
-
-// ======================= Bill splitter =======================
-
-@Composable
-private fun BillSplitSection(state: UiState, vm: AppViewModel) {
-    var adding by remember { mutableStateOf(false) }
-    val bills = state.rows("bill_splits")
-    val unsettled = bills.filter { !it.bool("is_settled") }
-    val p = state.privacy
-
-    // Totals across all bills that are not settled yet.
-    val overall = HashMap<String, Double>()
-    unsettled.forEach { b -> billNet(b).forEach { (k, v) -> overall[k] = (overall[k] ?: 0.0) + v } }
-    val overallPayouts = settleBalances(overall)
-
-    AddButton(tr("নতুন বিল", "New bill")) { adding = true }
-    if (unsettled.isNotEmpty()) {
-        AppCard {
-            Text(tr("অমীমাংসিত বিল: সব মিলিয়ে", "Unsettled bills, total"), fontWeight = FontWeight.Bold)
-            if (overallPayouts.isEmpty()) {
-                Text(tr("কারও কাছে কিছু পাওনা বা দেনা নেই।", "Nobody owes or is owed anything."), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                overallPayouts.forEachIndexed { i, it -> Box(Modifier.staggerIn(i)) { Text(tr("${it.from} দেবেন ${it.to}-কে: ${taka(it.amount, p)}", "${it.from} owes ${it.to}: ${taka(it.amount, p)}"), fontSize = 14.sp) }}
-            }
-        }
-    }
-    if (bills.isEmpty()) EmptyHint(tr("কোনো বিল ভাগ নেই", "No bill splits yet"))
-    bills.forEach { b -> BillCard(b, vm, p) }
-    if (adding) NewBillDialog(state, vm) { adding = false }
-}
-
-@Composable
-private fun BillCard(b: JsonObject, vm: AppViewModel, p: Boolean) {
-    val total = b.num("total_amount")
-    val custom = b.str("split_mode") == "custom"
-    val net = billNet(b)
-    val payouts = settleBalances(net)
-    val settled = b.bool("is_settled")
-    AppCard {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Column(Modifier.weight(1f)) {
-                Text(b.str("title"), fontWeight = FontWeight.Bold)
-                Text(
-                    tr("পরিশোধ করেছেন", "Paid by") + ": ${b.str("payer")} · ${displayDate(dateOf(b, "split_date"))} · ${if (custom) tr("কাস্টম ভাগ", "Custom split") else tr("সমান ভাগ", "Equal split")}",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Text(taka(total, p), fontWeight = FontWeight.Bold)
-        }
-        b.strList("participants").forEach { n -> KeyValue(tr("$n-এর ভাগ", "$n's share"), taka(billShare(b, n), p)) }
-        Text(tr("ফলাফল", "Result"), fontWeight = FontWeight.Bold, fontSize = 13.sp)
-        net.forEach { (n, v) ->
-            when {
-                v > 0.005 -> KeyValue("$n · " + tr("পাবেন", "gets back"), taka(v, p), Emerald500)
-                v < -0.005 -> KeyValue("$n · " + tr("দেবেন", "owes"), taka(-v, p), Rose500)
-                else -> KeyValue(n, tr("মিটে গেছে", "Settled"))
-            }
-        }
-        payouts.forEach { Text(tr("${it.from} → ${it.to}-কে ফেরত: ${taka(it.amount, p)}", "${it.from} → ${it.to} repays: ${taka(it.amount, p)}"), fontSize = 13.sp) }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(modifier = Modifier.pressScale(), onClick = { vm.save("bill_splits", row("is_settled" to !settled), b.id()) }) {
-                Text(if (settled) tr("অমীমাংসিত করুন", "Mark unsettled") else tr("মিটে গেছে", "Settled"))
-            }
-            DeleteButton { vm.remove("bill_splits", b.id()) }
-        }
-    }
-}
-
-@Composable
-private fun NewBillDialog(state: UiState, vm: AppViewModel, onDone: () -> Unit) {
-    var title by remember { mutableStateOf("") }
-    var total by remember { mutableStateOf("") }
-    var mode by remember { mutableStateOf("equal") }
-    var people by remember { mutableStateOf(listOf<String>()) }
-    var payer by remember { mutableStateOf("") }
-    var extra by remember { mutableStateOf(listOf<String>()) }
-    var newName by remember { mutableStateOf("") }
-    var amounts by remember { mutableStateOf(mapOf<String, String>()) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    val known = (state.rows("mess_members").map { it.str("name") } + state.rows("bill_splits").flatMap { it.strList("participants") } + extra)
-        .filter { it.isNotBlank() }
-        .distinct()
-    val t = parseAmount(total)
-    val tv = t ?: 0.0
-    val customSum = people.sumOf { parseAmount(amounts[it] ?: "") ?: 0.0 }
-
-    SharedDialog(tr("নতুন বিল ভাগ", "New bill split"), tr("সেভ", "Save"), onDismiss = onDone, onConfirm = {
-        when {
-            title.isBlank() -> error = tr("বিলের নাম লিখুন", "Enter the bill name")
-            t == null || t <= 0 -> error = tr("সঠিক মোট টাকা লিখুন", "Enter a valid total")
-            people.isEmpty() -> error = tr("অন্তত একজন অংশগ্রহণকারী বাছাই করুন", "Pick at least one participant")
-            payer !in people -> error = tr("কে পরিশোধ করেছেন তা অংশগ্রহণকারীদের মধ্য থেকে বাছাই করুন", "Pick who paid, from the participants")
-            mode == "custom" && people.any { parseAmount(amounts[it] ?: "") == null } -> error = tr("প্রত্যেকের ভাগের পরিমাণ লিখুন", "Enter each person's share")
-            mode == "custom" && kotlin.math.abs(customSum - tv) > 0.01 ->
-                error = tr("ভাগের যোগফল মোট টাকার সমান হতে হবে (এখন ${taka(customSum)})", "Shares must add up to the total (now ${taka(customSum)})")
-            else -> {
-                val shares = if (mode == "custom") {
-                    JsonObject(people.associateWith { JsonPrimitive(parseAmount(amounts[it] ?: "") ?: 0.0) })
-                } else {
-                    JsonObject(emptyMap())
-                }
-                vm.save(
-                    "bill_splits",
-                    row(
-                        "title" to title.trim(),
-                        "total_amount" to tv,
-                        "payer" to payer,
-                        "participants" to JsonArray(people.map { JsonPrimitive(it) }),
-                        "split_mode" to mode,
-                        "shares" to shares,
-                        "split_date" to todayIso()
-                    ),
-                    null
-                )
-                onDone()
-            }
-        }
-    }) {
-        TextIn(tr("বিলের নাম (যেমন: বাসা ভাড়া, খাবার)", "Bill name (e.g. rent, food)"), title, { title = it })
-        TextIn(tr("মোট টাকা (৳)", "Total amount (৳)"), total, { total = it }, number = true)
-        Text(tr("অংশগ্রহণকারী", "Participants"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (known.isNotEmpty()) {
-            ToggleChips(known, people) { n ->
-                people = if (n in people) people - n else people + n
-                if (payer !in people) payer = ""
-            }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextIn(tr("নতুন নাম", "New name"), newName, { newName = it }, modifier = Modifier.weight(1f))
-            OutlinedButton(modifier = Modifier.pressScale(), onClick = {
-                val n = newName.trim()
-                if (n.isNotEmpty()) {
-                    extra = (extra + n).distinct()
-                    if (n !in people) people = people + n
-                    newName = ""
-                }
-            }) { Text(tr("যোগ", "Add")) }
-        }
-        if (people.isNotEmpty()) {
-            Text(tr("কে পরিশোধ করেছেন", "Paid by"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            ChoiceChips(people.map { it to it }, payer) { payer = it }
-        }
-        Text(tr("ভাগের ধরন", "Split type"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        ChoiceChips(listOf("equal" to tr("সমান ভাগ", "Equal split"), "custom" to tr("কাস্টম পরিমাণ", "Custom amounts")), mode) { mode = it }
-        if (mode == "custom") {
-            people.forEach { n ->
-                TextIn(tr("$n-এর ভাগ (৳)", "$n's share (৳)"), amounts[n] ?: "", { v -> amounts = amounts + (n to v) }, number = true)
-            }
-            if (t != null) Text(tr("বাকি", "Left") + ": ${taka(tv - customSum)}", fontSize = 12.sp)
-        } else if (t != null && people.isNotEmpty()) {
-            Text(tr("জনপ্রতি", "Per person") + ": ${taka(tv / people.size)}", fontSize = 12.sp)
-        }
-        error?.let { Text(it, color = readableOn(Rose500), fontSize = 12.sp) }
-    }
 }
 
 // ======================= Shopping list =======================
@@ -633,7 +468,7 @@ private fun MonthNav(ym: YearMonth, onChange: (YearMonth) -> Unit) {
 
 /** Multi-select chips (participants). Wraps into rows of three. */
 @Composable
-private fun ToggleChips(options: List<String>, selected: List<String>, onToggle: (String) -> Unit) {
+internal fun ToggleChips(options: List<String>, selected: List<String>, onToggle: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         options.chunked(3).forEach { chunk ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -653,7 +488,7 @@ private fun ToggleChips(options: List<String>, selected: List<String>, onToggle:
 
 /** Dialog with its own confirm label (FormDialog always says সেভ). */
 @Composable
-private fun SharedDialog(
+internal fun SharedDialog(
     title: String,
     confirmLabel: String,
     onDismiss: () -> Unit,
