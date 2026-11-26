@@ -179,7 +179,7 @@ object UpdateCenter {
             when {
                 info == null -> Toast.makeText(ctx, tr("আপডেট যাচাই করা যায়নি", "Could not check for updates"), Toast.LENGTH_SHORT)
                 isNewer(info) -> offer(info)
-                else -> Toast.makeText(ctx, tr("সর্বশেষ ভার্সন ব্যবহার করছেন", "You have the latest version"), Toast.LENGTH_SHORT)
+                else -> Toast.makeText(ctx, tr("আপনার অ্যাপটি ইতিমধ্যেই সর্বশেষ আপডেট রয়েছে। নতুন কোনো আপডেট এভেইলেবল নাই।", "Your app is already up to date. No new update is available."), Toast.LENGTH_SHORT)
             }
         }
     }
@@ -409,9 +409,6 @@ private fun UpdatePrompt() {
                                 bnDigits("${info.versionName} (${info.code}) · $sizeMb"),
                                 fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            info.notes.take(4).forEach { line ->
-                                Text("• $line", fontSize = 13.sp, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
                             GradientButton(tr("🚀 এখনই আপডেট", "🚀 Update now")) { UpdateCenter.start(ctx, info) }
                             OutlinedButton(modifier = Modifier.fillMaxWidth().pressScale(), onClick = { UpdateCenter.later() }) {
                                 Text(tr("পরে", "Later"))
