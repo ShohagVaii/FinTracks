@@ -55,6 +55,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlin.math.abs
 
+// Shopping list: units and categories offered in the item sheet.
 private val shopUnits = listOf("পিস", "কেজি", "গ্রাম", "লিটার", "ডজন", "প্যাকেট")
 private val shopCategories = listOf("সবজি", "মাছ-মাংস", "মুদি", "দুধ-ডিম", "মসলা", "প্রসাধনী", "অন্যান্য")
 
