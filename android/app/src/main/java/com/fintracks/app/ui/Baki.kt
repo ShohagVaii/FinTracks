@@ -1,5 +1,8 @@
 package com.fintracks.app.ui
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
+import com.fintracks.app.ui.design.StampLabel
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.clickable
@@ -312,7 +315,7 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
             KeyValue(tr("বাকি আছে", "Balance due"), taka(balance, p), if (balance > EPS) BakiRed else BakiGreen)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 AnimatedRing(if (bought > 0) (paid / bought).toFloat().coerceIn(0f, 1f) else 0f, BakiGreen, 56.dp, 6.dp)
-                if (balance <= EPS) Box(Modifier.popIn()) { Text(tr("পরিশোধ সম্পূর্ণ", "Fully paid"), color = readableOn(BakiGreen), fontWeight = FontWeight.Bold) }
+                if (balance <= EPS) Box(Modifier.popIn()) { StampLabel(tr("শোধ", "Settled"), BakiGreen) }
             }
             if (settleCelebrate.value > 0) key(settleCelebrate.value) { Box(Modifier.fillMaxWidth().height(120.dp)) { ConfettiBurst(Modifier.matchParentSize()) } }
             KeyValue(tr("মোট কেনা", "Total bought"), taka(bought, p))
@@ -327,52 +330,59 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
             }
         }
 
-        SectionTitle(tr("কেনার তালিকা", "Purchases"))
-        if (purchases.isEmpty()) EmptyHint(tr("এখনো কোনো কেনা নেই", "No purchases yet"))
-        purchases.forEach { e ->
-            val st = settled[e.id()]
-            val status = st?.status ?: BakiStatus.ONGOING
-            val overdue = st?.overdue(today) == true
-            AppCard {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(e.str("item_name"), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    StatusChip(if (overdue) tr("মেয়াদোত্তীর্ণ", "Overdue") else status.label, if (overdue) BakiRed else status.color)
-                }
-                val lines = purchaseLines(e)
-                lines.forEach { l ->
-                    Text(
-                        "• ${l.name} · ${l.qty} × ${taka(parseAmount(l.price) ?: 0.0, p)} = ${taka(lineTotal(l), p)}",
-                        fontSize = 12.sp
-                    )
-                }
-                val adj = e.num("adjustment")
-                if (adj != 0.0) Text(tr("সমন্বয়", "Adjustment") + ": ${if (adj > 0) "+" else ""}${taka(adj, p)}", fontSize = 12.sp)
-                KeyValue(tr("মোট", "Total"), taka(e.num("total"), p))
-                KeyValue(tr("পরিশোধ", "Pay"), taka(st?.paid ?: 0.0, p), BakiGreen)
-                KeyValue(tr("বাকি", "Due"), taka(st?.remaining ?: e.num("total"), p), if ((st?.remaining ?: 0.0) > EPS) BakiRed else BakiGreen)
-                Text(
-                    tr("কেনা", "Bought") + ": ${displayDate(dateOf(e, "purchase_date"))}" + (e.strOrNull("due_date")?.take(10)?.let { " · " + tr("শেষ তারিখ", "Due") + ": ${displayDate(it)}" } ?: ""),
-                    fontSize = 11.sp,
-                    color = if (overdue) BakiRed else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (e.str("note").isNotBlank()) Text(e.str("note"), fontSize = 11.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(modifier = Modifier.pressScale(), onClick = { editingPurchase = e }) { Text(tr("সম্পাদনা", "Edit")) }
-                    DeleteButton { vm.remove("credit_entries", e.id()) }
-                }
-            }
-        }
-
-        SectionTitle(tr("পরিশোধের ইতিহাস", "Payment history"))
-        if (payments.isEmpty()) EmptyHint(tr("এখনো কোনো পরিশোধ নেই", "No payments yet"))
-        payments.sortedByDescending { it.str("paid_on") }.forEach { pay ->
-            AppCard {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column {
-                        Text(taka(pay.num("amount"), p), fontWeight = FontWeight.Bold, color = readableOn(BakiGreen))
-                        Text(displayDate(dateOf(pay, "paid_on")) + (if (pay.str("note").isNotBlank()) " · ${pay.str("note")}" else ""), fontSize = 11.sp)
+        SectionTitle(tr("খাতার পাতা", "Ledger"))
+        val lines = ledgerLines(purchases, payments, settled, today)
+        if (lines.isEmpty()) EmptyHint(tr("এখনো কোনো কেনা বা পরিশোধ নেই", "No purchases or payments yet"))
+        val paperLine = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+        Column(
+            Modifier.fillMaxWidth().ledgerPaper(paperLine).padding(start = 36.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            lines.forEach { l ->
+                Column {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                        Column(Modifier.weight(1f)) {
+                            Text(displayDate(l.date), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (l.purchase) {
+                                Text(l.row.str("item_name"), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                purchaseLines(l.row).forEach { ln ->
+                                    Text(
+                                        "• ${ln.name} · ${ln.qty} × ${taka(parseAmount(ln.price) ?: 0.0, p)} = ${taka(lineTotal(ln), p)}",
+                                        fontSize = 11.sp
+                                    )
+                                }
+                                val adj = l.row.num("adjustment")
+                                if (adj != 0.0) Text(tr("সমন্বয়", "Adjustment") + ": ${if (adj > 0) "+" else ""}${taka(adj, p)}", fontSize = 11.sp)
+                                val st = settled[l.row.id()]
+                                Text(tr("বাকি", "Due") + ": " + taka(st?.remaining ?: l.row.num("total"), p), fontSize = 11.sp)
+                                l.row.strOrNull("due_date")?.take(10)?.let {
+                                    Text(tr("শেষ তারিখ", "Due date") + ": " + displayDate(it), fontSize = 11.sp,
+                                        color = if (st?.overdue(today) == true) BakiRed else MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            } else {
+                                Text(tr("পরিশোধ", "Payment"), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = readableOn(BakiGreen))
+                                l.note?.let { Text(it, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            }
+                            if (l.row.str("note").isNotBlank()) Text(l.row.str("note"), fontSize = 11.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                (if (l.purchase) "+" else "−") + taka(l.amount, p),
+                                fontWeight = FontWeight.Bold,
+                                color = if (l.purchase) readableOn(BakiRed) else readableOn(BakiGreen)
+                            )
+                            Text(
+                                tr("জের", "Balance") + ": " + taka(l.balance, p),
+                                fontSize = 11.sp,
+                                color = if (l.balance > EPS) readableOn(BakiRed) else readableOn(BakiGreen)
+                            )
+                            l.stamp?.let { (text, color) -> Spacer(Modifier.height(4.dp)); StampLabel(text, color) }
+                        }
                     }
-                    DeleteButton { vm.remove("credit_payments", pay.id()) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        if (l.purchase) TextButton(modifier = Modifier.pressScale(), onClick = { editingPurchase = l.row }) { Text(tr("সম্পাদনা", "Edit")) }
+                        DeleteButton { vm.remove(if (l.purchase) "credit_entries" else "credit_payments", l.row.id()) }
+                    }
                 }
             }
         }
@@ -492,3 +502,74 @@ private fun PaymentDialog(shopId: String, shopName: String, balance: Double, vm:
 }
 
 private class ShopStat(val balance: Double, val open: Int, val overdue: Int)
+
+private class LedgerLine(
+    val date: String,
+    val purchase: Boolean,
+    val row: JsonObject,
+    val amount: Double,
+    val balance: Double,
+    val stamp: Pair<String, Color>?,
+    val note: String?
+)
+
+/** One mixed timeline: purchases and payments by date, with a running balance (জের). */
+private fun ledgerLines(
+    purchases: List<JsonObject>,
+    payments: List<JsonObject>,
+    settled: Map<String, Settlement>,
+    today: String
+): List<LedgerLine> {
+    val fifo = purchases.sortedWith(compareBy<JsonObject>({ it.str("purchase_date") }, { it.str("created_at") }))
+    val raw = purchases.map { Triple(it.str("purchase_date").take(10), it, true) } +
+        payments.map { Triple(it.str("paid_on").take(10), it, false) }
+    val sorted = raw.sortedWith(compareBy<Triple<String, JsonObject, Boolean>>(
+        { it.first }, { if (it.third) 0 else 1 }, { it.second.str("created_at") }
+    ))
+    val out = ArrayList<LedgerLine>()
+    var bal = 0.0
+    var cumPaid = 0.0
+    for ((date, row, isPurchase) in sorted) {
+        if (isPurchase) {
+            val total = row.num("total")
+            bal += total
+            val st = settled[row.id()]
+            val stamp: Pair<String, Color>? = when {
+                st?.overdue(today) == true -> tr("মেয়াদ-পার", "Overdue") to BakiRed
+                st?.status == BakiStatus.SETTLED -> tr("শোধ", "Settled") to BakiGreen
+                st?.status == BakiStatus.PARTIAL -> tr("আংশিক", "Partly") to BakiAmber
+                else -> null
+            }
+            out += LedgerLine(date, true, row, total, bal, stamp, null)
+        } else {
+            val amount = row.num("amount")
+            // FIFO note: the purchase where this payment's money starts landing.
+            var end = 0.0
+            var note: String? = null
+            for (e in fifo) {
+                end += e.num("total")
+                if (end > cumPaid + EPS) {
+                    note = tr("প্রথমে ${displayDate(e.str("purchase_date").take(10))}-এর কেনায় বসেছে",
+                        "Applied first to the purchase of ${displayDate(e.str("purchase_date").take(10))}")
+                    break
+                }
+            }
+            cumPaid += amount
+            bal -= amount
+            out += LedgerLine(date, false, row, amount, bal, null, note)
+        }
+    }
+    return out
+}
+
+/** Faint ruled lines every 32dp with a red margin, drawn behind the ledger column. */
+private fun Modifier.ledgerPaper(lineColor: Color): Modifier = this.drawBehind {
+    val step = 32.dp.toPx()
+    val margin = 28.dp.toPx()
+    var y = step
+    while (y < size.height) {
+        drawLine(lineColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
+        y += step
+    }
+    drawLine(BakiRed.copy(alpha = 0.25f), Offset(margin, 0f), Offset(margin, size.height), strokeWidth = 2f)
+}
