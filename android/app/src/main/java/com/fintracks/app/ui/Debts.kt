@@ -184,7 +184,6 @@ private fun openSms(ctx: Context, number: String) {
 // ---------- Shared pieces ----------
 
 @Composable
-@Composable
 private fun DebtGradientButton(text: String, enabled: Boolean, onClick: () -> Unit) {
     val fill = if (enabled) listOf(DebtViolet, DebtIndigo) else listOf(Color.Gray.copy(alpha = 0.4f), Color.Gray.copy(alpha = 0.4f))
     Box(
