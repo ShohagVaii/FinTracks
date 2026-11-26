@@ -1,5 +1,14 @@
 package com.fintracks.app.ui
 
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.ui.graphics.vector.ImageVector
 import android.Manifest
 import com.fintracks.app.data.SmsAuto
 import androidx.compose.animation.core.animateFloatAsState
@@ -213,7 +222,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
         ProfileHero(state, email, emailLoaded, uid, lastSync) { editProfile = true }
 
         if (sectionHit(tr("চেহারা", "Appearance"), tTheme, tAccent, tFull)) {
-            SettingsAccordion(tr("চেহারা", "Appearance"), themeName, isOpen("look"), { toggle("look") }) {
+            SettingsAccordion(tr("চেহারা", "Appearance"), themeName, isOpen("look"), { toggle("look") }, icon = Icons.Default.Palette) {
                 if (rowHit(tTheme)) {
                     FieldLabel(tTheme)
                     ChoiceChips(
@@ -251,7 +260,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
         }
 
         if (sectionHit(tLang, tr("ভাষা", "Language"), tr("মুদ্রা", "Currency"), tr("তারিখের ধরন", "Date format"))) {
-            SettingsAccordion(tLang, langName + " · " + currencyText, isOpen("lang"), { toggle("lang") }) {
+            SettingsAccordion(tLang, langName + " · " + currencyText, isOpen("lang"), { toggle("lang") }, icon = Icons.Default.Translate) {
                 if (rowHit(tr("ভাষা", "Language"))) {
                     FieldLabel(tr("ভাষা", "Language"))
                     ChoiceChips(listOf("bn" to "বাংলা", "en" to "English"), langStyle) { vm.saveProfile(row("language" to it)) }
@@ -275,8 +284,8 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
             SettingsAccordion(
                 tr("গোপনীয়তা ও নিরাপত্তা", "Privacy & security"),
                 if (lockOn) tr("লক চালু", "Lock on") else tr("লক বন্ধ", "Lock off"),
-                isOpen("security"), { toggle("security") }
-            ) {
+                isOpen("security"), { toggle("security") },
+                icon = Icons.Default.Shield) {
                 if (rowHit(tPriv)) {
                     SwitchRow(tPriv, state.privacy) { vm.saveProfile(row("is_privacy_mode" to it)) }
                 }
@@ -290,15 +299,15 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
         }
 
         if (rowHit(tCategories)) {
-            NavRow(tCategories, if (AppPrefs.english) "$catCount" else bnDigits(catCount.toString()) + "টি") { onPage("categories") }
+            NavRow(tCategories, if (AppPrefs.english) "$catCount" else bnDigits(catCount.toString()) + "টি", icon = Icons.Default.Category) { onPage("categories") }
         }
 
         if (sectionHit(tr("ডাটা ও ব্যাকআপ", "Data & backup"), tBackupRow, tr("এক্সপোর্ট", "Export"), tr("ব্যাকআপ", "Backup"))) {
             SettingsAccordion(
                 tr("ডাটা ও ব্যাকআপ", "Data & backup"),
                 if (AppPrefs.english) "$txCount transactions" else bnDigits(txCount.toString()) + " টি লেনদেন",
-                isOpen("data"), { toggle("data") }
-            ) {
+                isOpen("data"), { toggle("data") },
+                icon = Icons.Default.Storage) {
                 if (rowHit(tBackupRow)) {
                     SettingsAccordion(tBackupRow, "", backupOpen || q.isNotEmpty(), { backupOpen = !backupOpen }) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -339,14 +348,14 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
         }
 
         if (rowHit(tr("নোটিফিকেশন", "Notifications"))) {
-            NavRow(tr("নোটিফিকেশন", "Notifications"), "") { onPage("notifs") }
+            NavRow(tr("নোটিফিকেশন", "Notifications"), "", icon = Icons.Default.Notifications) { onPage("notifs") }
         }
         val updCtx = LocalContext.current
         if (rowHit(tr("আপডেট দেখুন", "Check for updates"))) {
-            NavRow(tr("আপডেট দেখুন", "Check for updates"), "") { UpdateCenter.manualCheck(updCtx) }
+            NavRow(tr("আপডেট দেখুন", "Check for updates"), "", icon = Icons.Default.SystemUpdate) { UpdateCenter.manualCheck(updCtx) }
         }
         if (rowHit(tHelp)) {
-            NavRow(tHelp, "") { onPage("help") }
+            NavRow(tHelp, "", icon = Icons.Default.HelpOutline) { onPage("help") }
         }
 
         AppFooter()
@@ -512,14 +521,16 @@ private fun SettingsAccordion(
     summary: String,
     expanded: Boolean,
     onToggle: () -> Unit,
+    icon: ImageVector? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val turn by animateFloatAsState(if (expanded) 180f else 0f, label = "accordionTurn")
     AppCard {
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onToggle).padding(vertical = 6.dp),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onToggle).padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            TopicIcon(icon)
             Text(title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             if (summary.isNotEmpty()) {
                 Text(summary, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
@@ -537,11 +548,25 @@ private fun SettingsAccordion(
     }
 }
 
+/** Topic icon in a small tinted circle; nothing when there is no icon. */
+@Composable
+private fun TopicIcon(icon: ImageVector?) {
+    if (icon == null) return
+    Box(
+        Modifier.size(30.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(17.dp))
+    }
+    Spacer(Modifier.width(10.dp))
+}
+
 /** A single tappable card row with a status summary and a chevron (opens a page). */
 @Composable
-private fun NavRow(title: String, summary: String, onClick: () -> Unit) {
+private fun NavRow(title: String, summary: String, icon: ImageVector? = null, onClick: () -> Unit) {
     AppCard(onClick = onClick) {
-        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            TopicIcon(icon)
             Text(title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             if (summary.isNotEmpty()) {
                 Text(summary, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
