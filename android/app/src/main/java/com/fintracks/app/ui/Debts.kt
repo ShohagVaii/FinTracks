@@ -96,6 +96,7 @@ import com.fintracks.app.data.id
 import com.fintracks.app.data.num
 import com.fintracks.app.data.row
 import com.fintracks.app.data.str
+import com.fintracks.app.data.strOrNull
 import kotlinx.serialization.json.JsonObject
 import java.time.OffsetDateTime
 import java.time.ZoneId
