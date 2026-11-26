@@ -1,5 +1,14 @@
 package com.fintracks.app.ui
 
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.clickable
+import com.fintracks.app.ui.design.SearchBox
+import com.fintracks.app.ui.design.FilterPill
+import com.fintracks.app.ui.design.StatusChip
+import com.fintracks.app.ui.design.MetricTile
+import com.fintracks.app.ui.design.GlassCard
+import com.fintracks.app.ui.design.AvatarCircle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -144,6 +153,10 @@ fun CreditDueCard(state: UiState, onOpen: () -> Unit) {
 fun BakiScreen(state: UiState, vm: AppViewModel, subPage: String, go: (String) -> Unit, onBack: () -> Unit) {
     val selectedId = subPage.ifEmpty { null }
     var addingShop by remember { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var chipFilter by rememberSaveable { mutableStateOf("all") }
+    var sortKey by rememberSaveable { mutableStateOf("due") }
+    var paying by remember { mutableStateOf<JsonObject?>(null) }
     val shop = selectedId?.let { id -> state.rows("credit_shops").firstOrNull { it.id() == id } }
     if (shop != null) {
         ShopDetail(shop, state, vm) { onBack() }
@@ -153,29 +166,92 @@ fun BakiScreen(state: UiState, vm: AppViewModel, subPage: String, go: (String) -
     val shops = state.rows("credit_shops")
     val totalDue = shops.sumOf { shopBalance(it.id(), state) }
     val overdue = bakiOverdueCount(state)
+    val today = todayIso()
+    val month = today.take(7)
+    val boughtThisMonth = state.rows("credit_entries").filter { it.str("purchase_date").startsWith(month) }.sumOf { it.num("total") }
+    val totalPaid = state.rows("credit_payments").sumOf { it.num("amount") }
+    val stats = shops.associate { s ->
+        val lines = settleShop(s.id(), state).values
+        s.id() to ShopStat(
+            balance = shopBalance(s.id(), state),
+            open = lines.count { it.status != BakiStatus.SETTLED },
+            overdue = lines.count { it.overdue(today) }
+        )
+    }
+    val q = query.trim()
+    val visible = shops.filter { s ->
+        val st = stats.getValue(s.id())
+        (q.isEmpty() || s.str("name").contains(q, true) || s.str("phone").contains(q)) &&
+            when (chipFilter) {
+                "due" -> st.balance > 0.005
+                "overdue" -> st.overdue > 0
+                else -> true
+            }
+    }.sortedWith(when (sortKey) {
+        "name" -> compareBy<JsonObject> { it.str("name") }
+        "balance" -> compareByDescending<JsonObject> { stats.getValue(it.id()).balance }
+        else -> compareByDescending<JsonObject> { stats.getValue(it.id()).overdue > 0 }
+            .thenByDescending { stats.getValue(it.id()).balance }
+    })
 
     Page {
-        AppCard {
-            Text(tr("মোট বাকি দেনা", "Total credit due"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-            Text(taka(totalDue, p), fontSize = 26.sp, fontWeight = FontWeight.Bold, color = readableOn(BakiRed))
-            if (overdue > 0) Text(tr("$overdue টি কেনার শেষ তারিখ পার হয়ে গেছে", "$overdue purchases past due date"), fontSize = 12.sp, color = readableOn(BakiRed))
-            Text(tr("ধার/লোন থেকে আলাদা হিসাব। দোকান ও ব্যক্তির বাকি এখানে।", "Separate from loans. Shop and personal credit is here."), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        GlassCard(Modifier.fillMaxWidth()) {
+            Text(tr("মোট বাকি", "Total credit due"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+            CountUpText(
+                target = totalDue,
+                format = { taka(it, p) },
+                color = readableOn(BakiRed),
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                tr("${shops.size} টি দোকান", "${shops.size} shops") +
+                    (if (overdue > 0) " · " + tr("$overdue টি মেয়াদ-পার", "$overdue overdue") else ""),
+                fontSize = 12.sp,
+                color = if (overdue > 0) readableOn(BakiRed) else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            MetricTile(tr("এই মাসে কেনা", "Bought this month"), taka(boughtThisMonth, p), Modifier.weight(1f))
+            MetricTile(tr("শোধ", "Paid"), taka(totalPaid, p), Modifier.weight(1f), Emerald500)
+            MetricTile(tr("মেয়াদ-পার", "Overdue"), overdue.toString(), Modifier.weight(1f).clickable { chipFilter = "overdue" }, Rose500)
+        }
+        SearchBox(query, { query = it }, tr("দোকান বা ফোন খুঁজুন", "Search shop or phone"))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            FilterPill(tr("সব", "All"), chipFilter == "all") { chipFilter = "all" }
+            FilterPill(tr("বাকি আছে", "Due"), chipFilter == "due") { chipFilter = "due" }
+            FilterPill(tr("মেয়াদ-পার", "Overdue"), chipFilter == "overdue") { chipFilter = "overdue" }
+            Spacer(Modifier.weight(1f))
+            val sortText = when (sortKey) {
+                "balance" -> tr("বেশি বাকি", "Highest due")
+                "name" -> tr("নাম", "Name")
+                else -> tr("মেয়াদ আগে", "Overdue first")
+            }
+            FilterPill(sortText, false) { sortKey = when (sortKey) { "due" -> "balance"; "balance" -> "name"; else -> "due" } }
         }
         AddButton(tr("নতুন দোকান", "New shop")) { addingShop = true }
         if (shops.isEmpty()) EmptyHint(tr("কোনো দোকান নেই। দোকান যোগ করে কেনা ও বাকি তুলুন।", "No shops yet. Add a shop to record purchases and credit."))
-        shops.forEach { s ->
-            val open = settleShop(s.id(), state).values.count { it.status != BakiStatus.SETTLED }
+        visible.forEach { s ->
+            val st = stats.getValue(s.id())
             AppCard(onClick = { go("ov:CREDIT/${s.id()}") }) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column {
-                        Text(s.str("name"), fontWeight = FontWeight.Bold)
-                        val sub = listOfNotNull(
-                            nonEmpty(s.str("phone")),
-                            if (open > 0) tr("$open টি কেনা খোলা আছে", "$open purchases open") else tr("সব কেনা শোধ", "All purchases settled")
-                        ).joinToString(" · ")
-                        Text(sub, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    AvatarCircle(s.str("name"), size = 44.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(s.str("name"), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.height(4.dp))
+                        when {
+                            st.overdue > 0 -> StatusChip(tr("${st.overdue} টি মেয়াদ-পার", "${st.overdue} overdue"), Rose500)
+                            st.open > 0 -> StatusChip(tr("${st.open} টি খোলা", "${st.open} open"), BakiAmber)
+                            else -> StatusChip(tr("সব শোধ", "All settled"), Emerald500)
+                        }
                     }
-                    Text(taka(shopBalance(s.id(), state), p), fontWeight = FontWeight.Bold, color = readableOn(BakiRed))
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(taka(st.balance, p), fontWeight = FontWeight.Bold, color = readableOn(BakiRed))
+                        if (st.balance > 0.005) {
+                            TextButton(onClick = { paying = s }) { Text(tr("শোধ", "Pay")) }
+                        }
+                    }
                 }
             }
         }
@@ -183,6 +259,9 @@ fun BakiScreen(state: UiState, vm: AppViewModel, subPage: String, go: (String) -
 
     if (addingShop) {
         ShopDialog(null, vm) { addingShop = false }
+    }
+    paying?.let { s ->
+        PaymentDialog(s.id(), s.str("name"), stats.getValue(s.id()).balance, vm) { paying = null }
     }
 }
 
@@ -317,13 +396,6 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
     }
 }
 
-@Composable
-private fun StatusChip(text: String, color: Color) {
-    Surface(shape = RoundedCornerShape(50), color = color.copy(alpha = 0.15f)) {
-        Text(text, Modifier.padding(horizontal = 8.dp, vertical = 3.dp), color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
 // ---------- Purchase form (একাধিক আইটেম + ± সমন্বয়) ----------
 
 @Composable
@@ -418,3 +490,5 @@ private fun PaymentDialog(shopId: String, shopName: String, balance: Double, vm:
         TextIn(tr("নোট (ঐচ্ছিক)", "Note (optional)"), note, { note = it })
     }
 }
+
+private class ShopStat(val balance: Double, val open: Int, val overdue: Int)
