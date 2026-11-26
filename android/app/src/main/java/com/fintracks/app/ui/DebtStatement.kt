@@ -48,7 +48,7 @@ internal fun statementLines(person: JsonObject, state: UiState): List<String> {
 private fun statementFile(ctx: Context, name: String): File =
     File(ctx.cacheDir, "exports").apply { mkdirs() }.let { File(it, name) }
 
-private fun shareFile(ctx: Context, file: File, mime: String) {
+internal fun shareFile(ctx: Context, file: File, mime: String) {
     val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
     val intent = Intent(Intent.ACTION_SEND)
         .setType(mime)
@@ -60,7 +60,7 @@ private fun shareFile(ctx: Context, file: File, mime: String) {
 private fun wrapStatement(lines: List<String>): List<String> = lines.flatMap { if (it.isEmpty()) listOf("") else it.chunked(72) }
 
 /** A4 PDF with the statement lines; long lines wrap and long statements continue on the next page. */
-private fun writeStatementPdf(ctx: Context, title: String, lines: List<String>): File {
+internal fun writeStatementPdf(ctx: Context, title: String, lines: List<String>): File {
     val doc = PdfDocument()
     val pageW = 595
     val pageH = 842
@@ -89,7 +89,7 @@ private fun writeStatementPdf(ctx: Context, title: String, lines: List<String>):
 }
 
 /** PNG of the same lines on a white card, 1080 px wide. */
-private fun writeStatementImage(ctx: Context, title: String, lines: List<String>): File {
+internal fun writeStatementImage(ctx: Context, title: String, lines: List<String>): File {
     val rows = wrapStatement(lines)
     val width = 1080
     val height = 160 + rows.size * 40
@@ -145,5 +145,41 @@ fun StatementShareDialog(person: JsonObject, state: UiState, onDismiss: () -> Un
         confirmButton = {},
         dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } },
         modifier = Modifier
+    )
+}
+
+/** Share any statement (title + lines) as text, PDF or PNG. Used by the shop page. */
+@Composable
+fun ShopStatementDialog(title: String, lines: List<String>, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    fun share(kind: String) {
+        try {
+            when (kind) {
+                "pdf" -> shareFile(ctx, writeStatementPdf(ctx, title, lines), "application/pdf")
+                "image" -> shareFile(ctx, writeStatementImage(ctx, title, lines), "image/png")
+                else -> ctx.startActivity(
+                    Intent.createChooser(
+                        Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, lines.joinToString("\n")),
+                        tr("খতিয়ান শেয়ার", "Share statement")
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Toast.makeText(ctx, tr("খতিয়ান তৈরি করা যায়নি", "Could not create the statement"), Toast.LENGTH_SHORT).show()
+        }
+        onDismiss()
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr("খতিয়ান শেয়ার", "Share statement"), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) },
+        text = {
+            androidx.compose.foundation.layout.Column {
+                TextButton(onClick = { share("text") }) { Text(tr("টেক্সট", "Text")) }
+                TextButton(onClick = { share("pdf") }) { Text("PDF") }
+                TextButton(onClick = { share("image") }) { Text(tr("ছবি (PNG)", "Image (PNG)")) }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("বাতিল", "Cancel")) } }
     )
 }

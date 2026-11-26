@@ -24,10 +24,12 @@ object DebtReminders {
     private const val KEY = "work_names"
     private const val HOUR = 9
 
-    fun sync(ctx: Context, dues: List<DebtDue>) {
+    /** source keeps debt and credit-shop reminders apart, so each screen only manages its own set. */
+    fun sync(ctx: Context, dues: List<DebtDue>, source: String = "debt") {
         val wm = WorkManager.getInstance(ctx)
         val prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val previous = prefs.getStringSet(KEY, emptySet()).orEmpty()
+        val key = "$KEY-$source"
+        val previous = prefs.getStringSet(key, emptySet()).orEmpty()
         val now = System.currentTimeMillis()
         val zone = ZoneId.systemDefault()
         val keep = HashSet<String>()
@@ -47,7 +49,7 @@ object DebtReminders {
             }
         }
         for (old in previous - keep) wm.cancelUniqueWork(old)
-        prefs.edit().putStringSet(KEY, keep).apply()
+        prefs.edit().putStringSet(key, keep).apply()
     }
 
     private fun enqueue(ctx: Context, name: String, delayMs: Long, title: String, body: String) {
