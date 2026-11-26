@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -21,7 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.clip
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -97,7 +98,7 @@ fun SwipeRow(
 }
 
 @Composable
-private fun BoxWithConstraintsScope.ActionBackdrop(action: SwipeAction, alignStart: Boolean) {
+private fun BoxScope.ActionBackdrop(action: SwipeAction, alignStart: Boolean) {
     Box(
         Modifier.matchParentSize().background(action.color.copy(alpha = 0.18f)).padding(horizontal = 18.dp),
         contentAlignment = if (alignStart) Alignment.CenterStart else Alignment.CenterEnd
