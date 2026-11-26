@@ -87,7 +87,7 @@ fun shopBalance(shopId: String, state: UiState): Double {
 }
 
 /** Pays the oldest purchases first. Returns purchase id to its settlement. */
-private fun settle(shopId: String, state: UiState): Map<String, Settlement> {
+private fun settleShop(shopId: String, state: UiState): Map<String, Settlement> {
     var pool = state.rows("credit_payments").filter { it.str("shop_id") == shopId }.sumOf { it.num("amount") }
     val purchases = state.rows("credit_entries").filter { it.str("shop_id") == shopId }
         .sortedWith(compareBy<JsonObject>({ it.str("purchase_date") }, { it.str("created_at") }))
@@ -104,7 +104,7 @@ private fun settle(shopId: String, state: UiState): Map<String, Settlement> {
 /** Number of purchases past their due date and still unpaid, across all shops. */
 fun bakiOverdueCount(state: UiState): Int {
     val today = todayIso()
-    return state.rows("credit_shops").sumOf { s -> settle(s.id(), state).values.count { it.overdue(today) } }
+    return state.rows("credit_shops").sumOf { s -> settleShop(s.id(), state).values.count { it.overdue(today) } }
 }
 
 /** Purchase lines. Old single-item rows (before grouping) show as one line. */
@@ -164,7 +164,7 @@ fun BakiScreen(state: UiState, vm: AppViewModel, subPage: String, go: (String) -
         AddButton(tr("নতুন দোকান", "New shop")) { addingShop = true }
         if (shops.isEmpty()) EmptyHint(tr("কোনো দোকান নেই। দোকান যোগ করে কেনা ও বাকি তুলুন।", "No shops yet. Add a shop to record purchases and credit."))
         shops.forEach { s ->
-            val open = settle(s.id(), state).values.count { it.status != BakiStatus.SETTLED }
+            val open = settleShop(s.id(), state).values.count { it.status != BakiStatus.SETTLED }
             AppCard(onClick = { go("ov:CREDIT/${s.id()}") }) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
@@ -215,7 +215,7 @@ private fun ShopDetail(shop: JsonObject, state: UiState, vm: AppViewModel, onBac
     val purchases = state.rows("credit_entries").filter { it.str("shop_id") == shop.id() }
         .sortedWith(compareByDescending<JsonObject> { it.str("purchase_date") }.thenByDescending { it.str("created_at") })
     val payments = state.rows("credit_payments").filter { it.str("shop_id") == shop.id() }
-    val settled = settle(shop.id(), state)
+    val settled = settleShop(shop.id(), state)
     val bought = purchases.sumOf { it.num("total") }
     val paid = payments.sumOf { it.num("amount") }
     val balance = bought - paid

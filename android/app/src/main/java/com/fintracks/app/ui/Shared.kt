@@ -82,7 +82,7 @@ private fun round2(v: Double): Double = Math.round(v * 100) / 100.0
  * Smallest practical set of payments that brings every balance to zero.
  * Balances must sum to zero (they do for bills and mess); positive = is owed, negative = owes.
  */
-private fun settle(balances: Map<String, Double>): List<Payout> {
+private fun settleBalances(balances: Map<String, Double>): List<Payout> {
     val debtors = balances.filter { it.value < -0.005 }.map { it.key to -it.value }.sortedByDescending { it.second }.toMutableList()
     val creditors = balances.filter { it.value > 0.005 }.map { it.key to it.value }.sortedByDescending { it.second }.toMutableList()
     val out = mutableListOf<Payout>()
@@ -130,7 +130,7 @@ private fun BillSplitSection(state: UiState, vm: AppViewModel) {
     // Totals across all bills that are not settled yet.
     val overall = HashMap<String, Double>()
     unsettled.forEach { b -> billNet(b).forEach { (k, v) -> overall[k] = (overall[k] ?: 0.0) + v } }
-    val overallPayouts = settle(overall)
+    val overallPayouts = settleBalances(overall)
 
     AddButton(tr("নতুন বিল", "New bill")) { adding = true }
     if (unsettled.isNotEmpty()) {
@@ -153,7 +153,7 @@ private fun BillCard(b: JsonObject, vm: AppViewModel, p: Boolean) {
     val total = b.num("total_amount")
     val custom = b.str("split_mode") == "custom"
     val net = billNet(b)
-    val payouts = settle(net)
+    val payouts = settleBalances(net)
     val settled = b.bool("is_settled")
     AppCard {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -398,7 +398,7 @@ private fun MessSection(state: UiState, vm: AppViewModel) {
         m.id() to (paid + cash - mealN * rate)
     }
     val nameOf = members.associate { it.id() to it.str("name") }
-    val payouts = settle(balances)
+    val payouts = settleBalances(balances)
 
     MonthNav(ym) { ym = it }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
