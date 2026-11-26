@@ -55,6 +55,7 @@ val TABLES: List<Pair<String, String>> = listOf(
     "credit_payments" to "select=*&order=paid_on.desc",
     "bill_splits" to "select=*&order=split_date.desc",
     "bill_groups" to "select=*&order=name.asc",
+    "shopping_lists" to "select=*&order=created_at.asc",
     "bill_settlements" to "select=*&order=paid_on.desc",
     "shopping_items" to "select=*",
     "mess_members" to "select=*",
@@ -78,7 +79,7 @@ private val UNDO_BN = mapOf(
     "transactions" to "লেনদেন", "accounts" to "অ্যাকাউন্ট", "budgets" to "বাজেট", "goals" to "লক্ষ্য",
     "debts" to "ধার", "debt_people" to "ধার ব্যক্তি", "debt_payments" to "ধার পরিশোধ", "loans" to "লোন", "subscriptions" to "সাবস্ক্রিপশন", "investments" to "বিনিয়োগ",
     "credit_entries" to "কেনা", "credit_payments" to "পরিশোধ", "shopping_items" to "শপিং আইটেম",
-    "bill_splits" to "বিল ভাগ", "bill_groups" to "বিল গ্রুপ", "bill_settlements" to "বিল পরিশোধ", "mess_bazaars" to "বাজার", "mess_meals" to "মিল", "mess_deposits" to "জমা",
+    "bill_splits" to "বিল ভাগ", "bill_groups" to "বিল গ্রুপ", "shopping_lists" to "শপিং তালিকা", "bill_settlements" to "বিল পরিশোধ", "mess_bazaars" to "বাজার", "mess_meals" to "মিল", "mess_deposits" to "জমা",
     "categories" to "ক্যাটাগরি", "cash_counts" to "গণনা"
 )
 private val UNDO_EN = mapOf(

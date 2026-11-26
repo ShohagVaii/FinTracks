@@ -113,7 +113,7 @@ private fun billSummaryText(b: JsonObject, net: Map<String, Double>, p: Boolean)
     return lines.joinToString("\n")
 }
 
-private fun shareText(ctx: Context, text: String) {
+internal fun shareText(ctx: Context, text: String) {
     val intent = Intent.createChooser(
         Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text),
         tr("শেয়ার", "Share")
