@@ -379,15 +379,20 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
     }
 }
 
-/** Newest first by last save or edit (local), then created_at; older rows without it fall back to the transaction date. */
+/**
+ * Newest first by the latest of: this phone's last save or edit, the server's updated_at, created_at.
+ * Rows with none of them fall back to the transaction date.
+ */
 private fun recentKey(t: JsonObject, touches: Map<String, Long>): Long {
-    touches[t.id()]?.let { return it }
-    val created = t.str("created_at")
-    if (created.isNotEmpty()) runCatching { return java.time.OffsetDateTime.parse(created).toInstant().toEpochMilli() }
+    val latest = listOfNotNull(touches[t.id()], isoMillis(t.str("updated_at")), isoMillis(t.str("created_at"))).maxOrNull()
+    if (latest != null) return latest
     return runCatching {
         java.time.LocalDate.parse(t.str("tx_date")).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
     }.getOrDefault(0L)
 }
+
+private fun isoMillis(s: String): Long? =
+    if (s.isEmpty()) null else runCatching { java.time.OffsetDateTime.parse(s).toInstant().toEpochMilli() }.getOrNull()
 
 /** Small coloured dot with a label, used under the trend chart. */
 @Composable

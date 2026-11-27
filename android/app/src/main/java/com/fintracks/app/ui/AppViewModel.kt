@@ -685,16 +685,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val extra: Map<String, JsonElement> = when (table) {
                 "debts" -> mapOf("created_at" to JsonPrimitive(nowIso()), "settled" to JsonPrimitive(false))
                 // Stamped on the phone, so a new entry sorts as "latest" before the server copy comes back.
-                "transactions" -> mapOf("created_at" to JsonPrimitive(nowIso()))
+                "transactions" -> mapOf("created_at" to JsonPrimitive(nowIso()), "updated_at" to JsonPrimitive(nowIso()))
                 else -> emptyMap()
             }
             val full = JsonObject(body + mapOf<String, JsonElement>("id" to JsonPrimitive(nid)) + extra)
             if (table == "transactions") RecentTouch.touch(getApplication(), nid)
-            return listOf(LocalOutbox.op("insert", table, nid, full, full))
+            return listOf(LocalOutbox.op("insert", table, nid, sendable(table, full), full))
         }
         val existing = state.value.rows(table).firstOrNull { it.id() == id } ?: JsonObject(emptyMap())
         if (table == "transactions") RecentTouch.touch(getApplication(), id)
-        return listOf(LocalOutbox.op("update", table, id, body, JsonObject(existing + body)))
+        val stamp = if (table == "transactions") mapOf<String, JsonElement>("updated_at" to JsonPrimitive(nowIso())) else emptyMap()
+        val change = JsonObject(body + stamp)
+        return listOf(LocalOutbox.op("update", table, id, sendable(table, change), JsonObject(existing + change)))
+    }
+
+    /** Drops the local-only updated_at from a payload while the server column is not live yet. */
+    private fun sendable(table: String, row: JsonObject): JsonObject =
+        if (table == "transactions" && !TX_UPDATED_AT_LIVE) JsonObject(row - "updated_at") else row
     }
 
     /**
@@ -709,7 +716,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (existing != null && (existing.str("source") == "bike" || linked != null)) {
             val fixed = JsonObject(body + mapOf("type" to JsonPrimitive("Expense"), "category" to JsonPrimitive(BIKE_CAT)))
             val tx = JsonObject(existing + fixed)
-            val ops = mutableListOf(BikeLink.updateOp(BikeLink.TX, existing, fixed))
+            RecentTouch.touch(getApplication(), existing.id())
+            val change = JsonObject(fixed + mapOf<String, JsonElement>("updated_at" to JsonPrimitive(nowIso())))
+            val txOp = LocalOutbox.op("update", BikeLink.TX, existing.id(), sendable(BikeLink.TX, change), JsonObject(existing + change))
+            val ops = mutableListOf(txOp)
             linked?.let { (table, entry) ->
                 ops += BikeLink.updateOp(table, entry, BikeLink.entryFieldsFromTx(table, tx, entry, ::bikeKindLabel))
             }
