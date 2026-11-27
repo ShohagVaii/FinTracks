@@ -143,7 +143,7 @@ object UpdateCenter {
             val notes = (root["body"]?.jsonPrimitive?.content ?: "").lines()
                 .map { it.trim().trimStart('#', '-', '*', ' ') }
                 .filter { it.isNotEmpty() && !it.startsWith("Signed release build") }
-                .take(4)
+                .take(12)
             UpdateInfo(versionName, code, asset["size"]?.jsonPrimitive?.long ?: 0L, notes, apkUrl)
         } catch (e: Exception) {
             null
