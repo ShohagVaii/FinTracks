@@ -104,6 +104,10 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.CircularProgressIndicator
 
 private val USERNAME_RE = Regex("^[a-z0-9_]{3,20}$")
 private val SYNC_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy hh:mm a", Locale.US)
@@ -191,6 +195,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
     var query by rememberSaveable { mutableStateOf("") }
     var openSection by rememberSaveable { mutableStateOf("") }
     var backupOpen by rememberSaveable { mutableStateOf(false) }
+    var syncing by remember { mutableStateOf(false) }
     val q = query.trim()
     fun rowHit(t: String) = q.isEmpty() || t.contains(q, ignoreCase = true)
     fun sectionHit(vararg t: String) = q.isEmpty() || t.any { rowHit(it) }
@@ -316,6 +321,18 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
                 icon = Icons.Default.Storage) {
                 if (rowHit(tBackupRow)) {
                     SettingsAccordion(tBackupRow, "", backupOpen || q.isNotEmpty(), { backupOpen = !backupOpen }) {
+            val syncStatus = if (syncing) tr("সিঙ্ক হচ্ছে…", "Syncing…") else tr("শেষ সিঙ্ক: ", "Last sync: ") + syncText(lastSync)
+            SyncNowRow(syncStatus, syncing) {
+                if (!netOnline(ctx)) {
+                    flash(tr("ইন্টারনেট নেই। সংযোগ এলে সিঙ্ক হবে।", "No internet. It will sync when you're back online."))
+                } else {
+                    syncing = true
+                    vm.syncNow { ok ->
+                        syncing = false
+                        flash(if (ok) tr("সিঙ্ক সম্পন্ন", "Sync complete") else tr("সিঙ্ক ব্যর্থ হয়েছে", "Sync failed"))
+                    }
+                }
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(Export.Format.XLSX to "Excel", Export.Format.PDF to "PDF", Export.Format.CSV to "CSV").forEach { (fmt, label) ->
                     OutlinedButton(enabled = !exporting, onClick = {
@@ -867,4 +884,40 @@ private fun SlideInPage(content: @Composable () -> Unit) {
         enter = if (reduce) EnterTransition.None else slideInHorizontally(tween(300)) { it / 4 } + fadeIn(tween(300)),
         exit = ExitTransition.None
     ) { content() }
+}
+
+/** Row that starts a manual sync: spinner and disabled while a sync runs (no double sync). */
+@Composable
+private fun SyncNowRow(status: String, busy: Boolean, onClick: () -> Unit) {
+    val reduce = rememberReduceMotion()
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+            .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+            .clickable(enabled = !busy, onClick = onClick)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        when {
+            busy && !reduce -> CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+            else -> Icon(
+                Icons.Default.Sync, contentDescription = null,
+                tint = if (busy) muted else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        Column(Modifier.weight(1f)) {
+            Text(tr("এখনই সিঙ্ক করুন", "Sync now"), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(status, color = muted, fontSize = 12.sp)
+        }
+    }
+}
+
+/** True when the device reports an internet-capable network. */
+private fun netOnline(ctx: Context): Boolean {
+    val cm = ctx.getSystemService(ConnectivityManager::class.java) ?: return true
+    val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+    return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
 }

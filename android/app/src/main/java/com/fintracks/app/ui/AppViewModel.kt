@@ -413,22 +413,38 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun unlinkIdentity(identityId: String) = repo.unlinkIdentity(identityId)
     suspend fun changePassword(email: String, current: String, new: String) = repo.changePassword(email, current, new)
 
-    /** Refreshes every table now. Settings uses this for the manual sync button. */
-    fun syncNow() = act {
+    /** Refreshes every table now. Settings uses this for the manual sync button; [onDone] gets true on success. */
+    fun syncNow(onDone: (Boolean) -> Unit = {}) = act {
+        var ok = false
+        try {
+            ok = syncBody()
+        } finally {
+            onDone(ok)
+        }
+    }
+
+    private suspend fun syncBody(): Boolean {
+        var ok = true
         processAttachments()
         val r = outbox.flush()
-        if (r.dropped > 0) _state.update { it.copy(syncError = refusedText(r.dropped)) }
+        if (r.dropped > 0) {
+            ok = false
+            _state.update { it.copy(syncError = refusedText(r.dropped)) }
+        }
         if (!r.drained) {
+            ok = false
             _state.update { it.copy(syncError = tr("ইন্টারনেট নেই। সংযোগ এলে সিঙ্ক হবে।", "No internet. It will sync when you're back online.")) }
-            return@act
+            return false
         }
         try {
             refreshTables()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            ok = false
             _state.update { it.copy(syncError = offlineNotice(e)) }
         }
+        return ok
     }
 
     /**
