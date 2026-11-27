@@ -25,6 +25,7 @@ import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.util.Locale
 import kotlin.math.abs
+import android.graphics.BitmapFactory
 
 /**
  * FinTrack voucher: TRX ID, checksum, QR payload, the server registry record, and the A4 renderer
@@ -264,8 +265,11 @@ object Voucher {
             shader = LinearGradient(L, 0f, R, 0f, Color.parseColor("#0A1A33"), Color.parseColor("#0066B3"), Shader.TileMode.CLAMP)
         }
         c.drawPath(headPath, grad)
-        c.drawText("FINTRACK PREMIUM", 60f, 76f, text(ctx, 24f, "#FFFFFF", true))
-        c.drawText(subtitle, 60f, 102f, text(ctx, 13f, "#A5F3FC", true))
+        BitmapFactory.decodeResource(ctx.resources, com.fintracks.app.R.drawable.fintrack_mark)?.let { mark ->
+            c.drawBitmap(mark, null, RectF(26f, 18f, 26f + 96f, 18f + 96f), null)
+        }
+        c.drawText("FINTRACK PREMIUM", 132f, 76f, text(ctx, 24f, "#FFFFFF", true))
+        c.drawText(subtitle, 132f, 102f, text(ctx, 13f, "#A5F3FC", true))
 
         val chipP = text(ctx, 12f, "#FFFFFF", true, Paint.Align.CENTER)
         val w = chipP.measureText(chip) + 32f

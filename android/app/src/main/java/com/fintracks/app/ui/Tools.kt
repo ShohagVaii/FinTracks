@@ -91,6 +91,9 @@ import kotlinx.serialization.json.JsonObject
 import java.util.Locale
 import kotlin.math.pow
 import kotlin.math.roundToLong
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
 
 /** Audited constants. Tax: Finance Act 2026, assessment year 2026-27. Zakat: nisab in grams (gold 87.48 g, silver 612.36 g). */
 object Web {
@@ -562,12 +565,20 @@ private fun IntelligenceCard(onOpen: () -> Unit) {
  * No large brand block here; the app name is only in the header.
  */
 @Composable
-internal fun AppFooter() {
+internal fun AppFooter(withLogo: Boolean = false) {
     Column(
         Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        if (withLogo) {
+            Image(
+                painter = painterResource(com.fintracks.app.R.drawable.fintrack_logo),
+                contentDescription = "FinTrack",
+                modifier = Modifier.height(64.dp),
+                contentScale = ContentScale.Fit
+            )
+        }
         val uri = LocalUriHandler.current
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             SocialButton(FacebookGlyph, "Facebook") { uri.openUri(FACEBOOK_URL) }

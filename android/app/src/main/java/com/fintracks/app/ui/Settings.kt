@@ -381,7 +381,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel, page: String, onPage: (Stri
             NavRow(tHelp, "", icon = Icons.Default.HelpOutline) { onPage("help") }
         }
 
-        AppFooter()
+        AppFooter(withLogo = true)
         // Logout is the last row, in its own rose band.
         LogoutRow { vm.signOut() }
     }

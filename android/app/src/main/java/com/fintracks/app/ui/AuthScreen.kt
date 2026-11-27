@@ -91,6 +91,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.sin
+import androidx.compose.ui.layout.ContentScale
 
 // Colours taken from the approved Sign-in / Sign-up / Welcome references (Drive folder "Sign-up / Login").
 private val auSkyA = Color(0xFF38BDF8)
@@ -637,26 +638,15 @@ private fun AuthCardScene(
 
 // ---------- Shared pieces ----------
 
-/** Logo drawn with shapes: white F with a blue rising arrow. */
+/** FinTrack arrow-F mark (site/assets, Concept C). */
 @Composable
 internal fun AuLogoMark(modifier: Modifier) {
-    Canvas(modifier) {
-        val s = size.minDimension / 100f
-        val white = Color.White
-        val arrow = Color(0xFF1E90FF)
-        // Thick white F: stem and top bar only. The F's middle stroke is the blue arrow shaft, which
-        // starts at the stem and rises to the upper right; no separate shaft and no coin in the mark.
-        drawRoundRect(white, Offset(28f * s, 30f * s), Size(14f * s, 54f * s), CornerRadius(3f * s))
-        drawRoundRect(white, Offset(28f * s, 30f * s), Size(44f * s, 12f * s), CornerRadius(4f * s))
-        drawLine(arrow, Offset(38f * s, 58f * s), Offset(70f * s, 28f * s), strokeWidth = 9f * s, cap = StrokeCap.Round)
-        val head = Path().apply {
-            moveTo(84f * s, 14f * s)
-            lineTo(56f * s, 18f * s)
-            lineTo(80f * s, 42f * s)
-            close()
-        }
-        drawPath(head, arrow)
-    }
+    Image(
+        painter = painterResource(R.drawable.fintrack_mark),
+        contentDescription = "FinTrack",
+        modifier = modifier,
+        contentScale = ContentScale.Fit
+    )
 }
 
 /** Input with a floating label: the label rises above the text once focused or filled. */
