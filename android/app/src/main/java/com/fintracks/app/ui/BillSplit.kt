@@ -479,6 +479,8 @@ private fun NewBillDialog(state: UiState, vm: AppViewModel, onDone: () -> Unit) 
                 if (people.isNotEmpty() && subtotal > 0) {
                     people.forEach { n -> KeyValue(n, taka(billShare(draft, n))) }
                     KeyValue(tr("মোট সহ", "Grand total"), taka(grand))
+                    // Who pays whom, from the same draft math as the saved bill.
+                    PayoutDiagram(settleBalances(billNet(draft, emptyList())), state.privacy)
                 }
                 if (people.contains("আমি")) {
                     FilterPill(tr("আমার ভাগ আমার লেনদেনে যোগ", "Add my share to my transactions"), addToTx) { addToTx = !addToTx }
