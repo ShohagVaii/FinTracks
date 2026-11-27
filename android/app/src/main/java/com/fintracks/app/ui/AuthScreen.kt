@@ -832,8 +832,11 @@ private val splashSky = Color(0xFF39C7E0)
 fun SplashScreen(onSkip: () -> Unit) {
     val reduce = rememberReduceMotion()
     val show = remember { Animatable(if (reduce) 1f else 0f) }
+    // Shows the logo once, then hands over to the app. A tap skips the wait.
     LaunchedEffect(Unit) {
         if (!reduce) show.animateTo(1f, tween(600, easing = FastOutSlowInEasing))
+        delay(120)
+        onSkip()
     }
     Box(
         Modifier.fillMaxSize().background(auBg()).clickable(onClick = onSkip),

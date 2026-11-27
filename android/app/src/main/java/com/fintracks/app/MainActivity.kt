@@ -10,7 +10,7 @@ import com.fintracks.app.ui.DailyReminder
 import com.fintracks.app.ui.BirthdayWish
 import com.fintracks.app.ui.DailySyncWorker
 import com.fintracks.app.data.PushRouter
-import com.fintracks.app.ui.FinTracksApp
+import com.fintracks.app.ui.FinTracksRoot
 
 /** FragmentActivity is required by BiometricPrompt. */
 class MainActivity : FragmentActivity() {
@@ -21,7 +21,7 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         com.fintracks.app.ui.Immersive.load(this)
         if (savedInstanceState == null && AppLock.isEnabled(this)) AppLock.lock()
-        setContent { FinTracksApp() }
+        setContent { FinTracksRoot() }
         PushRouter.put(intent?.getStringExtra(PushRouter.EXTRA_TARGET))
         // Background work is queued after the first frame, so it never delays the home screen.
         window.decorView.post {
