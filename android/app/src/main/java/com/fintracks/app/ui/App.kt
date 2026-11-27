@@ -100,7 +100,6 @@ enum class Overlay(private val bnTitle: String, private val enTitle: String) {
 /** A success moment to show over the app. A new object each time, so repeated saves replay it. */
 class Celebrate(val kind: Int)
 
-@Composable
 /** Root: the in-app logo splash first, then the app. Shown once per launch (not again on rotation). */
 @Composable
 fun FinTracksRoot() {
@@ -108,6 +107,7 @@ fun FinTracksRoot() {
     if (splashDone) FinTracksApp() else SplashScreen { splashDone = true }
 }
 
+@Composable
 fun FinTracksApp(vm: AppViewModel = viewModel()) {
     UpdateHost()
     val state by vm.state.collectAsState()
