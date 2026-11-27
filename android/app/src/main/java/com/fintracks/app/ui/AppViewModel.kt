@@ -180,11 +180,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             it.copy(
                 signedIn = true,
                 tables = liveTables(merged),
-                trash = trashedTables(merged),
+                trash = mergedTrash(trashedTables(merged)),
                 profile = merged["profiles"]?.firstOrNull() ?: it.profile,
                 pendingSms = pendingSms ?: it.pendingSms,
                 notice = notice ?: it.notice
             )
+        }
+    }
+
+    /** Trash shown to the user: server-side trash (notes, cash counts) plus the local Trash. */
+    private fun mergedTrash(server: Map<String, List<JsonObject>>): Map<String, List<JsonObject>> {
+        val local = LocalTrash.read(getApplication(), repo.currentUid())
+        return (server.keys + local.keys).associateWith { t ->
+            (server[t].orEmpty() + local[t].orEmpty()).distinctBy { it.id() }
+        }
+    }
+
+    /**
+     * Older builds kept deleted rows on the server. Those rows move to the local Trash and their server
+     * copies are deleted (sent by the next outbox run). Returns the live rows only.
+     */
+    private fun moveLegacyTrash(fetched: Map<String, List<JsonObject>>): Map<String, List<JsonObject>> {
+        val app = getApplication<Application>()
+        val uid = repo.currentUid()
+        val legacy = fetched.flatMap { (t, rows) ->
+            if (t in LOCAL_TRASH_TABLES) rows.filter { it.str("deleted_at").isNotEmpty() }.map { t to it } else emptyList()
+        }
+        legacy.forEach { (t, r) -> LocalTrash.add(app, uid, t, r) }
+        if (legacy.isNotEmpty()) outbox.enqueue(legacy.map { (t, r) -> LocalOutbox.op("delete", t, r.id()) })
+        return fetched.mapValues { (t, rows) ->
+            if (t in LOCAL_TRASH_TABLES) rows.filter { it.str("deleted_at").isEmpty() } else rows
         }
     }
 
@@ -236,9 +261,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // debt_payments is optional until its migration is applied; keep the last known rows if it could not be read.
         val tables = if ("debt_payments" in fetched) fetched
             else fetched + ("debt_payments" to outbox.cached()["debt_payments"].orEmpty())
+        val live = moveLegacyTrash(tables)
         Sync.markOk(getApplication<Application>())
         serverProfile = repo.list("profiles", "select=*&id=eq.${repo.uid()}").firstOrNull() ?: serverProfile
-        val base = tables + ("profiles" to listOfNotNull(serverProfile))
+        val base = live + ("profiles" to listOfNotNull(serverProfile))
         outbox.remember(base)
         publish(base)
         _state.update { it.copy(syncError = null) }
@@ -729,11 +755,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (table !in TRASH_TABLES) return LocalOutbox.op("delete", table, id)
         val existing = state.value.rows(table).firstOrNull { it.id() == id } ?: return null
         val body = row("deleted_at" to stamp)
-        return LocalOutbox.op("update", table, id, body, JsonObject(existing + body))
+        if (table in SERVER_TRASH_TABLES) return LocalOutbox.op("update", table, id, body, JsonObject(existing + body))
+        // The Trash is local only: keep the copy on the phone and delete the server row.
+        LocalTrash.add(getApplication(), repo.currentUid(), table, JsonObject(existing + body))
+        return LocalOutbox.op("delete", table, id)
     }
 
     /** The change that brings one trashed row back. */
     private fun restoreOp(table: String, trashed: JsonObject): JsonObject {
+        if (table !in SERVER_TRASH_TABLES) {
+            // Local Trash: the server row is missing, so restore re-inserts the saved copy.
+            LocalTrash.remove(getApplication(), repo.currentUid(), table, trashed.id())
+            val copy = JsonObject(trashed.filterKeys { it != "deleted_at" })
+            return LocalOutbox.op("insert", table, trashed.id(), copy, copy)
+        }
         val body = JsonObject(mapOf("deleted_at" to JsonNull))
         return LocalOutbox.op("update", table, trashed.id(), body, JsonObject(trashed + body))
     }
@@ -750,6 +785,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Removes everything from the given deletions for good. Children go first. */
     fun purgeTrash(stamps: Set<String>) {
+        LocalTrash.removeStamps(getApplication(), repo.currentUid(), stamps)
         val hit = state.value.trash.flatMap { (t, rows) ->
             rows.filter { it.str("deleted_at") in stamps }.map { t to it }
         }.sortedBy { TRASH_PURGE_ORDER.indexOf(it.first) }
