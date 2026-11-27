@@ -702,7 +702,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Drops the local-only updated_at from a payload while the server column is not live yet. */
     private fun sendable(table: String, row: JsonObject): JsonObject =
         if (table == "transactions" && !TX_UPDATED_AT_LIVE) JsonObject(row - "updated_at") else row
-    }
 
     /**
      * Bike category on a transaction. A linked bike expense keeps its category and mirrors amount, date and note
