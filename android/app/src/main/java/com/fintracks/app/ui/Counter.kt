@@ -103,6 +103,7 @@ private fun countFromRow(o: JsonObject): CountRecord? {
  */
 class CashCountStore(ctx: Context, private val repo: Repository, private val scope: CoroutineScope) {
     private val prefs = ctx.applicationContext.getSharedPreferences("fintrack_counter", Context.MODE_PRIVATE)
+    private val localCtx: Context = ctx.applicationContext
     private val lock = Mutex()
     private var rows: List<JsonObject> = emptyList()      // local copy of cash_counts rows
     private var pending: List<JsonObject> = emptyList()   // {op, id, row?} not yet on the server
@@ -117,6 +118,7 @@ class CashCountStore(ctx: Context, private val repo: Repository, private val sco
     val trashed: StateFlow<List<JsonObject>> = _trashed.asStateFlow()
 
     private fun key(): String = "counter-" + (runCatching { repo.uid() }.getOrDefault("anon"))
+    private fun uidNow(): String = runCatching { repo.uid() }.getOrDefault("")
 
     private fun ensureLoaded() {
         val k = key()
@@ -149,7 +151,7 @@ class CashCountStore(ctx: Context, private val repo: Repository, private val sco
 
     private fun publish() {
         _records.value = rows.filter { it.str("deleted_at").isEmpty() }.mapNotNull { countFromRow(it) }.sortedByDescending { it.at }
-        _trashed.value = rows.filter { it.str("deleted_at").isNotEmpty() }
+        _trashed.value = LocalTrash.read(localCtx, uidNow())["cash_counts"].orEmpty().sortedByDescending { it.str("deleted_at") }
         _pendingCount.value = pending.size
     }
 
@@ -166,15 +168,23 @@ class CashCountStore(ctx: Context, private val repo: Repository, private val sco
         return sync()
     }
 
-    /** Moves counts to the Trash (or back, when [stamp] is null). Each change is queued for the server. */
+    /** Trash is local only: trashing removes the server row and keeps a copy here; restoring re-inserts it. */
     private fun setTrash(ids: List<String>, stamp: String?) {
         synchronized(this) {
             ensureLoaded()
             for (id in ids) {
-                val old = rows.firstOrNull { it.id() == id } ?: continue
-                val r = JsonObject(old + ("deleted_at" to JsonPrimitive(stamp)))
-                rows = rows.filterNot { it.id() == id } + r
-                pending = pending.filterNot { it.str("id") == id } + row("op" to "upsert", "id" to id, "row" to r)
+                if (stamp != null) {
+                    val old = rows.firstOrNull { it.id() == id } ?: continue
+                    LocalTrash.add(localCtx, uidNow(), "cash_counts", JsonObject(old + ("deleted_at" to JsonPrimitive(stamp))))
+                    rows = rows.filterNot { it.id() == id }
+                    pending = pending.filterNot { it.str("id") == id } + row("op" to "delete", "id" to id)
+                } else {
+                    val old = LocalTrash.read(localCtx, uidNow())["cash_counts"].orEmpty().firstOrNull { it.id() == id } ?: continue
+                    LocalTrash.remove(localCtx, uidNow(), "cash_counts", id)
+                    val r = JsonObject(old.filterKeys { it != "deleted_at" })
+                    rows = rows.filterNot { it.id() == id } + r
+                    pending = pending.filterNot { it.str("id") == id } + row("op" to "upsert", "id" to id, "row" to r)
+                }
             }
             persist(); publish()
         }
@@ -188,7 +198,8 @@ class CashCountStore(ctx: Context, private val repo: Repository, private val sco
 
     /** Brings back every count that went to the Trash at [stamp]. */
     suspend fun restore(stamp: String): Boolean {
-        setTrash(rows.filter { it.str("deleted_at") == stamp }.map { it.id() }, null)
+        val ids = LocalTrash.read(localCtx, uidNow())["cash_counts"].orEmpty().filter { it.str("deleted_at") == stamp }.map { it.id() }
+        setTrash(ids, null)
         return sync()
     }
 
@@ -197,6 +208,7 @@ class CashCountStore(ctx: Context, private val repo: Repository, private val sco
         synchronized(this) {
             ensureLoaded()
             rows = rows.filterNot { it.id() == id }
+            LocalTrash.remove(localCtx, uidNow(), "cash_counts", id)
             pending = pending.filterNot { it.str("id") == id } + row("op" to "delete", "id" to id)
             persist(); publish()
         }
@@ -229,7 +241,11 @@ class CashCountStore(ctx: Context, private val repo: Repository, private val sco
             synchronized(this) {
                 val pendingIds = pending.map { it.str("id") }.toSet()
                 val localPending = rows.filter { it.id() in pendingIds }
-                rows = server.filter { it.id() !in pendingIds } + localPending
+                // Older builds kept trashed counts on the server: move them to the local Trash and delete the server copy.
+                val legacy = server.filter { it.str("deleted_at").isNotEmpty() }
+                legacy.forEach { LocalTrash.add(localCtx, uidNow(), "cash_counts", it) }
+                pending = pending + legacy.map { row("op" to "delete", "id" to it.id()) }
+                rows = server.filter { it.str("deleted_at").isEmpty() && it.id() !in pendingIds } + localPending
                 persist(); publish()
             }
         }

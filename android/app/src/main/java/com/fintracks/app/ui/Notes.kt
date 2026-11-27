@@ -135,6 +135,7 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
     val trashed: StateFlow<List<JsonObject>> = _trashed.asStateFlow()
 
     private fun key(): String = "notes-" + (runCatching { repo.uid() }.getOrDefault("anon"))
+    private fun uidNow(): String = runCatching { repo.uid() }.getOrDefault("")
 
     /** Clears the in-memory copy (used by the app reset). */
     fun reset() = synchronized(this) {
@@ -177,7 +178,7 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
 
     private fun publish() {
         _notes.value = cache.filter { it.str("deleted_at").isEmpty() }.sortedWith(compareByDescending<JsonObject> { it.bool("pinned") }.thenByDescending { timestamp(it) })
-        _trashed.value = cache.filter { it.str("deleted_at").isNotEmpty() }.sortedByDescending { it.str("deleted_at") }
+        _trashed.value = LocalTrash.read(ctx, uidNow())["notes"].orEmpty().sortedByDescending { it.str("deleted_at") }
         _pendingCount.value = pending.size + photoUploads.size + photoDeletes.size
     }
 
@@ -209,7 +210,7 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
     }
 
     private fun photosOf(nid: String): List<String> =
-        (cache.firstOrNull { it.id() == nid }?.get("attachments") as? JsonArray).orEmpty()
+        ((cache.firstOrNull { it.id() == nid } ?: LocalTrash.read(ctx, uidNow())["notes"].orEmpty().firstOrNull { it.id() == nid })?.get("attachments") as? JsonArray).orEmpty()
             .mapNotNull { (it as? JsonPrimitive)?.content }
 
     /** Creates or updates a note. Returns the note id. */
@@ -253,16 +254,25 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
 
     /** Brings back every note that went to the Trash at [stamp]. */
     fun restoreStamp(stamp: String) {
-        cache.filter { it.str("deleted_at") == stamp }.forEach { setTrash(it.id(), null) }
+        LocalTrash.read(ctx, uidNow())["notes"].orEmpty().filter { it.str("deleted_at") == stamp }.forEach { setTrash(it.id(), null) }
     }
 
+    /** Trash is local only: trashing removes the server row and keeps a copy here; restoring re-inserts it. */
     private fun setTrash(id: String, stamp: String?) {
         synchronized(this) {
             ensureLoaded()
-            val old = cache.firstOrNull { it.id() == id } ?: return@synchronized
-            val note = JsonObject(old + ("deleted_at" to JsonPrimitive(stamp)))
-            cache = cache.filterNot { it.id() == id } + note
-            pending = pending.filterNot { it.str("id") == id } + row("op" to "upsert", "id" to id, "note" to note)
+            if (stamp != null) {
+                val old = cache.firstOrNull { it.id() == id } ?: return@synchronized
+                LocalTrash.add(ctx, uidNow(), "notes", JsonObject(old + ("deleted_at" to JsonPrimitive(stamp))))
+                cache = cache.filterNot { it.id() == id }
+                pending = pending.filterNot { it.str("id") == id } + row("op" to "delete", "id" to id)
+            } else {
+                val old = LocalTrash.read(ctx, uidNow())["notes"].orEmpty().firstOrNull { it.id() == id } ?: return@synchronized
+                LocalTrash.remove(ctx, uidNow(), "notes", id)
+                val note = JsonObject(old.filterKeys { it != "deleted_at" })
+                cache = cache.filterNot { it.id() == id } + note
+                pending = pending.filterNot { it.str("id") == id } + row("op" to "upsert", "id" to id, "note" to note)
+            }
             persist()
             publish()
             scope.launch { sync() }
@@ -277,6 +287,7 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
             else photoDeletes = photoDeletes + path
         }
         cache = cache.filterNot { it.id() == id }
+        LocalTrash.remove(ctx, uidNow(), "notes", id)
         pending = pending.filterNot { it.str("id") == id } + row("op" to "delete", "id" to id)
         persist()
         publish()
@@ -336,7 +347,11 @@ class NotesStore(private val ctx: Context, private val repo: Repository, private
         synchronized(this) {
             val pendingIds = pending.map { it.str("id") }.toSet()
             val localPending = cache.filter { it.id() in pendingIds }
-            cache = server.filter { it.id() !in pendingIds } + localPending
+            // Older builds kept trashed notes on the server: move them to the local Trash and delete the server copy.
+            val legacy = server.filter { it.str("deleted_at").isNotEmpty() }
+            legacy.forEach { LocalTrash.add(ctx, uidNow(), "notes", it) }
+            pending = pending + legacy.map { row("op" to "delete", "id" to it.id()) }
+            cache = server.filter { it.str("deleted_at").isEmpty() && it.id() !in pendingIds } + localPending
             persist()
             publish()
         }
