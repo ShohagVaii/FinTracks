@@ -466,35 +466,16 @@ fun DataUsageScreen() {
             if (picked != null) {
                 Box(Modifier.fillMaxWidth().height(1.dp).background(faint(0.1f)))
                 Text(slotTitle(period, picked.slot), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconValue(Icons.Default.CellTower, DuCyan, "", duShort(picked.mRx + picked.mTx))
+                    IconValue(Icons.Default.Wifi, DuPurple, "", duShort(picked.wRx + picked.wTx))
+                }
                 val pickedApps = slotApps.filter { showSystem || !it.system }.take(5)
                 val peak = pickedApps.maxOfOrNull { it.bytes } ?: 0L
                 if (pickedApps.isEmpty()) {
                     Text(tr("এই সময়ে ডাটা ব্যবহারের তথ্য নেই", "No data usage in this period"), color = muted, fontSize = 13.sp)
                 }
                 pickedApps.forEach { app -> AppRow(app, peak) { openApp = it } }
-            }
-        }
-
-        // Daily (or hourly) history: mobile and Wi-Fi per row; tap a row to select it.
-        if (usage.isNotEmpty()) {
-            Text(tr("ইতিহাস", "History"), fontWeight = FontWeight.Bold)
-            usage.indices.reversed().forEach { i ->
-                val u = usage[i]
-                val on = selected == i
-                Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                        .background(if (on) DuCyan.copy(alpha = 0.12f) else cardBg)
-                        .border(1.dp, if (on) DuCyan.copy(alpha = 0.5f) else cardBorder, RoundedCornerShape(16.dp))
-                        .clickable { selected = if (on) -1 else i }.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(slotTitle(period, u.slot), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        IconValue(Icons.Default.CellTower, DuCyan, "", duShort(u.mRx + u.mTx))
-                        IconValue(Icons.Default.Wifi, DuPurple, "", duShort(u.wRx + u.wTx))
-                    }
-                }
             }
         }
 
