@@ -54,6 +54,10 @@ import com.fintracks.app.ui.design.UndoBar
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlin.math.abs
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.padding
 
 // Shopping list: units and categories offered in the item sheet.
 private val shopUnits = listOf("পিস", "কেজি", "গ্রাম", "লিটার", "ডজন", "প্যাকেট")
@@ -212,14 +216,14 @@ internal fun ShoppingSection(state: UiState, vm: AppViewModel) {
         AppCard {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextIn(tr("জিনিস যোগ করুন", "Add items"), quick, { quick = it }, modifier = Modifier.weight(1f))
-                TextButton(onClick = {
+                IconButton(onClick = {
                     runCatching {
                         voice.launch(
                             Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
                         )
                     }
-                }) { Text(tr("ভয়েস", "Voice")) }
+                }) { Icon(Icons.Default.Mic, contentDescription = tr("ভয়েস", "Voice"), tint = Emerald500) }
                 Button(
                     enabled = quick.isNotBlank(),
                     onClick = {
@@ -301,12 +305,14 @@ internal fun ShoppingSection(state: UiState, vm: AppViewModel) {
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(modifier = Modifier.pressScale(), onClick = { shareText(ctx, shoppingListText(l, items, p)) }) { Text(tr("শেয়ার", "Share")) }
-            OutlinedButton(modifier = Modifier.pressScale(), onClick = { pickingMember = true }) { Text(tr("মেস বাজার", "Mess bazaar")) }
-            OutlinedButton(modifier = Modifier.pressScale(), onClick = { editingList = true }) { Text(tr("সম্পাদনা", "Edit")) }
-            OutlinedButton(modifier = Modifier.pressScale(), onClick = { vm.save("shopping_lists", row("archived" to true), id) }) { Text(tr("আর্কাইভ", "Archive")) }
-            DeleteButton { vm.remove("shopping_lists", id) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(modifier = Modifier.weight(1f).pressScale(), onClick = { shareText(ctx, shoppingListText(l, items, p)) }) { Text(tr("শেয়ার", "Share"), maxLines = 1) }
+            OutlinedButton(modifier = Modifier.weight(1f).pressScale(), onClick = { pickingMember = true }) { Text(tr("মেস বাজার", "Mess bazaar"), maxLines = 1) }
+            OutlinedButton(modifier = Modifier.weight(1f).pressScale(), onClick = { editingList = true }) { Text(tr("সম্পাদনা", "Edit"), maxLines = 1) }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(modifier = Modifier.weight(1f).pressScale(), onClick = { vm.save("shopping_lists", row("archived" to true), id) }) { Text(tr("আর্কাইভ", "Archive"), maxLines = 1) }
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { DeleteButton { vm.remove("shopping_lists", id) } }
         }
         if (pickingMember) MessBazaarDialog(state, vm, l.str("name"), if (spent > 0) spent else est) { pickingMember = false }
         if (editingList) ListDialog(l, vm) { editingList = false }
@@ -343,7 +349,11 @@ private fun ShoppingItemRow(
     }
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onEdit),
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f))
+            .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+            .padding(start = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -356,7 +366,7 @@ private fun ShoppingItemRow(
             )
         }
         Box(Modifier.size(8.dp).clip(CircleShape).background(priority))
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f).clickable(onClick = onEdit).padding(vertical = 10.dp)) {
             Text(
                 item.str("name"),
                 fontWeight = FontWeight.Bold,
@@ -372,7 +382,7 @@ private fun ShoppingItemRow(
             )
         }
         IconButton(onClick = onDelete) {
-            Icon(Icons.Default.Delete, contentDescription = tr("মুছুন", "Delete"))
+            Icon(Icons.Default.Delete, contentDescription = tr("মুছুন", "Delete"), tint = Rose500)
         }
     }
 }
