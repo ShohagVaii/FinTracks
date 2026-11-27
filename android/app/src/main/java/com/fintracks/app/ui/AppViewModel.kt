@@ -147,6 +147,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val savedDemo = getApplication<Application>().getSharedPreferences("fintracks", Context.MODE_PRIVATE).getBoolean("demo_mode", false)
         _state.update { it.copy(signedIn = hasSession, checking = false, demo = savedDemo) }
         if (hasSession) publish(outbox.cached())
+        if (hasSession) purgeExpiredTrash()
         viewModelScope.launch { outbox.pendingCount.collect { n -> _state.update { it.copy(pendingSync = n) } } }
         if (hasSession) viewModelScope.launch { runGuarded { loadAll() } }
         watchNetwork()
@@ -785,8 +786,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Removes everything from the given deletions for good. Children go first. */
     fun purgeTrash(stamps: Set<String>) {
-        LocalTrash.removeStamps(getApplication(), repo.currentUid(), stamps)
-        val hit = state.value.trash.flatMap { (t, rows) ->
+        val ctx = getApplication<Application>()
+        val uid = repo.currentUid()
+        // Notes and cash counts first: their own purge also removes photos and local copies.
+        LocalTrash.read(ctx, uid)["notes"].orEmpty().filter { it.str("deleted_at") in stamps }.forEach { notes.purge(it.id()) }
+        LocalTrash.read(ctx, uid)["cash_counts"].orEmpty().filter { it.str("deleted_at") in stamps }.forEach { cashCounts.purgeLocal(it.id()) }
+        LocalTrash.removeStamps(ctx, uid, stamps)
+        // Notes and cash counts are not in the server outbox any more; their server rows are already gone.
+        val hit = state.value.trash.filterKeys { it !in SERVER_TRASH_TABLES }.flatMap { (t, rows) ->
             rows.filter { it.str("deleted_at") in stamps }.map { t to it }
         }.sortedBy { TRASH_PURGE_ORDER.indexOf(it.first) }
         val ops = hit.map { (t, r) ->
@@ -794,10 +801,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             LocalOutbox.op("delete", t, r.id())
         }
         if (ops.isNotEmpty()) localChange(ops)
-        notes.trashed.value.filter { it.str("deleted_at") in stamps }.forEach { notes.purge(it.id()) }
-        viewModelScope.launch {
-            cashCounts.trashed.value.filter { it.str("deleted_at") in stamps }.forEach { cashCounts.purge(it.id()) }
-        }
     }
 
     /** Removes everything in the Trash for good. */
@@ -806,10 +809,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         purgeTrash(all.map { it.str("deleted_at") }.toSet())
     }
 
-    /** Removes items that stayed in the Trash for 30 days. Runs on every refresh. */
-    private fun purgeExpiredTrash() {
-        val all = state.value.trash.values.flatten() + notes.trashed.value + cashCounts.trashed.value
-        val stamps = all.map { it.str("deleted_at") }.filter { trashExpired(it) }.toSet()
+    /**
+     * Removes items that stayed in the Trash for 30 days. The Trash is local, so this reads the phone's
+     * copy and needs no network. Runs at app start, when the Trash opens, and on every refresh.
+     */
+    fun purgeExpiredTrash() {
+        val local = LocalTrash.read(getApplication(), repo.currentUid())
+        val stamps = local.values.flatten().map { it.str("deleted_at") }.filter { trashExpired(it) }.toSet()
         if (stamps.isNotEmpty()) purgeTrash(stamps)
     }
 

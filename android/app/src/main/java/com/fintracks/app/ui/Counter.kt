@@ -204,14 +204,17 @@ class CashCountStore(ctx: Context, private val repo: Repository, private val sco
     }
 
     /** Removes a count for good. */
+    /** Local part of [purge]: works offline, the server delete is sent at the next sync. */
+    fun purgeLocal(id: String) = synchronized(this) {
+        ensureLoaded()
+        rows = rows.filterNot { it.id() == id }
+        LocalTrash.remove(localCtx, uidNow(), "cash_counts", id)
+        pending = pending.filterNot { it.str("id") == id } + row("op" to "delete", "id" to id)
+        persist(); publish()
+    }
+
     suspend fun purge(id: String): Boolean {
-        synchronized(this) {
-            ensureLoaded()
-            rows = rows.filterNot { it.id() == id }
-            LocalTrash.remove(localCtx, uidNow(), "cash_counts", id)
-            pending = pending.filterNot { it.str("id") == id } + row("op" to "delete", "id" to id)
-            persist(); publish()
-        }
+        purgeLocal(id)
         return sync()
     }
 
