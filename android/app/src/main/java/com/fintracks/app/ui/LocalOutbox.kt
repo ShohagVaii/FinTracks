@@ -19,8 +19,11 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import java.io.File
 
-/** Result of one send run: drained = nothing left in the queue; dropped = refused by the server. */
-data class FlushResult(val drained: Boolean, val dropped: Int)
+/**
+ * Result of one send run. drained = the run was not cut short by a network/session problem.
+ * pending = changes still on the phone. refused = changes the server rejected this run (they stay queued).
+ */
+data class FlushResult(val drained: Boolean, val pending: Int, val refused: Int, val refusedTables: Set<String>)
 
 /**
  * Local-first store for every table (see README in the Notes of AppViewModel).
@@ -161,33 +164,35 @@ class LocalOutbox(ctx: Context, private val repo: Repository) {
     }
 
     /**
-     * Sends the queue in order. Stops at the first network failure. A refused run is re-sent row by row,
-     * so only the refused row is dropped; a refused change also drops the rest of its group.
+     * Sends the queue in order. Stops at the first network failure. A change the server refuses is NOT dropped:
+     * it stays on the phone and is sent again on the next run, and the rest of the queue still goes on.
+     * A refused change also holds back the rest of its group, so a group is never half-sent.
      */
     suspend fun flush(): FlushResult = lock.withLock {
         val queue = synchronized(this) { ensureLoaded(); pending }
-        var done = 0
-        var dropped = 0
+        val keep = mutableListOf<JsonObject>()
+        val refusedTables = mutableSetOf<String>()
+        var refused = 0
         var drained = true
         var rejectedGroup: String? = null
         var i = 0
         while (i < queue.size) {
             val op = queue[i]
             val group = op.str("group")
-            if (group.isNotEmpty() && group == rejectedGroup) { done++; dropped++; i++; continue }
+            if (group.isNotEmpty() && group == rejectedGroup) { keep.add(op); i++; continue }
             val run = insertRun(queue, i)
             when (trySend(run)) {
-                Outcome.SENT -> { done += run.size; i += run.size }
+                Outcome.SENT -> i += run.size
                 Outcome.RETRY -> { drained = false; break }
                 Outcome.REFUSED -> {
                     if (run.size == 1) {
-                        done++; dropped++; i++
+                        keep.add(op); refused++; refusedTables.add(op.str("table")); i++
                         if (group.isNotEmpty()) rejectedGroup = group
                     } else {
                         // Only this one row is sent alone; the rest of the run is tried again from the next row.
                         when (trySend(listOf(op))) {
-                            Outcome.SENT -> { done++; i++ }
-                            Outcome.REFUSED -> { done++; dropped++; i++ }
+                            Outcome.SENT -> i++
+                            Outcome.REFUSED -> { keep.add(op); refused++; refusedTables.add(op.str("table")); i++ }
                             Outcome.RETRY -> { drained = false; break }
                         }
                     }
@@ -196,11 +201,12 @@ class LocalOutbox(ctx: Context, private val repo: Repository) {
         }
         synchronized(this) {
             ensureLoaded()
-            pending = pending.drop(done)
+            // Kept (refused) rows, then the unsent rest of the queue, then anything saved during this run.
+            pending = keep + queue.subList(i, queue.size) + pending.drop(queue.size)
             persist()
             _pendingCount.value = pending.size
         }
-        FlushResult(drained && synchronized(this) { pending.isEmpty() }, dropped)
+        FlushResult(drained, synchronized(this) { pending.size }, refused, refusedTables)
     }
 
     companion object {

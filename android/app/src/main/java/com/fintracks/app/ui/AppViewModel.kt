@@ -427,9 +427,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         var ok = true
         processAttachments()
         val r = outbox.flush()
-        if (r.dropped > 0) {
+        if (r.refused > 0) {
             ok = false
-            _state.update { it.copy(syncError = refusedText(r.dropped)) }
+            _state.update { it.copy(syncError = refusedText(r.refused, r.refusedTables)) }
         }
         if (!r.drained) {
             ok = false
@@ -564,8 +564,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return result
     }
 
-    private fun refusedText(n: Int): String =
-        tr("সার্ভার $n টি পরিবর্তন গ্রহণ করেনি, সেগুলো বাতিল হয়েছে", "The server refused $n change(s); they were removed.")
+    /** Server refused some queued changes. They stay on the phone and are sent again on the next sync. */
+    private fun refusedText(n: Int, tables: Set<String>): String {
+        val names = tables.map { tableLabel(it) }.sorted().joinToString(", ")
+        return tr(
+            "সার্ভার $n টি পরিবর্তন নেয়নি ($names)। ফোনেই আছে, পরের সিঙ্কে আবার চেষ্টা হবে।",
+            "The server did not accept $n change(s) ($names). They stay on this phone and will retry on the next sync."
+        )
+    }
+
+    private fun tableLabel(table: String): String =
+        if (AppPrefs.english) UNDO_EN[table] ?: table else UNDO_BN[table] ?: table
 
     /**
      * After a local save: the toast ("done") is shown because the change is already saved on the phone.
@@ -574,7 +583,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun reportSync(result: FlushResult, done: String?) {
         _state.update { s ->
             when {
-                result.dropped > 0 -> s.copy(syncError = refusedText(result.dropped))
+                result.refused > 0 -> s.copy(syncError = refusedText(result.refused, result.refusedTables))
                 result.drained -> s.copy(syncError = null, notice = done ?: s.notice)
                 else -> s.copy(notice = done ?: s.notice)
             }
