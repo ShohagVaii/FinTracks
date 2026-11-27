@@ -370,11 +370,20 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
         Column(Modifier.staggerIn(11), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(tr("সাম্প্রতিক লেনদেন", "Recent transactions"))
         if (txs.isEmpty()) EmptyHint(tr("এখনো কোনো লেনদেন নেই। নিচের + বাটন দিয়ে যোগ করুন।", "No transactions yet. Add one with the + button below."))
-        txs.take(5).forEach { t -> TxItem(t, state, onClick = { openReceipt(t) }, onLongClick = { onTxLongPress(t) }) }
+        txs.sortedByDescending { recentKey(it) }.take(5).forEach { t -> TxItem(t, state, onClick = { openReceipt(t) }, onLongClick = { onTxLongPress(t) }) }
         }
         AppFooter()
         Spacer(Modifier.height(90.dp))
     }
+}
+
+/** Newest first by when the entry was saved (created_at); older rows without it fall back to the transaction date. */
+private fun recentKey(t: JsonObject): Long {
+    val created = t.str("created_at")
+    if (created.isNotEmpty()) runCatching { return java.time.OffsetDateTime.parse(created).toInstant().toEpochMilli() }
+    return runCatching {
+        java.time.LocalDate.parse(t.str("tx_date")).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+    }.getOrDefault(0L)
 }
 
 /** Small coloured dot with a label, used under the trend chart. */

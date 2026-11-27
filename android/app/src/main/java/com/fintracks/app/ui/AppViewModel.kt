@@ -646,8 +646,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (table == BikeLink.TX) bikeTxOps(body, id)?.let { return it }
         if (id == null) {
             val nid = body.str("id").ifEmpty { newId() }
-            val extra: Map<String, JsonElement> = if (table == "debts")
-                mapOf("created_at" to JsonPrimitive(nowIso()), "settled" to JsonPrimitive(false)) else emptyMap()
+            val extra: Map<String, JsonElement> = when (table) {
+                "debts" -> mapOf("created_at" to JsonPrimitive(nowIso()), "settled" to JsonPrimitive(false))
+                // Stamped on the phone, so a new entry sorts as "latest" before the server copy comes back.
+                "transactions" -> mapOf("created_at" to JsonPrimitive(nowIso()))
+                else -> emptyMap()
+            }
             val full = JsonObject(body + mapOf<String, JsonElement>("id" to JsonPrimitive(nid)) + extra)
             return listOf(LocalOutbox.op("insert", table, nid, full, full))
         }
