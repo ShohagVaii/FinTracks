@@ -173,6 +173,8 @@ private data class DashStats(val income: Double, val expense: Double, val total:
 @Composable
 fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> Unit, openReceipt: (JsonObject) -> Unit, onTxLongPress: (JsonObject) -> Unit, openOverlay: (Overlay) -> Unit) {
     val txs = state.rows("transactions")
+    val touchCtx = LocalContext.current
+    val touches = remember(state.tables) { RecentTouch.all(touchCtx) }
     val accounts = state.rows("accounts")
     val p = state.privacy
     val month = monthPrefix()
@@ -370,15 +372,16 @@ fun DashboardScreen(state: UiState, vm: AppViewModel, openTx: (JsonObject?) -> U
         Column(Modifier.staggerIn(11), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(tr("সাম্প্রতিক লেনদেন", "Recent transactions"))
         if (txs.isEmpty()) EmptyHint(tr("এখনো কোনো লেনদেন নেই। নিচের + বাটন দিয়ে যোগ করুন।", "No transactions yet. Add one with the + button below."))
-        txs.sortedByDescending { recentKey(it) }.take(5).forEach { t -> TxItem(t, state, onClick = { openReceipt(t) }, onLongClick = { onTxLongPress(t) }) }
+        txs.sortedByDescending { recentKey(it, touches) }.take(5).forEach { t -> TxItem(t, state, onClick = { openReceipt(t) }, onLongClick = { onTxLongPress(t) }) }
         }
         AppFooter()
         Spacer(Modifier.height(90.dp))
     }
 }
 
-/** Newest first by when the entry was saved (created_at); older rows without it fall back to the transaction date. */
-private fun recentKey(t: JsonObject): Long {
+/** Newest first by last save or edit (local), then created_at; older rows without it fall back to the transaction date. */
+private fun recentKey(t: JsonObject, touches: Map<String, Long>): Long {
+    touches[t.id()]?.let { return it }
     val created = t.str("created_at")
     if (created.isNotEmpty()) runCatching { return java.time.OffsetDateTime.parse(created).toInstant().toEpochMilli() }
     return runCatching {

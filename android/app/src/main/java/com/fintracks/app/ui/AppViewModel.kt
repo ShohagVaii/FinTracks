@@ -662,9 +662,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 else -> emptyMap()
             }
             val full = JsonObject(body + mapOf<String, JsonElement>("id" to JsonPrimitive(nid)) + extra)
+            if (table == "transactions") RecentTouch.touch(getApplication(), nid)
             return listOf(LocalOutbox.op("insert", table, nid, full, full))
         }
         val existing = state.value.rows(table).firstOrNull { it.id() == id } ?: JsonObject(emptyMap())
+        if (table == "transactions") RecentTouch.touch(getApplication(), id)
         return listOf(LocalOutbox.op("update", table, id, body, JsonObject(existing + body)))
     }
 
