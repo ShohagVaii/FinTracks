@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import com.fintracks.app.data.DataPackEntity
+import com.fintracks.app.data.FinTrackRoom
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.CallLog
@@ -80,10 +82,47 @@ data class PackProfile(
 
 object PackStore {
     private const val PREFS = "fintrack_pack"
+    private const val K_SAVED = "savedAt"
+    private val io = java.util.concurrent.Executors.newSingleThreadExecutor()
+    /** Latest copy in Room, as read or last written. Room is only touched on the background thread. */
+    @Volatile private var roomRow: DataPackEntity? = null
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    /**
+     * Opens the Room copy in the background. The first time, the SharedPreferences profile is copied into Room;
+     * after that the newer of the two copies is written to the other side.
+     */
+    fun warm(ctx: Context) {
+        val app = ctx.applicationContext
+        io.execute {
+            runCatching {
+                val dao = FinTrackRoom.get(app).dataPack()
+                val p = prefs(app)
+                val prefSaved = p.getLong(K_SAVED, 0L)
+                val prefPayload = p.getString("profile", null)
+                val row = dao.get()
+                if (row == null) {
+                    if (prefPayload != null) {
+                        val fresh = DataPackEntity(payload = prefPayload, savedAt = prefSaved)
+                        dao.put(fresh)
+                        roomRow = fresh
+                    }
+                } else if (row.savedAt > prefSaved) {
+                    roomRow = row
+                    p.edit().putString("profile", row.payload).putLong(K_SAVED, row.savedAt).apply()
+                } else {
+                    roomRow = row
+                }
+            }
+        }
+    }
+
+    /** Reads both copies and uses the newer one. */
     fun load(ctx: Context): PackProfile? {
-        val s = prefs(ctx).getString("profile", null) ?: return null
+        val p = prefs(ctx)
+        val room = roomRow
+        val s = if (room != null && room.savedAt > p.getLong(K_SAVED, 0L)) room.payload
+            else p.getString("profile", null) ?: return null
         return runCatching {
             val o = JSONObject(s)
             PackProfile(
@@ -95,13 +134,20 @@ object PackStore {
         }.getOrNull()
     }
 
+    /** Writes the profile to SharedPreferences and, in the background, to Room. */
     fun save(ctx: Context, p: PackProfile) {
         val o = JSONObject()
             .put("gb", p.gb).put("price", p.price).put("start", p.start).put("days", p.days)
             .put("settled", p.settled).put("alert80", p.alert80).put("alertRisk", p.alertRisk)
             .put("cycleDay", p.cycleDay).put("dailyGb", p.dailyGb).put("quotaDay", p.quotaDay)
             .put("quota80", p.quota80).put("quota100", p.quota100)
-        prefs(ctx).edit().putString("profile", o.toString()).apply()
+        val payload = o.toString()
+        val now = System.currentTimeMillis()
+        val app = ctx.applicationContext
+        prefs(app).edit().putString("profile", payload).putLong(K_SAVED, now).apply()
+        val row = DataPackEntity(payload = payload, savedAt = now)
+        roomRow = row
+        io.execute { runCatching { FinTrackRoom.get(app).dataPack().put(row) } }
     }
 
     fun appendHistory(ctx: Context, p: PackProfile, usedBytes: Long) {

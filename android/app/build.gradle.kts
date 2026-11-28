@@ -4,6 +4,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.gms.google-services")
+    id("com.google.devtools.ksp")
 }
 
 // Release signing comes from environment variables set by CI (GitHub Secrets). No secret, no release key.
@@ -73,6 +74,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
     // QR codes for receipts (free, Apache-2.0)
     implementation("com.google.zxing:core:3.5.3")
     // On-device receipt OCR (free, works offline)
