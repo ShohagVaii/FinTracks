@@ -148,6 +148,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(signedIn = hasSession, checking = false, demo = savedDemo) }
         if (hasSession) publish(outbox.cached())
         if (hasSession) purgeExpiredTrash()
+        CatStore.onChange = { viewModelScope.launch(Dispatchers.IO) { syncCatStore() } }
         viewModelScope.launch { outbox.pendingCount.collect { n -> _state.update { it.copy(pendingSync = n) } } }
         if (hasSession) viewModelScope.launch { runGuarded { loadAll() } }
         watchNetwork()
@@ -271,6 +272,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(syncError = null) }
         syncRegistry(state.value.profile, liveTables(tables)["transactions"].orEmpty())
         purgeExpiredTrash()
+        syncCatStore()
+    }
+
+    /**
+     * Category and payment-method overrides: pull when the server copy is newer, push when this phone's copy is
+     * newer (last write wins by updated_at). Off until the migration is live; a failed request is retried later.
+     */
+    private suspend fun syncCatStore() {
+        if (!SETTINGS_SYNC_LIVE || repo.session == null) return
+        val rows = runCatching { repo.list("user_settings", "select=value,updated_at&key=eq.catstore_v1") }.getOrNull() ?: return
+        val row = rows.firstOrNull()
+        val serverMs = row?.str("updated_at")?.let { runCatching { java.time.OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull() } ?: 0L
+        val local = CatStore.stampMs()
+        if (row != null && serverMs > local) { CatStore.applyRemote(row.str("value"), serverMs); return }
+        if (local > serverMs) {
+            val stamp = java.time.Instant.ofEpochMilli(local).toString()
+            val body = JsonObject(mapOf<String, JsonElement>(
+                "key" to JsonPrimitive("catstore_v1"), "value" to JsonPrimitive(CatStore.snapshot()), "updated_at" to JsonPrimitive(stamp)
+            ))
+            runCatching { repo.upsert("user_settings", listOf(body), "user_id,key") }
+        }
     }
 
     /**
