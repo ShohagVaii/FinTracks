@@ -9,7 +9,7 @@ import org.json.JSONObject
  * True once supabase/migrations/20261128000100_user_settings.sql is applied live. Until then the overrides
  * stay on this phone only, exactly as before, and no sync request is made.
  */
-internal const val SETTINGS_SYNC_LIVE = false
+internal const val SETTINGS_SYNC_LIVE = true
 
 /** One built-in category as it is shown now: [orig] is the built-in name (the key), [name] and [icon] are the current values. */
 data class DefRow(val type: String, val orig: String, val name: String, val icon: String)
