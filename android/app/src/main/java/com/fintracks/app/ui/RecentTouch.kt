@@ -10,7 +10,7 @@ import android.content.Context
  * True once supabase/migrations/20261126000600_transactions_updated_at.sql is applied live. Until then
  * updated_at stays on the phone only (the local stamp below is the fallback), so saves are not refused.
  */
-internal const val TX_UPDATED_AT_LIVE = false
+internal const val TX_UPDATED_AT_LIVE = true
 
 internal object RecentTouch {
     private const val KEY = "tx_touch"
